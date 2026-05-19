@@ -1,0 +1,42 @@
+{
+  "name": "MindSpark Game",
+  "short_name": "MindSpark",
+  "description": "A 2D/3D anime-inspired browser RPG - Quiz Adventure Game",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#041008",
+  "theme_color": "#00441b",
+  "orientation": "portrait-primary",
+  "categories": ["games", "education"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Play Game",
+      "short_name": "Play",
+      "description": "Start your adventure",
+      "url": "/game",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your profile and stats",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

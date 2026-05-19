@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base resets ───────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #041008;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #041008; }
+::-webkit-scrollbar-thumb  { background: #238b45; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #74c476; }
+
+/* ── Game-specific utilities ───────────────────────────────────────────────── */
+@layer utilities {
+  .text-neon-glow {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .border-neon-glow {
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .glass {
+    background: rgba(229, 245, 224, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(199, 233, 192, 0.18);
+  }
+
+  .game-panel {
+    background: linear-gradient(135deg, rgba(229,245,224,0.10) 0%, rgba(65,171,93,0.05) 100%);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(199,233,192,0.18);
+    border-radius: 1rem;
+  }
+
+  .scanline::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.05) 2px,
+      rgba(0,0,0,0.05) 4px
+    );
+    pointer-events: none;
+    border-radius: inherit;
+  }
+}
+
+/* ── Canvas full-screen fix ────────────────────────────────────────────────── */
+canvas {
+  display: block;
+  outline: none;
+}

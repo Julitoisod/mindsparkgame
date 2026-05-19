@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MindSpark</string>
+    <string name="title_activity_main">MindSpark</string>
+    <string name="package_name">com.mindspark.game</string>
+    <string name="custom_url_scheme">com.mindspark.game</string>
+</resources>
