@@ -133,7 +133,7 @@
 
     // Fetch teacher-granted level unlocks for all students
     const studentIds = rows.map(r => r.id)
-    let unlockMap: Record<number, number[]> = {}
+    const unlockMap: Record<number, number[]> = {}
     if (studentIds.length > 0) {
       const placeholders = studentIds.map(() => '?').join(',')
       const unlockRows = await query<{ student_id: number; level_number: number }>(

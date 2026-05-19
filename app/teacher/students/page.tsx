@@ -708,7 +708,7 @@ export default function TeacherStudentsPage() {
                           const completedByStudent = student.progress.completedLevels.includes(levelNum)
                           const unlockedByTeacher = student.teacherUnlockedLevels.includes(levelNum)
                           const autoUnlocked = levelNum <= student.progress.levelsCompleted + 1
-                          const isUnlocked = completedByStudent || unlockedByTeacher || autoUnlocked
+                          const _isUnlocked = completedByStudent || unlockedByTeacher || autoUnlocked // eslint-disable-line @typescript-eslint/no-unused-vars
                           const loadingKey = `${student.id}-${levelNum}`
                           const isLoading = unlockingLevel === loadingKey
 

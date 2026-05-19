@@ -13,7 +13,6 @@ import {
   Heart,
   Lock,
   Map as MapIcon,
-  PlayCircle,
   RotateCcw,
   Shield,
   Sparkles,
@@ -83,13 +82,6 @@ const MAX_BOSS_HP = 100
 const NORMAL_POINTS = 10
 const NORMAL_EXP = 12
 const BOSS_DAMAGE = 20
-const MAP_NODE_POSITIONS = [
-  { left: '12%', top: '68%' },
-  { left: '30%', top: '30%' },
-  { left: '50%', top: '52%' },
-  { left: '70%', top: '30%' },
-  { left: '88%', top: '68%' },
-] as const
 const FALLBACK_CHARACTER_STATS: CharacterStats = {
   hp: 100,
   maxHp: 100,
@@ -512,8 +504,8 @@ export default function QuizAdventure({
   const [completedLevels, setCompletedLevels] = useState<number[]>([])
   const [teacherUnlockedLevels, setTeacherUnlockedLevels] = useState<number[]>([])
   const [progressLoaded, setProgressLoaded] = useState(!characterId)
-  const [progressSaving, setProgressSaving] = useState(false)
-  const [progressError, setProgressError] = useState<string | null>(null)
+  const [progressSaving, setProgressSaving] = useState(false) // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [progressError, setProgressError] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [showLevelUp, setShowLevelUp] = useState(false)
   const [levelStars, setLevelStars] = useState<Record<number, number>>({})
   const [earnedBadges, setEarnedBadges] = useState<string[]>([])

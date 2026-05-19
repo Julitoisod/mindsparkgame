@@ -7,9 +7,7 @@ import {
   Calendar,
   Clock,
   Star,
-  Sword,
   Shield,
-  Zap,
   Trophy,
   Lock,
 } from 'lucide-react'
@@ -17,7 +15,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import Card from '@/components/ui/Card'
 import { characterOptions } from '@/lib/characterOptions'
-import { BADGES, getBadgeById } from '@/lib/badges'
+import { BADGES } from '@/lib/badges'
 
 import type { CharacterData, CharacterStats } from '@/types/character'
 
@@ -33,7 +31,7 @@ interface CharacterAccess {
 }
 
 export default function DashboardProfilePage() {
-  const { user, isAuthed, logout } = useAuth()
+  const { user, isAuthed } = useAuth()
   const [character, setCharacter] = useState<CharacterData | null>(null)
   const [progress, setProgress] = useState<GameProgress | null>(null)
   const [access, setAccess] = useState<CharacterAccess>({ starBalance: 0, ownedClasses: [] })
