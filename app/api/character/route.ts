@@ -129,19 +129,24 @@ async function readCharacter(userId: number, characterId: number) {
 }
 
 export async function GET() {
-  const session = await requireEnrolledStudent()
-  if (!session) return NextResponse.json({ success: false, message: 'Enrolled student access required' }, { status: 403 })
+  try {
+    const session = await requireEnrolledStudent()
+    if (!session) return NextResponse.json({ success: false, message: 'Enrolled student access required' }, { status: 403 })
 
-  const rows = await getCharacters(session.userId)
-  const activeClass = rows[0]?.class ?? null
-  const meta = await getCharacterMeta(session.userId, activeClass)
+    const rows = await getCharacters(session.userId)
+    const activeClass = rows[0]?.class ?? null
+    const meta = await getCharacterMeta(session.userId, activeClass)
 
-  return NextResponse.json({
-    success: true,
-    message: 'OK',
-    data: rows.map(publicCharacter),
-    meta,
-  })
+    return NextResponse.json({
+      success: true,
+      message: 'OK',
+      data: rows.map(publicCharacter),
+      meta,
+    })
+  } catch (error) {
+    console.error('[API /api/character GET]', error)
+    return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })
+  }
 }
 
 export async function POST(request: Request) {

@@ -9,7 +9,6 @@ import {
   History,
   Map,
   Menu,
-  Package,
   Play,
   Star,
   Store,
@@ -54,7 +53,6 @@ const navItems = [
   { id: 'profile', label: 'Profile', icon: User, href: '/dashboard/profile' },
   { id: 'store', label: 'Store', icon: Store, href: '/dashboard/store' },
   { id: 'attempts', label: 'Attempts', icon: History, href: '/dashboard/attempts' },
-  { id: 'inventory', label: 'Inventory', icon: Package, href: '/dashboard/inventory' },
 ]
 
 export default function DashboardLayout({
@@ -240,6 +238,9 @@ function MobileStats() {
           setAccess(normalizeAccess(json.meta, json.data[0].class))
         }
       })
+      .catch(() => {
+        // Silently handle fetch failures
+      })
   }, [user?.role])
 
   const completedLevels = progress?.completedLevels ?? []
@@ -271,6 +272,10 @@ function DashboardStats() {
         if (json.success && json.data?.length) {
           setAccess(normalizeAccess(json.meta, json.data[0].class))
         }
+        loadProgress?.()
+      })
+      .catch(() => {
+        // Silently handle fetch failures (e.g. DB not running, network issues)
         loadProgress?.()
       })
   }, [user?.role, loadProgress])

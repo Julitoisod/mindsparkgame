@@ -6,11 +6,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Award,
   CheckCircle2,
-  Coins,
   Crown,
   Flame,
-  Gem,
-  Heart,
   Lock,
   Map as MapIcon,
   RotateCcw,
@@ -356,7 +353,7 @@ function StatPill({
 }) {
   return (
     <div
-      className="flex min-w-0 items-center gap-1 sm:gap-1.5 lg:gap-2 rounded-md sm:rounded-lg border border-primary-100/15 bg-[#041008]/35 px-1 sm:px-2 lg:px-3 shadow-card backdrop-blur-md"
+      className="flex flex-1 min-w-0 items-center gap-1 sm:gap-1.5 lg:gap-2 rounded-md sm:rounded-lg border border-primary-100/15 bg-[#041008]/35 px-1 sm:px-2 lg:px-3 shadow-card backdrop-blur-md"
       style={{ height: 'clamp(24px, 5.5dvh, 44px)' }}
     >
       <span className={`flex shrink-0 items-center justify-center rounded sm:rounded-md ${tone}`} style={{ height: 'clamp(14px, 3.5dvh, 28px)', width: 'clamp(14px, 3.5dvh, 28px)' }}>{icon}</span>
@@ -1043,7 +1040,7 @@ export default function QuizAdventure({
       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#041008] to-transparent" />
 
       <div className="relative z-10 flex h-full w-full flex-col px-1.5 py-1 sm:px-4 sm:py-2 lg:px-6">
-        <div className="shrink-0 grid grid-cols-8 gap-1 sm:gap-1.5 lg:gap-2">
+        <div className="shrink-0 flex flex-row items-center gap-1 sm:gap-1.5 lg:gap-2">
           <StatPill
             icon={<Crown className="h-3 w-3 sm:h-4 sm:w-4" />}
             label="Level"
@@ -1051,9 +1048,9 @@ export default function QuizAdventure({
             tone="bg-primary-300/20 text-primary-100"
           />
           <StatPill
-            icon={<Heart className="h-3 w-3 sm:h-4 sm:w-4 fill-current" />}
-            label="Hearts"
-            value={`${hearts}/${MAX_HEARTS}`}
+            icon={<Swords className="h-3 w-3 sm:h-4 sm:w-4" />}
+            label="Quiz"
+            value={`${questionIndex + 1}/${QUESTIONS_PER_PHASE}`}
             tone="bg-primary-400/20 text-primary-100"
           />
           <StatPill
@@ -1063,38 +1060,11 @@ export default function QuizAdventure({
             tone="bg-primary-200/20 text-primary-100"
           />
           <StatPill
-            icon={<Gem className="h-3 w-3 sm:h-4 sm:w-4" />}
-            label="Gems"
-            value={gems}
-            tone="bg-primary-400/20 text-primary-100"
-          />
-          <StatPill
-            icon={<Coins className="h-3 w-3 sm:h-4 sm:w-4" />}
-            label="Coins"
-            value={coins}
-            tone="bg-primary-500/20 text-primary-100"
-          />
-          <StatPill
-            icon={<Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />}
-            label="EXP"
-            value={exp}
-            tone="bg-primary-400/20 text-primary-100"
-          />
-          <StatPill
             icon={<Trophy className="h-3 w-3 sm:h-4 sm:w-4" />}
-            label="Score"
+            label="Points"
             value={score}
             tone="bg-primary-300/20 text-primary-100"
           />
-          <button
-            type="button"
-            onClick={resetGame}
-            className="flex items-center justify-center gap-1 rounded-md sm:rounded-lg border border-primary-200/20 bg-primary-950/40 px-1.5 font-bold text-white shadow-card backdrop-blur-md transition hover:bg-primary-200/10 focus:outline-none focus:ring-2 focus:ring-primary-300"
-            style={{ height: 'clamp(24px, 5.5dvh, 44px)', fontSize: 'clamp(8px, 1.8dvh, 14px)' }}
-          >
-            <RotateCcw className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4" />
-            <span className="hidden sm:inline">Reset</span>
-          </button>
         </div>
 
         <main className="flex-1 min-h-0 flex flex-row gap-[1dvh] sm:gap-3 lg:gap-4 pt-[0.5dvh] sm:pt-2 pb-[0.5dvh]">

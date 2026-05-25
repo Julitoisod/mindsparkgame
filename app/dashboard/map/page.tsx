@@ -51,6 +51,9 @@ export default function DashboardMapPage() {
           })
         }
       })
+      .catch(() => {
+        // Handle fetch failures gracefully (network/DB issues)
+      })
       .finally(() => setReady(true))
   }, [authLoading, isAuthed, router, user?.role])
 
