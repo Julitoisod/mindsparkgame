@@ -490,9 +490,6 @@ export default function QuizAdventure({
   const [score, setScore] = useState(0)
   const [stars, setStars] = useState(0)
   const [savedStarBalance, setSavedStarBalance] = useState(0)
-  const [exp, setExp] = useState(0)
-  const [gems, setGems] = useState(0)
-  const [coins, setCoins] = useState(0)
   const [bossHp, setBossHp] = useState(MAX_BOSS_HP)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
@@ -653,9 +650,6 @@ export default function QuizAdventure({
     setHearts(MAX_HEARTS)
     setScore(0)
     setStars(savedStarBalance)
-    setExp(0)
-    setGems(0)
-    setCoins(0)
     setBossHp(MAX_BOSS_HP)
     setNormalCorrectCount(0)
     setSelectedAnswer(null)
@@ -683,9 +677,6 @@ export default function QuizAdventure({
     })
 
     void saveLevelProgress(nextCompleted, starRating)
-    setCoins(current => current + level.rewards.coins)
-    setGems(current => current + level.rewards.gems)
-    setExp(current => current + level.rewards.exp)
     setSavedStarBalance(current => current + QUESTIONS_PER_PHASE)
     setBossHp(Math.max(0, nextBossHp))
     setScreen('battle')
@@ -763,7 +754,6 @@ export default function QuizAdventure({
         if (correct) {
           setScore(current => current + NORMAL_POINTS)
           setStars(current => current + 1)
-          setExp(current => current + NORMAL_EXP)
           setNormalCorrectCount(nextCorrectCount)
         } else {
           const nextHearts = Math.max(0, hearts - 1)
