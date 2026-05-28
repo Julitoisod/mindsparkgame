@@ -45,10 +45,18 @@
     const starBalance = Number(row.stars ?? 0)
     const currentLevel = Number(row.currentLevel ?? 1)
 
-    let performanceColor: 'green' | 'yellow' | 'red'
-    if (levelsCompleted >= 3) performanceColor = 'green'
-    else if (levelsCompleted >= 1) performanceColor = 'yellow'
-    else performanceColor = 'red'
+    // No color indicator for newly enrolled students who haven't played yet.
+    // Color appears only after they start playing (have at least 1 attempt).
+    let performanceColor: 'none' | 'green' | 'yellow' | 'red'
+    if (levelsCompleted === 0 && currentLevel === 1 && starBalance === 0) {
+      performanceColor = 'none'
+    } else if (levelsCompleted >= 3) {
+      performanceColor = 'green'
+    } else if (levelsCompleted >= 1) {
+      performanceColor = 'yellow'
+    } else {
+      performanceColor = 'red'
+    }
 
     return {
       id: row.id,
@@ -134,6 +142,8 @@
     // Fetch teacher-granted level unlocks for all students
     const studentIds = rows.map(r => r.id)
     const unlockMap: Record<number, number[]> = {}
+    const quizScoreMap: Record<number, { levelNumber: number; totalAttempts: number; correctAttempts: number; totalScore: number; lastAttempt: string }[]> = {}
+
     if (studentIds.length > 0) {
       const placeholders = studentIds.map(() => '?').join(',')
       const unlockRows = await query<{ student_id: number; level_number: number }>(
@@ -144,9 +154,42 @@
         if (!unlockMap[row.student_id]) unlockMap[row.student_id] = []
         unlockMap[row.student_id].push(row.level_number)
       }
+
+      // Fetch quiz score summaries per student per level
+      const scoreRows = await query<{
+        user_id: number
+        level_number: number
+        total_attempts: number
+        correct_attempts: number
+        total_score: number
+        last_attempt: string
+      }>(
+        `SELECT
+           user_id,
+           level_number,
+           COUNT(*) AS total_attempts,
+           SUM(is_correct) AS correct_attempts,
+           SUM(score_earned) AS total_score,
+           MAX(attempted_at) AS last_attempt
+         FROM quiz_attempts
+         WHERE user_id IN (${placeholders})
+         GROUP BY user_id, level_number
+         ORDER BY user_id, level_number`,
+        studentIds,
+      )
+      for (const row of scoreRows) {
+        if (!quizScoreMap[row.user_id]) quizScoreMap[row.user_id] = []
+        quizScoreMap[row.user_id].push({
+          levelNumber: row.level_number,
+          totalAttempts: Number(row.total_attempts),
+          correctAttempts: Number(row.correct_attempts),
+          totalScore: Number(row.total_score),
+          lastAttempt: row.last_attempt,
+        })
+      }
     }
 
-    return NextResponse.json({ success: true, message: 'OK', data: rows.map(row => ({ ...publicStudent(row), teacherUnlockedLevels: unlockMap[row.id] ?? [] })) })
+    return NextResponse.json({ success: true, message: 'OK', data: rows.map(row => ({ ...publicStudent(row), teacherUnlockedLevels: unlockMap[row.id] ?? [], quizScores: quizScoreMap[row.id] ?? [] })) })
   }
 
   export async function POST(request: Request) {

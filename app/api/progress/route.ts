@@ -61,8 +61,15 @@ export async function GET(request: Request) {
   )
   const earnedBadges = badgeRows.map(row => row.badge_id)
 
+  // Fetch cumulative total score from all quiz attempts
+  const scoreRows = await query<{ total_score: number }>(
+    'SELECT COALESCE(SUM(score_earned), 0) AS total_score FROM quiz_attempts WHERE user_id = ?',
+    [session.userId],
+  )
+  const totalScore = Number(scoreRows[0]?.total_score ?? 0)
+
   if (!rows.length) {
-    return NextResponse.json({ success: true, message: 'No progress', data: null, meta: { starBalance, teacherUnlockedLevels, earnedBadges } })
+    return NextResponse.json({ success: true, message: 'No progress', data: null, meta: { starBalance, totalScore, teacherUnlockedLevels, earnedBadges } })
   }
 
   // Parse JSON columns stored as TEXT
@@ -74,7 +81,7 @@ export async function GET(request: Request) {
     levelStars:      safeParseJSON(row.levelStars as string, {}),
   }
 
-  return NextResponse.json({ success: true, message: 'OK', data: parsed, meta: { starBalance, teacherUnlockedLevels, earnedBadges } })
+  return NextResponse.json({ success: true, message: 'OK', data: parsed, meta: { starBalance, totalScore, teacherUnlockedLevels, earnedBadges } })
 }
 
 /**
@@ -158,17 +165,8 @@ export async function POST(request: Request) {
     ],
   )
 
-  const earnedStars = Math.max(0, Math.floor(Number(starsEarned ?? 0)))
-  if (earnedStars > 0) {
-    await execute(
-      `INSERT INTO student_wallets (user_id, stars)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE
-         stars = stars + VALUES(stars),
-         updated_at = NOW()`,
-      [session.userId, earnedStars],
-    )
-  }
+  // Stars are now added in real-time via /api/attempts on each correct answer
+  // No need to add them again here to avoid double-counting
 
   // ── Badge evaluation ──────────────────────────────────────────────────────
   const newBadges: string[] = []

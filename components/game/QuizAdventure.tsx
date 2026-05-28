@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  playCorrectSound,
+  playWrongSound,
+  playBossHitSound,
+  playLevelCompleteSound,
+  playBossWarningSound,
+  playGameOverSound,
+  playClickSound,
+} from '@/lib/sounds'
+import {
   Award,
   CheckCircle2,
   Crown,
@@ -319,18 +328,19 @@ function ProgressBar({
   label: string
 }) {
   const width = `${Math.max(0, Math.min(100, (value / max) * 100))}%`
+  const percentage = Math.round((value / max) * 100)
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-primary-50/75">
+      <div className="flex items-center justify-between font-bold uppercase tracking-wide text-white" style={{ fontSize: 'clamp(10px, 2dvh, 13px)' }}>
         <span>{label}</span>
-        <span>
-          {value} / {max}
+        <span className="tabular-nums">
+          {value} / {max} ({percentage}%)
         </span>
       </div>
-      <div className="h-3 overflow-hidden rounded-full border border-primary-100/15 bg-[#041008]/35">
+      <div className="h-4 sm:h-5 overflow-hidden rounded-full border-2 border-white/20 bg-black/30 shadow-inner">
         <motion.div
-          className={`h-full rounded-full bg-gradient-to-r ${color}`}
+          className={`h-full rounded-full bg-gradient-to-r ${color} shadow-lg`}
           initial={{ width: 0 }}
           animate={{ width }}
           transition={{ duration: 0.45, ease: 'easeOut' }}
@@ -353,13 +363,15 @@ function StatPill({
 }) {
   return (
     <div
-      className="flex flex-1 min-w-0 items-center gap-1 sm:gap-1.5 lg:gap-2 rounded-md sm:rounded-lg border border-primary-100/15 bg-[#041008]/35 px-1 sm:px-2 lg:px-3 shadow-card backdrop-blur-md"
-      style={{ height: 'clamp(24px, 5.5dvh, 44px)' }}
+      className="relative flex flex-1 min-w-0 items-center gap-1.5 sm:gap-2 lg:gap-2.5 rounded-lg sm:rounded-xl border-2 border-amber-700/50 bg-gradient-to-b from-[#3d2914] via-[#2a1a0a] to-[#1a0f05] px-1.5 sm:px-2.5 lg:px-3.5 shadow-[0_3px_0_#1a0f05,inset_0_1px_0_rgba(255,255,255,0.1)]"
+      style={{ height: 'clamp(32px, 7dvh, 52px)' }}
     >
-      <span className={`flex shrink-0 items-center justify-center rounded sm:rounded-md ${tone}`} style={{ height: 'clamp(14px, 3.5dvh, 28px)', width: 'clamp(14px, 3.5dvh, 28px)' }}>{icon}</span>
-      <span className="min-w-0">
-        <span className="hidden sm:block font-semibold uppercase tracking-wide text-primary-50/55" style={{ fontSize: 'clamp(6px, 1.4dvh, 10px)' }}>{label}</span>
-        <span className="block truncate font-bold text-primary-50" style={{ fontSize: 'clamp(9px, 2dvh, 14px)' }}>{value}</span>
+      {/* Inner border highlight */}
+      <span className="absolute inset-[2px] rounded-lg border border-amber-600/20 pointer-events-none" />
+      <span className={`relative flex shrink-0 items-center justify-center rounded-md sm:rounded-lg ${tone}`} style={{ height: 'clamp(20px, 4.5dvh, 34px)', width: 'clamp(20px, 4.5dvh, 34px)' }}>{icon}</span>
+      <span className="relative min-w-0">
+        <span className="hidden sm:block font-bold uppercase tracking-wide text-amber-300/70" style={{ fontSize: 'clamp(7px, 1.6dvh, 11px)' }}>{label}</span>
+        <span className="block truncate font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" style={{ fontSize: 'clamp(12px, 2.8dvh, 18px)' }}>{value}</span>
       </span>
     </div>
   )
@@ -493,6 +505,8 @@ export default function QuizAdventure({
   const [bossHp, setBossHp] = useState(MAX_BOSS_HP)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [scorePopup, setScorePopup] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>('map')
   const [normalCorrectCount, setNormalCorrectCount] = useState(0)
   const [completedLevels, setCompletedLevels] = useState<number[]>([])
@@ -501,6 +515,8 @@ export default function QuizAdventure({
   const [progressSaving, setProgressSaving] = useState(false) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [progressError, setProgressError] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [showLevelUp, setShowLevelUp] = useState(false)
+  const [screenShake, setScreenShake] = useState(false)
+  const [showParticles, setShowParticles] = useState<'correct' | 'wrong' | null>(null)
   const [levelStars, setLevelStars] = useState<Record<number, number>>({})
   const [earnedBadges, setEarnedBadges] = useState<string[]>([])
   const [newBadgeNotification, setNewBadgeNotification] = useState<string | null>(null)
@@ -544,6 +560,7 @@ export default function QuizAdventure({
         if (!active) return
         const loadedCompleted = normalizeCompletedLevels(json.data?.completedLevels)
         const loadedStars = Number(json.meta?.starBalance ?? 0)
+        const loadedScore = Number(json.meta?.totalScore ?? 0)
         const loadedTeacherUnlocks: number[] = Array.isArray(json.meta?.teacherUnlockedLevels)
           ? json.meta.teacherUnlockedLevels.filter((n: unknown) => typeof n === 'number' && n >= 1 && n <= MAX_LEVELS)
           : []
@@ -560,6 +577,7 @@ export default function QuizAdventure({
         setTeacherUnlockedLevels(loadedTeacherUnlocks)
         setStars(Number.isFinite(loadedStars) ? loadedStars : 0)
         setSavedStarBalance(Number.isFinite(loadedStars) ? loadedStars : 0)
+        setScore(Number.isFinite(loadedScore) ? loadedScore : 0)
         setLevelStars(loadedLevelStars)
         setEarnedBadges(loadedBadges)
         setLevelIndex(nextPlayableLevelIndex(loadedCompleted))
@@ -648,7 +666,6 @@ export default function QuizAdventure({
     setScreen('map')
     setQuestionIndex(0)
     setHearts(MAX_HEARTS)
-    setScore(0)
     setStars(savedStarBalance)
     setBossHp(MAX_BOSS_HP)
     setNormalCorrectCount(0)
@@ -657,7 +674,19 @@ export default function QuizAdventure({
     setCompletedLevels([])
   }
 
+  function retryLevel() {
+    setPhase('normal')
+    setScreen('battle')
+    setQuestionIndex(0)
+    setHearts(MAX_HEARTS)
+    setBossHp(MAX_BOSS_HP)
+    setNormalCorrectCount(0)
+    setSelectedAnswer(null)
+    setFeedback(null)
+  }
+
   function startBossPhase() {
+    playBossWarningSound()
     setPhase('boss')
     setQuestionIndex(0)
     setBossHp(MAX_BOSS_HP)
@@ -666,6 +695,7 @@ export default function QuizAdventure({
   }
 
   function completeLevel(nextBossHp: number) {
+    playLevelCompleteSound()
     const nextCompleted = Array.from(new Set([...completedLevels, level.number]))
     setCompletedLevels(nextCompleted)
 
@@ -727,6 +757,25 @@ export default function QuizAdventure({
     const correct = isCorrectAnswer(question, option, optionIndex)
     setSelectedAnswer(option)
     setFeedback(correct ? 'correct' : 'wrong')
+    if (correct) {
+      const messages = ['✅ Amazing!', '🌟 Great job!', '🎉 Correct!', '⭐ Excellent!', '🏆 Brilliant!']
+      setFeedbackMessage(messages[Math.floor(Math.random() * messages.length)])
+    } else {
+      setFeedbackMessage('❌ Try again!')
+    }
+
+    // Play sound effects
+    if (correct) {
+      if (phase === 'boss') playBossHitSound()
+      else playCorrectSound()
+      setShowParticles('correct')
+      window.setTimeout(() => setShowParticles(null), 1000)
+    } else {
+      playWrongSound()
+      setScreenShake(true)
+      setShowParticles('wrong')
+      window.setTimeout(() => { setScreenShake(false); setShowParticles(null) }, 500)
+    }
 
     // Fire-and-forget: record attempt to the database
     if (characterId) {
@@ -755,10 +804,13 @@ export default function QuizAdventure({
           setScore(current => current + NORMAL_POINTS)
           setStars(current => current + 1)
           setNormalCorrectCount(nextCorrectCount)
+          setScorePopup(`+${NORMAL_POINTS} ⭐+1`)
+          window.setTimeout(() => setScorePopup(null), 1500)
         } else {
           const nextHearts = Math.max(0, hearts - 1)
           setHearts(nextHearts)
           if (nextHearts === 0) {
+            playGameOverSound()
             setPhase('gameOver')
             setSelectedAnswer(null)
             return
@@ -780,6 +832,8 @@ export default function QuizAdventure({
         if (correct) {
           const nextBossHp = Math.max(0, bossHp - BOSS_DAMAGE)
           setScore(current => current + NORMAL_POINTS * 2)
+          setScorePopup(`+${NORMAL_POINTS * 2} 💥${BOSS_DAMAGE}dmg`)
+          window.setTimeout(() => setScorePopup(null), 1500)
 
           if (nextBossHp === 0) {
             completeLevel(nextBossHp)
@@ -791,6 +845,7 @@ export default function QuizAdventure({
           const nextHearts = Math.max(0, hearts - 1)
           setHearts(nextHearts)
           if (nextHearts === 0) {
+            playGameOverSound()
             setPhase('gameOver')
             setSelectedAnswer(null)
             return
@@ -806,12 +861,12 @@ export default function QuizAdventure({
         setSelectedAnswer(null)
         setFeedback(null)
       }
-    }, 760)
+    }, 3000)
   }
 
   if (!progressLoaded) {
     return (
-      <section className="flex h-full items-center justify-center bg-[#041008] text-primary-100">
+      <section className="flex h-full items-center justify-center bg-[#1a1233] text-primary-100">
         <Sparkles className="mr-3 h-5 w-5 animate-pulse" />
         <span className="font-bold">Loading level progress...</span>
       </section>
@@ -834,37 +889,30 @@ export default function QuizAdventure({
     }
 
     return (
-      <section className="relative h-full overflow-hidden text-[#1b5e20]">
-        {/* Light misty green background matching reference */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#d4e6d8] via-[#dceee0] to-[#c8e0cc]" />
+      <section className="relative h-full overflow-hidden text-white">
+        {/* Magical purple/pink sky background - kid-friendly */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#3b2a73] via-[#6b21a8] to-[#a855f7]" />
         <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'url(/BACKGROUND FOREST 1/FOREST 1/2304x1296.png)', backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(4px)' }} />
 
         <div className="relative z-10 flex h-full w-full flex-col">
           {/* Header */}
           <header className="shrink-0 flex items-center justify-between gap-2 px-2 py-1 sm:px-4 sm:py-1.5">
             <div className="flex items-center gap-1.5">
-              <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full border-2 border-[#2e7d32] bg-[#c8e6c9]">
-                <MapIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#1b5e20]" />
+              <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 shadow-lg shadow-purple-500/40">
+                <MapIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
               </span>
-              <h1 className="font-game text-xs sm:text-base font-black text-[#1b5e20]">MindSpark Isles</h1>
+              <h1 className="font-game text-xs sm:text-base font-black bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-200 bg-clip-text text-transparent drop-shadow-md">MindSpark Isles</h1>
             </div>
 
             <div className="flex items-center gap-1">
-              <div className="rounded-md border border-[#2e7d32]/20 bg-white/60 px-1.5 py-0.5 text-center backdrop-blur-sm">
-                <p className="text-[6px] sm:text-[7px] font-bold uppercase text-[#388e3c] leading-none">Stars</p>
-                <p className="text-[10px] sm:text-xs font-black text-[#1b5e20] leading-tight">{stars}</p>
+              <div className="rounded-md bg-gradient-to-br from-yellow-400 to-orange-500 px-1.5 py-0.5 text-center shadow-md shadow-yellow-500/40">
+                <p className="text-[6px] sm:text-[7px] font-bold uppercase text-white leading-none">⭐ Stars</p>
+                <p className="text-[10px] sm:text-xs font-black text-white leading-tight">{stars}</p>
               </div>
-              <div className="rounded-md border border-[#2e7d32]/20 bg-white/60 px-1.5 py-0.5 text-center backdrop-blur-sm">
-                <p className="text-[6px] sm:text-[7px] font-bold uppercase text-[#388e3c] leading-none">Badges</p>
-                <p className="text-[10px] sm:text-xs font-black text-[#1b5e20] leading-tight">{earnedBadges.length}/6</p>
+              <div className="rounded-md bg-gradient-to-br from-purple-500 to-pink-500 px-1.5 py-0.5 text-center shadow-md shadow-purple-500/40">
+                <p className="text-[6px] sm:text-[7px] font-bold uppercase text-white leading-none">🏅 Badges</p>
+                <p className="text-[10px] sm:text-xs font-black text-white leading-tight">{earnedBadges.length}/6</p>
               </div>
-              <button
-                type="button"
-                onClick={resetGame}
-                className="rounded-md border border-[#2e7d32]/20 bg-white/60 p-1 sm:p-1.5 backdrop-blur-sm transition hover:bg-white/80"
-              >
-                <RotateCcw className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-[#1b5e20]" />
-              </button>
             </div>
           </header>
 
@@ -952,7 +1000,9 @@ export default function QuizAdventure({
                         'w-[64px] h-[64px] sm:w-[88px] sm:h-[88px] lg:w-[112px] lg:h-[112px]',
                         'border-2 sm:border-[3px]',
                         isUnlocked
-                          ? 'border-[#2e7d32] cursor-pointer hover:scale-110 active:scale-95'
+                          ? status === 'cleared'
+                            ? 'border-yellow-400 cursor-pointer hover:scale-110 active:scale-95 shadow-yellow-500/60 ring-2 ring-yellow-300/50'
+                            : 'border-cyan-400 cursor-pointer hover:scale-110 active:scale-95 shadow-cyan-500/50'
                           : 'border-[#4a5e52] bg-[#2a3830] cursor-not-allowed',
                       ].join(' ')}
                     >
@@ -970,8 +1020,12 @@ export default function QuizAdventure({
                         <Lock className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-[#78909c]" />
                       )}
                       <span className={[
-                        'absolute -bottom-1 right-0 sm:bottom-0.5 sm:right-0.5 lg:bottom-1 lg:right-1 rounded px-1 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-black leading-none',
-                        isUnlocked ? 'bg-[#1b5e20]/90 text-white' : 'bg-[#37474f]/90 text-[#90a4ae]',
+                        'absolute -bottom-1 right-0 sm:bottom-0.5 sm:right-0.5 lg:bottom-1 lg:right-1 rounded px-1 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-black leading-none shadow-md',
+                        isUnlocked
+                          ? status === 'cleared'
+                            ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                            : 'bg-gradient-to-br from-[#9333ea]lue-500 to-purple-500 text-white'
+                          : 'bg-[#37474f]/90 text-[#90a4ae]',
                       ].join(' ')}>
                         L{lvl.number}
                       </span>
@@ -979,17 +1033,17 @@ export default function QuizAdventure({
 
                     {/* Text labels */}
                     <div className="mt-1 sm:mt-1.5 lg:mt-2 text-center w-[64px] sm:w-[100px] lg:w-[130px]">
-                      <p className="text-[8px] sm:text-[10px] lg:text-xs font-black text-[#1b5e20] leading-tight">{meta.env}</p>
-                      <p className="hidden sm:block text-[7px] sm:text-[8px] lg:text-[9px] text-[#4a635a] leading-tight mt-0.5 line-clamp-2">{meta.subtitle}</p>
+                      <p className="text-[8px] sm:text-[10px] lg:text-xs font-black text-white drop-shadow-md leading-tight">{meta.env}</p>
+                      <p className="hidden sm:block text-[7px] sm:text-[8px] lg:text-[9px] text-purple-100 leading-tight mt-0.5 line-clamp-2">{meta.subtitle}</p>
                       <span className={[
-                        'inline-block mt-0.5 sm:mt-1 rounded px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7px] lg:text-[8px] font-black uppercase tracking-wider',
-                        status === 'cleared' ? 'bg-[#2e7d32] text-white' : '',
-                        status === 'open' ? 'bg-[#1b5e20] text-white' : '',
+                        'inline-block mt-0.5 sm:mt-1 rounded px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7px] lg:text-[8px] font-black uppercase tracking-wider shadow-sm',
+                        status === 'cleared' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' : '',
+                        status === 'open' ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white' : '',
                         status === 'locked' ? 'bg-[#37474f] text-[#b0bec5]' : '',
                       ].join(' ')}>
-                        {status === 'cleared' && 'Cleared'}
-                        {status === 'open' && 'Open'}
-                        {status === 'locked' && 'Locked'}
+                        {status === 'cleared' && '✨ Cleared'}
+                        {status === 'open' && '▶ Open'}
+                        {status === 'locked' && '🔒 Locked'}
                       </span>
                       {status === 'cleared' && levelStars[lvl.number] && (
                         <div className="flex items-center justify-center gap-0.5 mt-0.5">
@@ -1016,7 +1070,7 @@ export default function QuizAdventure({
   }
 
   return (
-    <section className="relative h-full overflow-hidden bg-[#041008] text-white">
+    <section className="relative h-full overflow-hidden bg-[#1a1233] text-white">
       <Image
         src={level.backgroundImage}
         alt=""
@@ -1026,289 +1080,484 @@ export default function QuizAdventure({
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#041008]/45 via-[#041008]/10 to-[#041008]/72" />
-      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#041008] to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1a1233]/45 via-[#1a1233]/10 to-[#1a1233]/72" />
+      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#1a1233] to-transparent" />
 
-      <div className="relative z-10 flex h-full w-full flex-col px-1.5 py-1 sm:px-4 sm:py-2 lg:px-6">
-        <div className="shrink-0 flex flex-row items-center gap-1 sm:gap-1.5 lg:gap-2">
+      {/* Floating ambient particles - gems/sparkles */}
+      <div className="absolute inset-0 pointer-events-none z-[1] overflow-hidden">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <motion.div
+            key={`particle-${i}`}
+            className="absolute text-2xl sm:text-3xl"
+            style={{ left: `${5 + (i * 8) % 90}%`, top: `${10 + (i * 17) % 75}%` }}
+            animate={{
+              y: [0, -25, 0],
+              x: [0, (i % 2 === 0 ? 10 : -10), 0],
+              opacity: [0.6, 1, 0.6],
+              scale: [0.9, 1.2, 0.9],
+            }}
+            transition={{ duration: 3 + i * 0.4, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 }}
+          >
+            {['💎', '✨', '🔮', '⭐', '💫', '🌟', '💰', '🪙', '✨', '💎', '⭐', '🌟'][i]}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Screen flash on correct answer */}
+      <AnimatePresence>
+        {feedback === 'correct' && (
+          <motion.div
+            key="flash"
+            initial={{ opacity: 0.6 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 z-[60] bg-white pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
+      <div className={`relative z-10 flex h-full w-full flex-col px-1.5 py-1 sm:px-4 sm:py-2 lg:px-6 transition-transform ${screenShake ? 'animate-[wiggle_0.3s_ease-in-out]' : ''}`}>
+        {/* Particle effects overlay - enhanced celebrations */}
+        <AnimatePresence>
+          {showParticles === 'correct' && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.5 }}
+              className="pointer-events-none absolute inset-0 z-50 overflow-hidden"
+            >
+              {/* Stars burst from center */}
+              {Array.from({ length: 16 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ x: '50%', y: '40%', scale: 0, opacity: 1 }}
+                  animate={{
+                    x: `${15 + Math.random() * 70}%`,
+                    y: `${5 + Math.random() * 90}%`,
+                    scale: [0, 1.8, 0.5],
+                    opacity: [1, 1, 0],
+                    rotate: [0, Math.random() * 720],
+                  }}
+                  transition={{ duration: 1.2, ease: 'easeOut', delay: i * 0.03 }}
+                  className="absolute text-xl sm:text-3xl"
+                >
+                  {['⭐', '✨', '🌟', '💫', '🎉', '🎊', '💰', '🪙'][i % 8]}
+                </motion.div>
+              ))}
+              {/* Golden ring burst */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0.8 }}
+                animate={{ scale: 3, opacity: 0 }}
+                transition={{ duration: 0.8 }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border-4 border-yellow-400"
+              />
+            </motion.div>
+          )}
+          {showParticles === 'wrong' && (
+            <motion.div
+              initial={{ opacity: 0.7 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6 }}
+              className="pointer-events-none absolute inset-0 z-50"
+            >
+              {/* Red vignette */}
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(220,38,38,0.4)_100%)]" />
+              {/* Crack lines */}
+              {Array.from({ length: 4 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  className="absolute top-1/2 left-1/2 h-[2px] bg-red-400/60 origin-left"
+                  style={{
+                    width: `${30 + Math.random() * 40}%`,
+                    transform: `translate(-50%, -50%) rotate(${i * 90 + Math.random() * 30}deg)`,
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div className="shrink-0 flex flex-row items-center gap-1.5 sm:gap-2 lg:gap-2.5">
           <StatPill
-            icon={<Crown className="h-3 w-3 sm:h-4 sm:w-4" />}
+            icon={<Crown className="h-4 w-4 sm:h-5 sm:w-5" />}
             label="Level"
             value={`${level.number}/5`}
-            tone="bg-primary-300/20 text-primary-100"
+            tone="bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/40"
           />
           <StatPill
-            icon={<Swords className="h-3 w-3 sm:h-4 sm:w-4" />}
+            icon={<Swords className="h-4 w-4 sm:h-5 sm:w-5" />}
             label="Quiz"
             value={`${questionIndex + 1}/${QUESTIONS_PER_PHASE}`}
-            tone="bg-primary-400/20 text-primary-100"
+            tone="bg-gradient-to-br from-[#9333ea]lue-500 to-[#c084fc]yan-500 text-white shadow-lg shadow-blue-500/40"
           />
           <StatPill
-            icon={<Star className="h-3 w-3 sm:h-4 sm:w-4 fill-current" />}
+            icon={<Star className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />}
             label="Stars"
             value={stars}
-            tone="bg-primary-200/20 text-primary-100"
+            tone="bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/40"
           />
           <StatPill
-            icon={<Trophy className="h-3 w-3 sm:h-4 sm:w-4" />}
+            icon={<Trophy className="h-4 w-4 sm:h-5 sm:w-5" />}
             label="Points"
             value={score}
-            tone="bg-primary-300/20 text-primary-100"
+            tone="bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/40"
           />
         </div>
 
-        <main className="flex-1 min-h-0 flex flex-row gap-[1dvh] sm:gap-3 lg:gap-4 pt-[0.5dvh] sm:pt-2 pb-[0.5dvh]">
-          {/* Character arena - 70% width */}
-          <div className="relative flex-[7] overflow-hidden rounded-lg border border-primary-200/15 bg-primary-950/15 min-h-0">
-            <div className="absolute left-1 top-1 z-20 rounded-md border border-primary-200/20 bg-primary-950/50 px-1.5 py-1 backdrop-blur-md sm:left-5 sm:top-5 sm:px-3 sm:py-2 sm:rounded-lg">
-              <p className="text-[8px] sm:text-[11px] font-bold uppercase tracking-wide text-primary-100">{level.environment}</p>
-              <h1 className="mt-0.5 max-w-[80px] sm:max-w-[260px] truncate text-[10px] sm:text-xl lg:text-2xl font-black text-white">{level.title}</h1>
-              <p className="hidden sm:block mt-0.5 max-w-[260px] truncate text-xs font-semibold text-white/65">{playerName}&apos;s quest</p>
+        <main className="flex-1 min-h-0 flex flex-col relative pt-0.5 sm:pt-1">
+          {/* Characters at bottom of screen - expand when answering */}
+          <div className={`absolute bottom-0 left-0 right-0 flex items-end justify-between px-2 sm:px-8 pointer-events-none z-0 transition-all duration-300 ${isResolving ? 'h-[75%]' : 'h-[40%]'}`}>
+            {/* Hero - left side */}
+            <div className="relative h-full w-[35%] sm:w-[30%]" style={{ transform: 'translateY(10%)' }}>
+              <motion.div
+                key={`hero-${level.id}`}
+                className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.45)]"
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+              >
+                <AnimatedSprite
+                  frames={level.characterFrames}
+                  action={heroAction}
+                  fallbackSrc={level.characterImage}
+                  alt="Player character"
+                  fill
+                  sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
+                  className="object-contain object-bottom scale-[1.5] origin-bottom sm:scale-[1.3]"
+                  fps={12}
+                  loop={heroAction === 'idle'}
+                />
+              </motion.div>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 h-full flex items-end justify-between px-1 sm:px-4">
-              {/* Hero - left side, facing right */}
-              <div
-                className="relative h-full w-[55%] sm:w-[50%]"
-                style={{ maxWidth: shouldShowBoss ? '50%' : '100%', transform: 'translateY(15%)' }}
-              >
+            {/* Boss - right side */}
+            {shouldShowBoss && (
+              <div className="relative h-full w-[35%] sm:w-[30%]" style={{ transform: 'translateY(10%)' }}>
                 <motion.div
-                  key={`hero-${level.id}`}
-                  className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.45)]"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
+                  key={`boss-${level.id}`}
+                  className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.55)]"
+                  initial={{ x: 20, opacity: 0 }}
+                  animate={{
+                    x: 0,
+                    opacity: 1,
+                    scale: phase === 'boss' ? [1, 1.03, 1] : 1,
+                  }}
+                  transition={{
+                    x: { duration: 0.4 },
+                    opacity: { duration: 0.4 },
+                    scale: { duration: 1.6, repeat: phase === 'boss' ? Infinity : 0 },
+                  }}
                 >
                   <AnimatedSprite
-                    frames={level.characterFrames}
-                    action={heroAction}
-                    fallbackSrc={level.characterImage}
-                    alt="Player character"
+                    frames={level.bossFrames}
+                    action={bossAction}
+                    fallbackSrc={level.bossImage}
+                    alt={level.bossName}
                     fill
-                    sizes="(min-width: 1024px) 1400px, (min-width: 640px) 1000px, 42vw"
-                    className="object-contain object-bottom scale-[1.8] origin-bottom sm:scale-150"
-                    fps={12}
-                    loop={heroAction === 'idle'}
+                    sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
+                    className="object-contain object-bottom -scale-x-100 scale-y-[1.3] origin-bottom sm:scale-y-[1.2]"
+                    fps={bossAction === 'idle' ? 10 : 14}
+                    loop={bossAction === 'idle'}
                   />
                 </motion.div>
               </div>
-
-              {/* Boss - right side, facing left (flipped) */}
-              {shouldShowBoss && (
-                <div
-                  className="relative h-full w-[45%] sm:w-[45%]"
-                  style={{ transform: 'translateY(15%)' }}
-                >
-                  <motion.div
-                    key={`boss-${level.id}`}
-                    className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.55)]"
-                    initial={{ x: 20, opacity: 0 }}
-                    animate={{
-                      x: 0,
-                      opacity: 1,
-                      scale: phase === 'boss' ? [1, 1.03, 1] : 1,
-                    }}
-                    transition={{
-                      x: { duration: 0.4 },
-                      opacity: { duration: 0.4 },
-                      scale: { duration: 1.6, repeat: phase === 'boss' ? Infinity : 0 },
-                    }}
-                  >
-                    <AnimatedSprite
-                      frames={level.bossFrames}
-                      action={bossAction}
-                      fallbackSrc={level.bossImage}
-                      alt={level.bossName}
-                      fill
-                      sizes="(min-width: 1024px) 1000px, (min-width: 640px) 700px, 40vw"
-                      className="object-contain object-bottom -scale-x-100 scale-y-150 origin-bottom sm:scale-y-150"
-                      fps={bossAction === 'idle' ? 10 : 14}
-                      loop={bossAction === 'idle'}
-                    />
-                  </motion.div>
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
-          {/* Quiz panel - 30% width */}
-          <div className="flex-[3] flex flex-col min-h-0 min-w-0 rounded-lg border border-primary-200/20 bg-[#0d2b18]/92 p-[1dvh] sm:p-3 shadow-card backdrop-blur-xl">
-            <div className="shrink-0 mb-[0.5dvh] sm:mb-3 flex items-start justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <span className="inline-flex items-center gap-1 rounded-md bg-primary-400/15 px-1.5 sm:px-2 py-0.5 text-[clamp(8px,1.8dvh,12px)] font-bold uppercase tracking-wide text-primary-100">
-                  {phase === 'boss' ? <Swords className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <Shield className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
-                  {phaseLabel}
-                </span>
-                <span className="rounded-md bg-primary-200/10 px-1.5 sm:px-2 py-0.5 text-[clamp(8px,1.8dvh,12px)] font-bold text-white/75">{progressLabel}</span>
+          {/* HP bars - floating above characters during boss */}
+          {phase === 'boss' && (
+            <div className="absolute bottom-[63%] left-3 right-3 sm:left-8 sm:right-8 z-10 flex items-center gap-3 sm:gap-6">
+              <div className="flex-1 min-w-0">
+                <ProgressBar value={hearts * 20} max={MAX_HEARTS * 20} color="from-cyan-400 to-blue-500" label="⚡ HP" />
               </div>
-              <div className="hidden min-w-16 text-right sm:block">
-                <p className="text-[10px] font-bold uppercase text-white/50">Reward</p>
-                <p className="text-xs font-black text-primary-100">{level.rewards.coins}c+{level.rewards.gems}g</p>
+              <div className="flex-1 min-w-0">
+                <ProgressBar value={bossHp} max={MAX_BOSS_HP} color="from-red-500 to-orange-500" label="👹 Boss" />
               </div>
             </div>
+          )}
 
-            {phase === 'boss' && (
-              <div className="shrink-0 mb-[0.5dvh] sm:mb-3 rounded-lg border border-primary-200/20 bg-primary-950/35 p-[1dvh] sm:p-3">
-                <ProgressBar value={bossHp} max={MAX_BOSS_HP} color="from-primary-200 to-primary-700" label="Boss HP" />
-              </div>
+          {/* Feedback popup - centered overlay */}
+          <AnimatePresence>
+            {feedback && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none"
+              >
+                <div
+                  className={`rounded-2xl border-4 px-6 sm:px-10 py-3 sm:py-5 text-center shadow-2xl backdrop-blur-md ${
+                    feedback === 'correct'
+                      ? 'border-emerald-400 bg-gradient-to-br from-emerald-500/90 to-teal-600/90 shadow-emerald-500/50'
+                      : 'border-red-400 bg-gradient-to-br from-red-500/90 to-rose-600/90 shadow-red-500/50'
+                  }`}
+                >
+                  <p className="text-xl sm:text-3xl font-black text-white drop-shadow-lg">
+                    {feedbackMessage}
+                  </p>
+                </div>
+              </motion.div>
             )}
+          </AnimatePresence>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          {/* Question + Answers - overlaid on top, hidden during feedback so characters are visible */}
+          <div className={`relative z-10 flex flex-col items-center w-full max-w-lg mx-auto px-2 sm:px-4 transition-all duration-300 ${isResolving ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
             <AnimatePresence mode="wait">
               {(phase === 'normal' || phase === 'boss') && (
                 <motion.div
                   key={`${phase}-${level.id}-${questionIndex}`}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.22 }}
+                  className="w-full"
                 >
-                  <div className="rounded-lg border border-primary-200/15 bg-primary-100/[0.06] p-[1dvh] sm:p-3">
-                    <p className="text-[clamp(8px,1.6dvh,12px)] font-bold uppercase tracking-wide text-primary-100">
-                      {phase === 'boss' ? `${level.bossName} challenges you` : `Question ${questionIndex + 1}`}
+                  {/* Question Card - RPG parchment scroll style with pulsing glow */}
+                  <motion.div
+                    animate={{ boxShadow: ['0 0 15px rgba(251,191,36,0.2)', '0 0 25px rgba(251,191,36,0.4)', '0 0 15px rgba(251,191,36,0.2)'] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="relative rounded-2xl border-[3px] border-amber-600/60 bg-gradient-to-b from-[#fff8e7] via-[#fff3cd] to-[#ffeaa7] px-4 py-3 sm:px-5 sm:py-4 shadow-[inset_0_2px_0_rgba(255,255,255,0.6)]"
+                  >
+                    {/* Inner highlight */}
+                    <div className="absolute inset-[3px] rounded-xl border border-amber-200/50 pointer-events-none" />
+                    <p className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-amber-700/80">
+                      {phase === 'boss' ? `⚔️ ${level.bossName} challenges you!` : `✨ Question ${questionIndex + 1}:`}
                     </p>
-                    <h2 className="mt-[0.3dvh] font-black leading-tight text-white" style={{ fontSize: 'clamp(11px, 2.8dvh, 20px)' }}>{question.prompt}</h2>
-                  </div>
+                    <h2 className="mt-1 sm:mt-1.5 text-sm sm:text-lg lg:text-xl font-black leading-snug text-gray-800">
+                      {question.prompt}
+                    </h2>
+                  </motion.div>
 
-                  <div className="mt-[1dvh] sm:mt-3 grid gap-[0.8dvh] sm:gap-2">
+                  {/* 2x2 Answer Grid - Glossy RPG pill buttons */}
+                  <div className="mt-2 sm:mt-3 grid grid-cols-2 gap-2 sm:gap-3">
                     {question.options.map((option, optionIndex) => {
                       const selected = selectedAnswer === option
                       const correct = isCorrectAnswer(question, option, optionIndex)
                       const showCorrect = isResolving && correct
                       const showWrong = selected && feedback === 'wrong'
 
+                      // RPG glossy pill button styles matching reference
+                      const choiceStyles = [
+                        { bg: 'bg-gradient-to-b from-[#4ade80] via-[#22c55e] to-[#15803d]', border: 'border-[#15803d]', shadow: 'shadow-[0_4px_0_#14532d,0_6px_12px_rgba(22,163,74,0.4)]', glow: 'shadow-green-500/30' },
+                        { bg: 'bg-gradient-to-b from-[#60a5fa] via-[#3b82f6] to-[#1d4ed8]', border: 'border-[#1e40af]', shadow: 'shadow-[0_4px_0_#1e3a5f,0_6px_12px_rgba(59,130,246,0.4)]', glow: 'shadow-blue-500/30' },
+                        { bg: 'bg-gradient-to-b from-[#f87171] via-[#ef4444] to-[#b91c1c]', border: 'border-[#991b1b]', shadow: 'shadow-[0_4px_0_#7f1d1d,0_6px_12px_rgba(239,68,68,0.4)]', glow: 'shadow-red-500/30' },
+                        { bg: 'bg-gradient-to-b from-[#c084fc] via-[#a855f7] to-[#7c3aed]', border: 'border-[#6d28d9]', shadow: 'shadow-[0_4px_0_#4c1d95,0_6px_12px_rgba(168,85,247,0.4)]', glow: 'shadow-purple-500/30' },
+                      ]
+                      const style = choiceStyles[optionIndex] ?? choiceStyles[0]
+
                       return (
-                        <button
+                        <motion.button
                           key={`${option}-${optionIndex}`}
                           type="button"
-                          onClick={() => handleAnswer(option, optionIndex)}
+                          onClick={() => { playClickSound(); handleAnswer(option, optionIndex) }}
                           disabled={isResolving}
+                          whileTap={{ scale: 0.92, y: 3 }}
+                          whileHover={{ scale: 1.03 }}
                           className={[
-                            'group flex w-full items-center gap-2 sm:gap-3 rounded-lg border px-2 sm:px-3 text-left transition focus:outline-none focus:ring-2 focus:ring-primary-300',
+                            'relative flex items-center justify-center rounded-full border-2 px-3 py-3 sm:py-3.5 text-center font-black text-white transition-all overflow-hidden',
                             showCorrect
-                              ? 'border-primary-300/70 bg-primary-500/25 text-primary-50'
+                              ? 'border-yellow-300 bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-500 scale-105 shadow-[0_4px_0_#b45309,0_0_20px_rgba(250,204,21,0.6)] ring-2 ring-yellow-200'
                               : showWrong
-                                ? 'border-primary-200/70 bg-primary-950/50 text-primary-50'
-                                : 'border-primary-200/20 bg-primary-950/30 text-white hover:border-primary-200/50 hover:bg-primary-300/10',
+                                ? 'border-gray-500 bg-gradient-to-b from-gray-500 via-gray-600 to-gray-700 scale-95 opacity-50 shadow-none'
+                                : `${style.bg} ${style.border} ${style.shadow}`,
                             isResolving ? 'cursor-default' : 'cursor-pointer',
                           ].join(' ')}
-                          style={{ paddingTop: 'clamp(4px, 1.2dvh, 10px)', paddingBottom: 'clamp(4px, 1.2dvh, 10px)' }}
                         >
-                          <span className="flex shrink-0 items-center justify-center rounded-md bg-primary-200/10 font-black" style={{ height: 'clamp(20px, 4dvh, 32px)', width: 'clamp(20px, 4dvh, 32px)', fontSize: 'clamp(10px, 2dvh, 14px)' }}>
-                            {String.fromCharCode(65 + optionIndex)}
+                          {/* Glossy highlight overlay */}
+                          <span className="absolute inset-x-0 top-0 h-[45%] rounded-full bg-gradient-to-b from-white/35 to-transparent pointer-events-none" />
+                          {/* Star decoration */}
+                          <Star className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-white/30 fill-white/20" />
+                          {/* Answer text */}
+                          <span className="relative z-10 text-base sm:text-lg lg:text-xl font-black drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">
+                            {String.fromCharCode(65 + optionIndex)}. {option}
                           </span>
-                          <span className="min-w-0 flex-1 font-bold leading-snug" style={{ fontSize: 'clamp(10px, 2.2dvh, 14px)' }}>{option}</span>
-                          {showCorrect && <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
-                          {showWrong && <XCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
-                        </button>
+                          {showCorrect && <CheckCircle2 className="absolute top-1 right-1 h-5 w-5 text-yellow-100 drop-shadow z-10" />}
+                          {showWrong && <XCircle className="absolute top-1 right-1 h-5 w-5 text-gray-200 z-10" />}
+                        </motion.button>
                       )
                     })}
                   </div>
-
-                  <AnimatePresence>
-                    {feedback && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        className={`mt-[0.8dvh] sm:mt-2 rounded-lg border px-2 sm:px-3 py-[0.6dvh] sm:py-2 font-semibold ${
-                          feedback === 'correct'
-                            ? 'border-primary-300/30 bg-primary-500/15 text-primary-50'
-                            : 'border-primary-200/30 bg-primary-950/45 text-primary-50'
-                        }`}
-                        style={{ fontSize: 'clamp(9px, 2dvh, 14px)' }}
-                      >
-                        {feedback === 'correct'
-                          ? phase === 'boss'
-                            ? `Direct hit! ${BOSS_DAMAGE} dmg`
-                            : `+${NORMAL_POINTS} pts, +1★, +${NORMAL_EXP} EXP`
-                          : phase === 'boss'
-                            ? `${level.bossName} strikes! -1♥`
-                            : 'Miss! -1♥'}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </motion.div>
               )}
 
-              {phase === 'levelComplete' && (
-                <motion.div
-                  key="level-complete"
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-lg border border-primary-200/30 bg-primary-500/15 p-3 sm:p-5 text-center"
-                >
-                  <Award className="mx-auto h-8 w-8 sm:h-12 sm:w-12 text-primary-100" />
-                  <h2 className="mt-2 text-lg sm:text-2xl font-black text-white">Boss Defeated</h2>
-                  <p className="mt-1 text-xs sm:text-sm font-semibold text-white/70">
-                    {level.rewards.title}. Next zone unlocked.
-                  </p>
-                  <div className="mt-2 sm:mt-4 grid grid-cols-3 gap-1.5 text-xs font-bold">
-                    <span className="rounded-lg bg-primary-950/30 px-2 py-1.5">+{level.rewards.coins}c</span>
-                    <span className="rounded-lg bg-primary-950/30 px-2 py-1.5">+{level.rewards.gems}g</span>
-                    <span className="rounded-lg bg-primary-950/30 px-2 py-1.5">+{level.rewards.exp}xp</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={continueToNextLevel}
-                    className="mt-3 sm:mt-5 inline-flex h-9 sm:h-11 items-center justify-center gap-2 rounded-lg bg-primary-200 px-4 text-xs sm:text-sm font-black text-[#00441b] transition hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-white"
-                  >
-                    <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    View Map
-                  </button>
-                </motion.div>
-              )}
-
-              {phase === 'gameComplete' && (
-                <motion.div
-                  key="game-complete"
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-lg border border-primary-200/30 bg-primary-400/15 p-3 sm:p-5 text-center"
-                >
-                  <Trophy className="mx-auto h-8 w-8 sm:h-12 sm:w-12 text-primary-100" />
-                  <h2 className="mt-2 text-lg sm:text-2xl font-black text-white">All Levels Cleared!</h2>
-                  <p className="mt-1 text-xs sm:text-sm font-semibold text-white/70">
-                    Every boss defeated. All zones unlocked.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={resetGame}
-                    className="mt-3 sm:mt-5 inline-flex h-9 sm:h-11 items-center justify-center gap-2 rounded-lg bg-primary-200 px-4 text-xs sm:text-sm font-black text-[#00441b] transition hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-white"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Play Again
-                  </button>
-                </motion.div>
-              )}
-
-              {phase === 'gameOver' && (
-                <motion.div
-                  key="game-over"
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-lg border border-primary-200/30 bg-primary-950/45 p-3 sm:p-5 text-center"
-                >
-                  <XCircle className="mx-auto h-8 w-8 sm:h-12 sm:w-12 text-primary-100" />
-                  <h2 className="mt-2 text-lg sm:text-2xl font-black text-white">Quest Failed</h2>
-                  <p className="mt-1 text-xs sm:text-sm font-semibold text-white/70">
-                    Hearts depleted on level {level.number}.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={resetGame}
-                    className="mt-3 sm:mt-5 inline-flex h-9 sm:h-11 items-center justify-center gap-2 rounded-lg bg-primary-300 px-4 text-xs sm:text-sm font-black text-[#00441b] transition hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-white"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Retry
-                  </button>
-                </motion.div>
-              )}
+              {phase === 'levelComplete' && (<span className="hidden" />)}
+              {phase === 'gameComplete' && (<span className="hidden" />)}
+              {phase === 'gameOver' && (<span className="hidden" />)}
             </AnimatePresence>
-            </div>
           </div>
         </main>
 
       </div>
+
+      {/* Score Popup Modal — compact centered card */}
+      <AnimatePresence>
+        {phase === 'levelComplete' && (
+          <motion.div
+            key="level-complete-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+              className="relative rounded-xl border border-purple-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(168,85,247,0.35)]"
+              style={{ width: '90vw', maxWidth: '340px' }}
+            >
+              <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
+
+              <div className="flex justify-center gap-0.5 mb-1">
+                {[1, 2, 3].map(s => (
+                  <Star key={s} className={`h-6 w-6 ${s <= (hearts >= 5 ? 3 : hearts >= 3 ? 2 : 1) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'}`} />
+                ))}
+              </div>
+
+              <span className="inline-block rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-sm font-bold text-emerald-300">✅ Passed</span>
+
+              <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
+                Level {level.number} Result
+              </h2>
+
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-left">
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
+                  <p className="text-lg font-black text-white">{QUESTIONS_PER_PHASE}/{QUESTIONS_PER_PHASE}</p>
+                </div>
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">⭐ Stars</p>
+                  <p className="text-lg font-black text-yellow-300">{stars}</p>
+                </div>
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">🏆 Points</p>
+                  <p className="text-lg font-black text-white">{score}</p>
+                </div>
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">❤️ Hearts</p>
+                  <p className="text-lg font-black text-cyan-300">{hearts}/{MAX_HEARTS}</p>
+                </div>
+              </div>
+
+              <p className="mt-2 text-sm font-semibold text-purple-200/80">🎉 Amazing job!</p>
+
+              <div className="mt-3 flex gap-2 justify-center">
+                <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+                  <RotateCcw className="h-4 w-4" /> Retry
+                </button>
+                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+                  <MapIcon className="h-4 w-4" /> Map
+                </button>
+                <button type="button" onClick={continueToNextLevel} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400">
+                  <Flame className="h-4 w-4" /> Next
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {phase === 'gameComplete' && (
+          <motion.div
+            key="game-complete-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+              className="relative rounded-xl border border-yellow-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(250,204,21,0.3)]"
+              style={{ width: '90vw', maxWidth: '340px' }}
+            >
+              <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
+
+              <Trophy className="mx-auto h-9 w-9 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.7)]" />
+
+              <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
+                🎊 All Levels Cleared!
+              </h2>
+
+              <p className="mt-1 text-sm font-semibold text-purple-200/80">You are a MindSpark champion!</p>
+
+              <div className="mt-3 flex gap-2 justify-center">
+                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+                  <MapIcon className="h-4 w-4" /> Map
+                </button>
+                <button type="button" onClick={resetGame} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-yellow-500 to-orange-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-yellow-500/30 hover:from-yellow-400 hover:to-orange-400">
+                  <RotateCcw className="h-4 w-4" /> Play Again
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {phase === 'gameOver' && (
+          <motion.div
+            key="game-over-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+              className="relative rounded-xl border border-red-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(239,68,68,0.25)]"
+              style={{ width: '90vw', maxWidth: '340px' }}
+            >
+              <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-red-400 to-transparent" />
+
+              <XCircle className="mx-auto h-8 w-8 text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+
+              <span className="mt-1 inline-block rounded-full bg-red-500/20 border border-red-400/40 px-3 py-0.5 text-sm font-bold text-red-300">❌ Failed</span>
+
+              <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-300 via-pink-300 to-purple-300">
+                Level {level.number} Result
+              </h2>
+
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-left">
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
+                  <p className="text-lg font-black text-white">{normalCorrectCount}/{QUESTIONS_PER_PHASE}</p>
+                </div>
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">⭐ Stars</p>
+                  <p className="text-lg font-black text-yellow-300">{stars}</p>
+                </div>
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">🏆 Points</p>
+                  <p className="text-lg font-black text-white">{score}</p>
+                </div>
+                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">❤️ Hearts</p>
+                  <p className="text-lg font-black text-red-300">0/{MAX_HEARTS}</p>
+                </div>
+              </div>
+
+              <p className="mt-2 text-sm font-semibold text-purple-200/80">💪 Try again, hero!</p>
+
+              <div className="mt-3 flex gap-2 justify-center">
+                <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-purple-500/30 hover:from-purple-400 hover:to-pink-400">
+                  <RotateCcw className="h-4 w-4" /> Retry
+                </button>
+                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+                  <MapIcon className="h-4 w-4" /> Map
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Level Up Celebration Overlay */}
       <AnimatePresence>
@@ -1377,7 +1626,7 @@ export default function QuizAdventure({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -40 }}
             transition={{ duration: 0.4 }}
-            className="absolute top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-yellow-400/40 bg-[#0d2b18]/95 px-5 py-3 shadow-2xl backdrop-blur-md"
+            className="absolute top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-yellow-400/40 bg-[#2e215b]/95 px-5 py-3 shadow-2xl backdrop-blur-md"
           >
             <div className="flex items-center gap-3">
               <span className="text-2xl">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.icon ?? '🏅' })()}</span>

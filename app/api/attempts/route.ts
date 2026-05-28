@@ -46,6 +46,18 @@ export async function POST(request: Request) {
     [session.userId, characterId, levelNumber, phase, questionId, selectedAnswer, isCorrect, heartsRemaining, scoreEarned],
   )
 
+  // Update star wallet and score in real-time for correct answers
+  if (isCorrect && scoreEarned > 0) {
+    await execute(
+      `INSERT INTO student_wallets (user_id, stars)
+       VALUES (?, 1)
+       ON DUPLICATE KEY UPDATE
+         stars = stars + 1,
+         updated_at = NOW()`,
+      [session.userId],
+    )
+  }
+
   return NextResponse.json({ success: true, message: 'Attempt recorded' })
 }
 

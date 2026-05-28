@@ -1,28 +1,25 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BookOpenCheck,
-  GraduationCap,
+  BarChart3,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Filter,
   KeyRound,
   Lock,
-  LogOut,
-  Pencil,
-  PlusCircle,
-  RefreshCw,
-  School,
-  ShieldCheck,
+  Mail,
+  Search,
+  Shield,
   Star,
   Unlock,
   UserPlus,
   Users,
 } from 'lucide-react'
-
 import { useAuth } from '@/hooks/useAuth'
-import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
 import type { EnrollmentStatus, PublicUser } from '@/types/user'
 
 type StudentProgress = {
@@ -31,7 +28,15 @@ type StudentProgress = {
   completedLevels: number[]
   starBalance: number
   currentLevel: number
-  performanceColor: 'green' | 'yellow' | 'red'
+  performanceColor: 'none' | 'green' | 'yellow' | 'red'
+}
+
+type QuizScore = {
+  levelNumber: number
+  totalAttempts: number
+  correctAttempts: number
+  totalScore: number
+  lastAttempt: string
 }
 
 type Student = PublicUser & {
@@ -41,788 +46,467 @@ type Student = PublicUser & {
   parentEmail: string | null
   progress: StudentProgress
   teacherUnlockedLevels: number[]
+  quizScores: QuizScore[]
 }
 
-type Classroom = {
-  id: number
-  name: string
-  studentCount: number
-  createdAt: string
-  updatedAt: string
-}
+type Classroom = { id: number; name: string; studentCount: number }
 
-const statusTone: Record<EnrollmentStatus, string> = {
-  enrolled: 'border-primary-300/25 bg-primary-400/10 text-primary-100',
-  pending: 'border-primary-300/25 bg-primary-400/10 text-primary-100',
-  disabled: 'border-primary-200/30 bg-primary-950/45 text-primary-50',
-}
+const ITEMS_PER_PAGE = 10
 
-const performanceColors: Record<string, string> = {
-  green: 'bg-emerald-500',
-  yellow: 'bg-yellow-400',
-  red: 'bg-red-500',
-}
-
-function isFieldErrors(value: unknown): value is Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  return Object.values(value).every(item => typeof item === 'string')
+const perfConfig: Record<string, { dot: string; bg: string; label: string; text: string }> = {
+  none: { dot: 'bg-gray-400', bg: 'bg-gray-400/10 border-gray-400/30', label: 'Not Started', text: 'text-gray-300' },
+  green: { dot: 'bg-emerald-500', bg: 'bg-emerald-500/10 border-emerald-400/30', label: 'Good', text: 'text-emerald-300' },
+  yellow: { dot: 'bg-yellow-400', bg: 'bg-yellow-400/10 border-yellow-400/30', label: 'Average', text: 'text-yellow-300' },
+  red: { dot: 'bg-red-500', bg: 'bg-red-500/10 border-red-400/30', label: 'Needs Help', text: 'text-red-300' },
 }
 
 export default function TeacherStudentsPage() {
-  const router = useRouter()
-  const { user, loading: authLoading, isAuthed, logout } = useAuth()
-  const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [selectedClassroomId, setSelectedClassroomId] = useState<number | null>(null)
+  const { user } = useAuth()
   const [students, setStudents] = useState<Student[]>([])
-  const [loadingClassrooms, setLoadingClassrooms] = useState(true)
-  const [loadingStudents, setLoadingStudents] = useState(false)
-  const [creatingClassroom, setCreatingClassroom] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [classroomName, setClassroomName] = useState('')
-  const [form, setForm] = useState({ username: '', email: '', password: '' })
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const [classroomError, setClassroomError] = useState<string | null>(null)
-  const [passwordDrafts, setPasswordDrafts] = useState<Record<number, string>>({})
-  const [parentEmailDrafts, setParentEmailDrafts] = useState<Record<number, string>>({})
-  const [notifyingParent, setNotifyingParent] = useState<number | null>(null)
+  const [classrooms, setClassrooms] = useState<Classroom[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Edit classroom state
-  const [editingClassroomId, setEditingClassroomId] = useState<number | null>(null)
-  const [editClassroomName, setEditClassroomName] = useState('')
-  const [savingClassroomEdit, setSavingClassroomEdit] = useState(false)
+  // Filters
+  const [search, setSearch] = useState('')
+  const [filterClassroom, setFilterClassroom] = useState<number | ''>('')
+  const [filterPerformance, setFilterPerformance] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string>('')
 
-  // Level unlock loading state
+  // Pagination
+  const [page, setPage] = useState(1)
+
+  // Expanded student
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  // Action states
+  const [passwordDraft, setPasswordDraft] = useState('')
+  const [parentEmailDraft, setParentEmailDraft] = useState('')
+  const [saving, setSaving] = useState(false)
   const [unlockingLevel, setUnlockingLevel] = useState<string | null>(null)
 
-  const selectedClassroom = useMemo(
-    () => classrooms.find(classroom => classroom.id === selectedClassroomId) ?? null,
-    [classrooms, selectedClassroomId],
-  )
-
-  const totalStudents = useMemo(
-    () => classrooms.reduce((sum, classroom) => sum + Number(classroom.studentCount ?? 0), 0),
-    [classrooms],
-  )
-
-  const enrolledCount = useMemo(
-    () => students.filter(student => student.enrollmentStatus === 'enrolled').length,
-    [students],
-  )
-
-  const loadClassrooms = useCallback(async () => {
-    setLoadingClassrooms(true)
-    setError(null)
+  const loadData = useCallback(async () => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/teacher/classrooms', { credentials: 'include' })
-      const json = await response.json()
-      if (!response.ok || !json.success) throw new Error(json.message ?? 'Failed to load classrooms')
-
-      const next = (json.data ?? []) as Classroom[]
-      setClassrooms(next)
-      setSelectedClassroomId(current => {
-        if (current && next.some(classroom => classroom.id === current)) return current
-        return next[0]?.id ?? null
-      })
-      if (next.length === 0) setStudents([])
-      return next
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load classrooms')
-      return []
+      const [studRes, classRes] = await Promise.all([
+        fetch('/api/teacher/students', { credentials: 'include' }),
+        fetch('/api/teacher/classrooms', { credentials: 'include' }),
+      ])
+      const studJson = await studRes.json()
+      const classJson = await classRes.json()
+      if (studJson.success) setStudents(studJson.data)
+      if (classJson.success) setClassrooms(classJson.data)
+    } catch {
+      setError('Failed to load data')
     } finally {
-      setLoadingClassrooms(false)
+      setLoading(false)
     }
   }, [])
 
-  const loadStudents = useCallback(async (classroomId: number | null) => {
-    if (!classroomId) {
-      setStudents([])
-      return
-    }
+  useEffect(() => { loadData() }, [loadData])
 
-    setLoadingStudents(true)
-    setError(null)
-    try {
-      const response = await fetch(`/api/teacher/students?classroomId=${classroomId}`, { credentials: 'include' })
-      const json = await response.json()
-      if (!response.ok || !json.success) throw new Error(json.message ?? 'Failed to load students')
-      setStudents(json.data ?? [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students')
-    } finally {
-      setLoadingStudents(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (authLoading) return
-    if (!isAuthed) {
-      router.replace('/login')
-      return
-    }
-    if (user?.role !== 'teacher') {
-      router.replace('/character-select')
-    }
-  }, [authLoading, isAuthed, router, user?.role])
-
-  useEffect(() => {
-    if (user?.role !== 'teacher') return
-    void loadClassrooms()
-  }, [loadClassrooms, user?.role])
-
-  useEffect(() => {
-    if (user?.role !== 'teacher') return
-    if (!selectedClassroomId) {
-      setStudents([])
-      setLoadingStudents(false)
-      return
-    }
-    void loadStudents(selectedClassroomId)
-  }, [loadStudents, selectedClassroomId, user?.role])
-
-  async function refreshData() {
-    const next = await loadClassrooms()
-    const selectedStillExists = selectedClassroomId && next.some(classroom => classroom.id === selectedClassroomId)
-    const nextClassroomId = selectedStillExists ? selectedClassroomId : next[0]?.id
-    if (nextClassroomId) await loadStudents(nextClassroomId)
-  }
-
-  async function createClassroom(event: React.FormEvent) {
-    event.preventDefault()
-    const name = classroomName.trim()
-    if (name.length < 2 || name.length > 80) {
-      setClassroomError('Classroom name must be 2-80 characters')
-      return
-    }
-
-    setCreatingClassroom(true)
-    setClassroomError(null)
-    setError(null)
-    try {
-      const response = await fetch('/api/teacher/classrooms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name }),
-      })
-      const json = await response.json()
-      if (!response.ok || !json.success) {
-        if (isFieldErrors(json.data)) setClassroomError(json.data.name ?? null)
-        throw new Error(json.message ?? 'Failed to create classroom')
+  // Filtered + paginated
+  const filtered = useMemo(() => {
+    return students.filter(s => {
+      if (search) {
+        const q = search.toLowerCase()
+        if (!s.username.toLowerCase().includes(q) && !s.email.toLowerCase().includes(q)) return false
       }
+      if (filterClassroom && s.classroomId !== filterClassroom) return false
+      if (filterPerformance && s.progress.performanceColor !== filterPerformance) return false
+      if (filterStatus && s.enrollmentStatus !== filterStatus) return false
+      return true
+    })
+  }, [students, search, filterClassroom, filterPerformance, filterStatus])
 
-      const classroom = json.data as Classroom
-      setClassrooms(current => [classroom, ...current])
-      setSelectedClassroomId(classroom.id)
-      setClassroomName('')
-      setStudents([])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create classroom')
-    } finally {
-      setCreatingClassroom(false)
-    }
-  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+  const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
-  async function renameClassroom(event: React.FormEvent) {
-    event.preventDefault()
-    if (!editingClassroomId) return
-    const name = editClassroomName.trim()
-    if (name.length < 2 || name.length > 80) {
-      setError('Classroom name must be 2-80 characters')
-      return
-    }
+  // Reset page when filters change
+  useEffect(() => { setPage(1) }, [search, filterClassroom, filterPerformance, filterStatus])
 
-    setSavingClassroomEdit(true)
+  // Stats
+  const totalStudents = students.length
+  const activeStudents = students.filter(s => s.progress.performanceColor !== 'none').length
+  const greenCount = students.filter(s => s.progress.performanceColor === 'green').length
+
+  // Actions
+  async function updateStudent(studentId: number, changes: Record<string, string>) {
+    setSaving(true)
     setError(null)
     try {
-      const response = await fetch('/api/teacher/classrooms', {
+      const res = await fetch(`/api/teacher/students/${studentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ id: editingClassroomId, name }),
+        body: JSON.stringify(changes),
       })
-      const json = await response.json()
-      if (!response.ok || !json.success) throw new Error(json.message ?? 'Failed to rename classroom')
-
-      const updated = json.data as Classroom
-      setClassrooms(current => current.map(c => (c.id === updated.id ? updated : c)))
-      setEditingClassroomId(null)
-      setEditClassroomName('')
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.message)
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, ...json.data } : s))
+      setPasswordDraft('')
+      setParentEmailDraft('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to rename classroom')
-    } finally {
-      setSavingClassroomEdit(false)
-    }
-  }
-
-  async function enrollStudent(event: React.FormEvent) {
-    event.preventDefault()
-    const errs: Record<string, string> = {}
-
-    if (!selectedClassroomId) errs.classroomId = 'Create and select a classroom before enrolling students.'
-    if (form.username.trim().length < 3 || form.username.trim().length > 32 || !/^[a-zA-Z0-9_]+$/.test(form.username.trim())) {
-      errs.username = 'Username must be 3-32 letters, numbers, or underscores.'
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      errs.email = 'A valid email address is required.'
-    }
-    if (form.password.length < 8 || !/[a-zA-Z]/.test(form.password) || !/\d/.test(form.password)) {
-      errs.password = 'Password must be at least 8 characters and include a letter and a number.'
-    }
-
-    if (Object.keys(errs).length > 0) {
-      setFormErrors(errs)
-      setError(errs.classroomId ?? null)
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    setFormErrors({})
-    try {
-      const response = await fetch('/api/teacher/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ...form,
-          username: form.username.trim(),
-          email: form.email.trim(),
-          classroomId: selectedClassroomId,
-        }),
-      })
-      const json = await response.json()
-      if (!response.ok || !json.success) {
-        if (isFieldErrors(json.data)) {
-          setFormErrors(json.data)
-          if (json.data.classroomId) setError(json.data.classroomId)
-        }
-        throw new Error(json.message ?? 'Failed to enroll student')
-      }
-
-      setStudents(current => [json.data, ...current])
-      setClassrooms(current =>
-        current.map(classroom =>
-          classroom.id === selectedClassroomId
-            ? { ...classroom, studentCount: Number(classroom.studentCount ?? 0) + 1 }
-            : classroom,
-        ),
-      )
-      setForm({ username: '', email: '', password: '' })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to enroll student')
+      setError(err instanceof Error ? err.message : 'Failed to update')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function updateStudent(studentId: number, changes: Record<string, string>) {
-    setError(null)
-    const response = await fetch(`/api/teacher/students/${studentId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(changes),
-    })
-    const json = await response.json()
-    if (!response.ok || !json.success) {
-      setError(json.message ?? 'Failed to update student')
-      return
-    }
-
-    setStudents(current => current.map(student => (student.id === studentId ? { ...student, ...json.data } : student)))
-    if (changes.password) {
-      setPasswordDrafts(current => ({ ...current, [studentId]: '' }))
     }
   }
 
   async function toggleLevelUnlock(studentId: number, levelNumber: number, currentlyUnlocked: boolean) {
     const key = `${studentId}-${levelNumber}`
     setUnlockingLevel(key)
-    setError(null)
     try {
       const method = currentlyUnlocked ? 'DELETE' : 'POST'
-      const response = await fetch(`/api/teacher/students/${studentId}/unlock-level`, {
+      const res = await fetch(`/api/teacher/students/${studentId}/unlock-level`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ levelNumber }),
       })
-      const json = await response.json()
-      if (!response.ok || !json.success) throw new Error(json.message ?? 'Failed to toggle level unlock')
-
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.message)
       const newUnlocks: number[] = json.data?.unlockedLevels ?? []
-      setStudents(current =>
-        current.map(student =>
-          student.id === studentId ? { ...student, teacherUnlockedLevels: newUnlocks } : student,
-        ),
-      )
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, teacherUnlockedLevels: newUnlocks } : s))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle level unlock')
+      setError(err instanceof Error ? err.message : 'Failed')
     } finally {
       setUnlockingLevel(null)
     }
   }
 
-  async function notifyParent(studentId: number) {
-    setNotifyingParent(studentId)
-    setError(null)
-    try {
-      const response = await fetch(`/api/teacher/students/${studentId}/notify-parent`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      const json = await response.json()
-      if (!response.ok || !json.success) throw new Error(json.message ?? 'Failed to send notification')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to notify parent')
-    } finally {
-      setNotifyingParent(null)
-    }
-  }
-
-  if (authLoading || loadingClassrooms || user?.role !== 'teacher') {
+  if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-game-gradient text-primary-300">
-        <RefreshCw className="mr-3 h-5 w-5 animate-spin" />
-        <span className="font-game text-sm">Loading teacher workspace...</span>
-      </main>
+      <div className="flex items-center justify-center py-20">
+        <div className="flex items-center gap-3 text-purple-300">
+          <Users className="h-5 w-5 animate-pulse" />
+          <span className="text-sm font-bold">Loading students...</span>
+        </div>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-game-gradient text-white">
-      <nav className="sticky top-0 z-20 border-b border-primary-200/10 bg-dark-900/85 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <GraduationCap className="h-6 w-6 shrink-0 text-primary-300" />
-            <div className="min-w-0">
-              <h1 className="truncate font-game text-lg font-black">Teacher Management</h1>
-              <p className="truncate text-xs text-primary-100/45">
-                {selectedClassroom ? `${user.username} / ${selectedClassroom.name}` : `${user.username} classroom setup`}
-              </p>
-            </div>
-          </div>
-          <Button variant="ghost" size="sm" icon={<LogOut className="h-3.5 w-3.5" />} onClick={logout}>
-            Sign Out
-          </Button>
+    <div className="space-y-5">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-black">All Students</h2>
+          <p className="text-sm text-purple-300">Manage and monitor student accounts</p>
         </div>
-      </nav>
-
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <section className="rounded-lg border border-primary-200/15 bg-primary-900/80 p-5 shadow-card backdrop-blur-md">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-primary-300">Classroom</p>
-                <h2 className="text-xl font-black">Create Classroom</h2>
-              </div>
-              <School className="h-6 w-6 text-primary-300" />
-            </div>
-
-            <form onSubmit={createClassroom} className="space-y-4">
-              <Input
-                label="Classroom Name"
-                value={classroomName}
-                onChange={event => setClassroomName(event.target.value)}
-                placeholder="Grade 5 Math"
-                autoComplete="off"
-                error={classroomError ?? undefined}
-              />
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                variant="neon"
-                loading={creatingClassroom}
-                icon={<PlusCircle className="h-4 w-4" />}
-              >
-                Create Classroom
-              </Button>
-            </form>
-
-            <div className="mt-5 space-y-2">
-              {classrooms.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-primary-200/20 p-4 text-center text-sm text-primary-100/45">
-                  No classrooms yet.
-                </div>
-              ) : (
-                classrooms.map(classroom => {
-                  const active = classroom.id === selectedClassroomId
-                  const isEditing = editingClassroomId === classroom.id
-                  return (
-                    <div key={classroom.id} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => setSelectedClassroomId(classroom.id)}
-                          className={[
-                            'flex flex-1 items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition',
-                            active
-                              ? 'border-primary-300/60 bg-primary-500/15 text-white'
-                              : 'border-primary-200/15 bg-primary-950/25 text-primary-100 hover:bg-primary-200/10',
-                          ].join(' ')}
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-bold">{classroom.name}</span>
-                            <span className="text-xs text-primary-100/45">{classroom.studentCount} students</span>
-                          </span>
-                          <BookOpenCheck className={active ? 'h-4 w-4 text-primary-300' : 'h-4 w-4 text-primary-100/45'} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingClassroomId(isEditing ? null : classroom.id)
-                            setEditClassroomName(classroom.name)
-                          }}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-primary-200/15 bg-primary-950/25 text-primary-100/65 transition hover:bg-primary-200/10 hover:text-white"
-                          title="Rename classroom"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                      {isEditing && (
-                        <form onSubmit={renameClassroom} className="flex items-center gap-2 pl-1">
-                          <Input
-                            containerClassName="flex-1"
-                            value={editClassroomName}
-                            onChange={e => setEditClassroomName(e.target.value)}
-                            placeholder="New name"
-                            autoComplete="off"
-                          />
-                          <Button type="submit" size="sm" variant="neon" loading={savingClassroomEdit}>
-                            Save
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" onClick={() => setEditingClassroomId(null)}>
-                            Cancel
-                          </Button>
-                        </form>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-primary-200/15 bg-primary-900/80 p-5 shadow-card backdrop-blur-md">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-primary-300">Enrollment</p>
-                <h2 className="text-xl font-black">Create Student Login</h2>
-              </div>
-              <UserPlus className="h-6 w-6 text-primary-300" />
-            </div>
-
-            <form onSubmit={enrollStudent} className="space-y-4">
-              <Input
-                label="Username"
-                value={form.username}
-                onChange={event => setForm(current => ({ ...current, username: event.target.value }))}
-                placeholder="StudentName"
-                autoComplete="off"
-                disabled={!selectedClassroom}
-                error={formErrors.username}
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={form.email}
-                onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
-                placeholder="student@example.com"
-                autoComplete="off"
-                disabled={!selectedClassroom}
-                error={formErrors.email}
-              />
-              <Input
-                label="Assigned Password"
-                type="text"
-                value={form.password}
-                onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
-                placeholder="At least 8 characters"
-                autoComplete="off"
-                disabled={!selectedClassroom}
-                error={formErrors.password}
-              />
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                loading={saving}
-                disabled={!selectedClassroom}
-                icon={<ShieldCheck className="h-4 w-4" />}
-              >
-                Enroll Student
-              </Button>
-            </form>
-
-            {error && (
-              <p className="mt-4 rounded-lg border border-primary-200/35 bg-primary-950/45 px-3 py-2 text-sm text-primary-50">
-                {error}
-              </p>
-            )}
-          </section>
-        </div>
-
-        <section className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-primary-200/15 bg-primary-900/75 p-4">
-              <p className="text-xs font-bold uppercase text-primary-100/45">Classrooms</p>
-              <p className="mt-1 text-2xl font-black text-white">{classrooms.length}</p>
-            </div>
-            <div className="rounded-lg border border-primary-200/15 bg-primary-900/75 p-4">
-              <p className="text-xs font-bold uppercase text-primary-100/45">All Students</p>
-              <p className="mt-1 text-2xl font-black text-white">{totalStudents}</p>
-            </div>
-            <div className="rounded-lg border border-primary-200/15 bg-primary-900/75 p-4">
-              <p className="text-xs font-bold uppercase text-primary-100/45">Selected</p>
-              <p className="mt-1 text-2xl font-black text-primary-200">{enrolledCount}</p>
-            </div>
-            <button
-              type="button"
-              onClick={refreshData}
-              className="flex min-h-20 items-center justify-center gap-2 rounded-lg border border-primary-200/15 bg-primary-900/75 px-4 text-sm font-bold text-white transition hover:bg-primary-200/10"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </button>
-          </div>
-
-          {/* Performance Summary */}
-          {students.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-emerald-500" />
-                  <p className="text-xs font-bold uppercase text-emerald-300">Good Performance</p>
-                </div>
-                <p className="mt-1 text-2xl font-black text-emerald-200">{students.filter(s => s.progress.performanceColor === 'green').length}</p>
-                <p className="text-xs text-primary-100/45">3+ levels completed</p>
-              </div>
-              <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-4">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-yellow-400" />
-                  <p className="text-xs font-bold uppercase text-yellow-300">Average Performance</p>
-                </div>
-                <p className="mt-1 text-2xl font-black text-yellow-200">{students.filter(s => s.progress.performanceColor === 'yellow').length}</p>
-                <p className="text-xs text-primary-100/45">1-2 levels completed</p>
-              </div>
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-red-500" />
-                  <p className="text-xs font-bold uppercase text-red-300">Needs Attention</p>
-                </div>
-                <p className="mt-1 text-2xl font-black text-red-200">{students.filter(s => s.progress.performanceColor === 'red').length}</p>
-                <p className="text-xs text-primary-100/45">0 levels completed</p>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-primary-200/15 bg-primary-900/70 p-4 shadow-card backdrop-blur-md">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Users className="h-5 w-5 shrink-0 text-primary-300" />
-                <h2 className="truncate text-lg font-black">
-                  {selectedClassroom ? selectedClassroom.name : 'Student Accounts'}
-                </h2>
-              </div>
-              {loadingStudents && <RefreshCw className="h-4 w-4 animate-spin text-primary-300" />}
-            </div>
-
-            {!selectedClassroom ? (
-              <div className="rounded-lg border border-dashed border-primary-200/20 p-8 text-center text-sm text-primary-100/45">
-                Create a classroom first.
-              </div>
-            ) : students.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-primary-200/20 p-8 text-center text-sm text-primary-100/45">
-                No enrolled students in this classroom yet.
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {students.map(student => (
-                  <motion.article
-                    key={student.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-lg border border-primary-200/15 bg-primary-950/25 p-4"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`h-3 w-3 rounded-full ${performanceColors[student.progress.performanceColor]}`} title={`Performance: ${student.progress.performanceColor}`} />
-                          <h3 className="truncate text-base font-black">{student.username}</h3>
-                          <span className={`rounded-md border px-2 py-1 text-xs font-bold ${statusTone[student.enrollmentStatus]}`}>
-                            {student.enrollmentStatus}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-sm text-primary-100/65">{student.email}</p>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-primary-100/45">
-                          <School className="h-3 w-3" />
-                          {student.classroomName ?? selectedClassroom.name}
-                        </p>
-
-                        {/* Progress Stats */}
-                        <div className="mt-3 flex flex-wrap items-center gap-3">
-                          <div className="flex items-center gap-1.5 rounded-md border border-primary-200/15 bg-primary-950/40 px-2.5 py-1.5">
-                            <BookOpenCheck className="h-3.5 w-3.5 text-primary-300" />
-                            <span className="text-xs font-bold text-primary-100">
-                              {student.progress.levelsCompleted}/{student.progress.totalLevels} levels
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 rounded-md border border-primary-200/15 bg-primary-950/40 px-2.5 py-1.5">
-                            <Star className="h-3.5 w-3.5 text-yellow-400" />
-                            <span className="text-xs font-bold text-primary-100">
-                              {student.progress.starBalance} stars
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 rounded-md border border-primary-200/15 bg-primary-950/40 px-2.5 py-1.5">
-                            <GraduationCap className="h-3.5 w-3.5 text-primary-300" />
-                            <span className="text-xs font-bold text-primary-100">
-                              Lv. {student.progress.currentLevel}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant={student.enrollmentStatus === 'disabled' ? 'primary' : 'secondary'}
-                          onClick={() =>
-                            updateStudent(student.id, {
-                              enrollmentStatus: student.enrollmentStatus === 'disabled' ? 'enrolled' : 'disabled',
-                            })
-                          }
-                        >
-                          {student.enrollmentStatus === 'disabled' ? 'Reactivate' : 'Disable'}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Level Unlock Controls */}
-                    <div className="mt-4">
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-primary-100/55">Unlock Levels</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[1, 2, 3, 4, 5].map(levelNum => {
-                          const completedByStudent = student.progress.completedLevels.includes(levelNum)
-                          const unlockedByTeacher = student.teacherUnlockedLevels.includes(levelNum)
-                          const autoUnlocked = levelNum <= student.progress.levelsCompleted + 1
-                          const _isUnlocked = completedByStudent || unlockedByTeacher || autoUnlocked // eslint-disable-line @typescript-eslint/no-unused-vars
-                          const loadingKey = `${student.id}-${levelNum}`
-                          const isLoading = unlockingLevel === loadingKey
-
-                          return (
-                            <button
-                              key={levelNum}
-                              type="button"
-                              disabled={completedByStudent || isLoading}
-                              onClick={() => toggleLevelUnlock(student.id, levelNum, unlockedByTeacher)}
-                              className={[
-                                'flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition',
-                                completedByStudent
-                                  ? 'cursor-default border-emerald-500/40 bg-emerald-500/20 text-emerald-300'
-                                  : unlockedByTeacher
-                                    ? 'border-yellow-400/40 bg-yellow-400/15 text-yellow-300 hover:bg-yellow-400/25'
-                                    : autoUnlocked
-                                      ? 'cursor-default border-primary-300/30 bg-primary-500/10 text-primary-200'
-                                      : 'border-primary-200/20 bg-primary-950/40 text-primary-100/50 hover:border-primary-300/40 hover:text-primary-100',
-                              ].join(' ')}
-                              title={
-                                completedByStudent
-                                  ? `Level ${levelNum} completed`
-                                  : unlockedByTeacher
-                                    ? `Level ${levelNum} unlocked by teacher (click to lock)`
-                                    : autoUnlocked
-                                      ? `Level ${levelNum} auto-unlocked`
-                                      : `Click to unlock level ${levelNum}`
-                              }
-                            >
-                              {isLoading ? (
-                                <RefreshCw className="h-3 w-3 animate-spin" />
-                              ) : completedByStudent ? (
-                                <span>✓</span>
-                              ) : unlockedByTeacher ? (
-                                <Unlock className="h-3.5 w-3.5" />
-                              ) : autoUnlocked ? (
-                                <span>{levelNum}</span>
-                              ) : (
-                                <Lock className="h-3.5 w-3.5" />
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <Input
-                        containerClassName="flex-1"
-                        label="Reset Password"
-                        type="text"
-                        value={passwordDrafts[student.id] ?? ''}
-                        onChange={event =>
-                          setPasswordDrafts(current => ({ ...current, [student.id]: event.target.value }))
-                        }
-                        placeholder="New assigned password"
-                        autoComplete="off"
-                      />
-                      <Button
-                        type="button"
-                        variant="neon"
-                        className="sm:mt-7"
-                        icon={<KeyRound className="h-3.5 w-3.5" />}
-                        disabled={!passwordDrafts[student.id]}
-                        onClick={() => updateStudent(student.id, { password: passwordDrafts[student.id] })}
-                      >
-                        Save
-                      </Button>
-                    </div>
-
-                    {/* Parent Email & Notify */}
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <Input
-                        containerClassName="flex-1"
-                        label="Parent Email"
-                        type="email"
-                        value={parentEmailDrafts[student.id] ?? student.parentEmail ?? ''}
-                        onChange={event =>
-                          setParentEmailDrafts(current => ({ ...current, [student.id]: event.target.value }))
-                        }
-                        placeholder="parent@example.com"
-                        autoComplete="off"
-                      />
-                      <Button
-                        type="button"
-                        variant="neon"
-                        className="sm:mt-7"
-                        disabled={!(parentEmailDrafts[student.id] ?? student.parentEmail)}
-                        onClick={() => {
-                          const email = parentEmailDrafts[student.id] ?? student.parentEmail ?? ''
-                          if (email !== (student.parentEmail ?? '')) {
-                            updateStudent(student.id, { parentEmail: email })
-                          }
-                        }}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="sm:mt-7"
-                        disabled={!student.parentEmail || notifyingParent === student.id}
-                        onClick={() => notifyParent(student.id)}
-                      >
-                        {notifyingParent === student.id ? 'Sending...' : 'Notify Parent'}
-                      </Button>
-                    </div>
-                  </motion.article>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+        <button
+          onClick={() => window.location.href = '/teacher/dashboard'}
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition"
+        >
+          <UserPlus className="h-4 w-4" />
+          Add Student
+        </button>
       </div>
-    </main>
+
+      {error && <div className="rounded-lg bg-red-500/20 border border-red-400/30 px-4 py-2 text-sm text-red-200">{error}</div>}
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 p-3 shadow-lg shadow-blue-500/20">
+          <p className="text-[10px] font-bold uppercase text-white/70">Total Students</p>
+          <p className="text-2xl font-black text-white">{totalStudents}</p>
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 p-3 shadow-lg shadow-purple-500/20">
+          <p className="text-[10px] font-bold uppercase text-white/70">Active</p>
+          <p className="text-2xl font-black text-white">{activeStudents}</p>
+          <p className="text-[9px] text-white/60">{totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0}% of total</p>
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 p-3 shadow-lg shadow-emerald-500/20">
+          <p className="text-[10px] font-bold uppercase text-white/70">Performing Well</p>
+          <p className="text-2xl font-black text-white">{greenCount}</p>
+          <p className="text-[9px] text-white/60">3+ levels completed</p>
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-orange-500 to-red-500 p-3 shadow-lg shadow-orange-500/20">
+          <p className="text-[10px] font-bold uppercase text-white/70">By Classroom</p>
+          <p className="text-2xl font-black text-white">{classrooms.length}</p>
+          <p className="text-[9px] text-white/60">{classrooms.length} classrooms</p>
+        </div>
+      </div>
+
+      {/* Search + Filters */}
+      <div className="rounded-xl border border-purple-400/20 bg-purple-950/40 backdrop-blur-md p-4">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
+            <input
+              type="text"
+              placeholder="Search by name, email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full rounded-lg bg-purple-900/50 border border-purple-400/20 text-white pl-10 pr-4 py-2 text-sm placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+          <select value={filterClassroom} onChange={e => setFilterClassroom(Number(e.target.value) || '')} className="rounded-lg bg-purple-900/50 border border-purple-400/20 text-purple-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+            <option value="">All Classrooms</option>
+            {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={filterPerformance} onChange={e => setFilterPerformance(e.target.value)} className="rounded-lg bg-purple-900/50 border border-purple-400/20 text-purple-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+            <option value="">All Performance</option>
+            <option value="green">🟢 Good</option>
+            <option value="yellow">🟡 Average</option>
+            <option value="red">🔴 Needs Help</option>
+            <option value="none">⚪ Not Started</option>
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-lg bg-purple-900/50 border border-purple-400/20 text-purple-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+            <option value="">All Status</option>
+            <option value="enrolled">Enrolled</option>
+            <option value="disabled">Disabled</option>
+          </select>
+          <div className="flex items-center gap-1 text-xs text-purple-400">
+            <Filter className="h-3.5 w-3.5" />
+            <span>{filtered.length} results</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Students Table */}
+      <div className="rounded-xl border border-purple-400/20 bg-purple-950/40 backdrop-blur-md overflow-hidden">
+        <div className="px-4 py-3 border-b border-purple-400/15">
+          <h3 className="font-bold text-white">Students List</h3>
+        </div>
+
+        {/* Table Header (desktop) */}
+        <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-2 px-4 py-2 border-b border-purple-400/10 text-xs font-bold uppercase text-purple-400">
+          <span>Student</span>
+          <span>Classroom</span>
+          <span>Status</span>
+          <span>Progress</span>
+          <span>Stars</span>
+          <span>Actions</span>
+        </div>
+
+        {/* Rows */}
+        {paginated.length === 0 ? (
+          <div className="p-8 text-center">
+            <Users className="mx-auto h-10 w-10 text-purple-500" />
+            <p className="mt-3 font-bold text-purple-200">No students found</p>
+            <p className="text-sm text-purple-400">Try adjusting your filters</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-purple-400/10">
+            {paginated.map(student => {
+              const perf = perfConfig[student.progress.performanceColor] ?? perfConfig.none
+              const expanded = expandedId === student.id
+              const progressPct = Math.round((student.progress.levelsCompleted / student.progress.totalLevels) * 100)
+
+              return (
+                <div key={student.id}>
+                  {/* Main Row */}
+                  <button
+                    type="button"
+                    onClick={() => { setExpandedId(expanded ? null : student.id); setPasswordDraft(''); setParentEmailDraft('') }}
+                    className="w-full grid grid-cols-1 md:grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-2 items-center px-4 py-3 text-left hover:bg-purple-500/5 transition"
+                  >
+                    {/* Student */}
+                    <div className="flex items-center gap-3">
+                      <span className={`h-3 w-3 rounded-full shrink-0 ${perf.dot}`} />
+                      <div className="min-w-0">
+                        <p className="font-bold text-white truncate">{student.username}</p>
+                        <p className="text-xs text-purple-300 truncate">{student.email}</p>
+                      </div>
+                    </div>
+                    {/* Classroom */}
+                    <span className="hidden md:block text-sm text-purple-200">{student.classroomName ?? '—'}</span>
+                    {/* Status */}
+                    <span className="hidden md:block">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${student.enrollmentStatus === 'enrolled' ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-red-400/30 bg-red-500/10 text-red-300'}`}>
+                        {student.enrollmentStatus === 'enrolled' ? 'Active' : 'Disabled'}
+                      </span>
+                    </span>
+                    {/* Progress */}
+                    <div className="hidden md:block">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 rounded-full bg-purple-800/50 overflow-hidden">
+                          <div className={`h-full rounded-full ${perf.dot}`} style={{ width: `${progressPct}%` }} />
+                        </div>
+                        <span className="text-xs font-bold text-purple-200">{progressPct}%</span>
+                      </div>
+                      <p className="text-[10px] text-purple-400 mt-0.5">{student.progress.levelsCompleted}/{student.progress.totalLevels} levels</p>
+                    </div>
+                    {/* Stars */}
+                    <span className="hidden md:flex items-center gap-1 text-sm font-bold text-yellow-300">
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                      {student.progress.starBalance}
+                    </span>
+                    {/* Expand */}
+                    <span className="hidden md:flex justify-end">
+                      {expanded ? <ChevronUp className="h-4 w-4 text-purple-400" /> : <ChevronDown className="h-4 w-4 text-purple-400" />}
+                    </span>
+                  </button>
+
+                  {/* Expanded Actions Panel */}
+                  <AnimatePresence>
+                    {expanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-purple-400/15 bg-purple-900/20 px-4 py-4"
+                      >
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {/* Unlock Levels */}
+                          <div className="rounded-lg border border-purple-400/15 bg-purple-950/30 p-3">
+                            <p className="text-xs font-bold text-purple-200 mb-2 flex items-center gap-1"><Unlock className="h-3.5 w-3.5" /> Unlock Levels</p>
+                            <div className="flex gap-1.5">
+                              {[1, 2, 3, 4, 5].map(lvl => {
+                                const isCompleted = student.progress.completedLevels.includes(lvl)
+                                const isUnlocked = student.teacherUnlockedLevels.includes(lvl)
+                                const isLoading = unlockingLevel === `${student.id}-${lvl}`
+                                return (
+                                  <button
+                                    key={lvl}
+                                    onClick={() => !isCompleted && toggleLevelUnlock(student.id, lvl, isUnlocked)}
+                                    disabled={isCompleted || isLoading}
+                                    className={[
+                                      'flex h-9 w-9 items-center justify-center rounded-lg text-xs font-black transition',
+                                      isCompleted ? 'bg-emerald-500/30 text-emerald-300 cursor-default' :
+                                      isUnlocked ? 'bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 hover:bg-cyan-500/50' :
+                                      'bg-purple-800/40 border border-purple-400/20 text-purple-300 hover:bg-purple-500/30',
+                                      isLoading ? 'animate-pulse' : '',
+                                    ].join(' ')}
+                                    title={isCompleted ? `Level ${lvl} Completed` : isUnlocked ? `Level ${lvl} Unlocked` : `Level ${lvl} Locked`}
+                                  >
+                                    {isCompleted ? '✓' : lvl}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Reset Password */}
+                          <div className="rounded-lg border border-purple-400/15 bg-purple-950/30 p-3">
+                            <p className="text-xs font-bold text-purple-200 mb-2 flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Reset Password</p>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="New password..."
+                                value={passwordDraft}
+                                onChange={e => setPasswordDraft(e.target.value)}
+                                className="flex-1 rounded-lg bg-purple-900/50 border border-purple-400/20 text-white px-3 py-2 text-xs placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                              />
+                              <button
+                                onClick={() => passwordDraft && updateStudent(student.id, { password: passwordDraft })}
+                                disabled={!passwordDraft || saving}
+                                className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500 disabled:opacity-50 transition"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Parent Email */}
+                          <div className="rounded-lg border border-purple-400/15 bg-purple-950/30 p-3">
+                            <p className="text-xs font-bold text-purple-200 mb-2 flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Parent Email</p>
+                            <div className="flex gap-2">
+                              <input
+                                type="email"
+                                placeholder={student.parentEmail ?? 'parent@email.com'}
+                                value={parentEmailDraft}
+                                onChange={e => setParentEmailDraft(e.target.value)}
+                                className="flex-1 rounded-lg bg-purple-900/50 border border-purple-400/20 text-white px-3 py-2 text-xs placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                              />
+                              <button
+                                onClick={() => parentEmailDraft && updateStudent(student.id, { parentEmail: parentEmailDraft })}
+                                disabled={!parentEmailDraft || saving}
+                                className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500 disabled:opacity-50 transition"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quiz Scores Per Level */}
+                        {student.quizScores && student.quizScores.length > 0 && (
+                          <div className="mt-3 rounded-lg border border-purple-400/15 bg-purple-950/30 p-3">
+                            <p className="text-xs font-bold text-purple-200 mb-2 flex items-center gap-1"><BarChart3 className="h-3.5 w-3.5" /> Quiz Scores</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                              {student.quizScores.map(qs => {
+                                const accuracy = qs.totalAttempts > 0 ? Math.round((qs.correctAttempts / qs.totalAttempts) * 100) : 0
+                                const accColor = accuracy >= 70 ? 'text-emerald-300' : accuracy >= 40 ? 'text-yellow-300' : 'text-red-300'
+                                return (
+                                  <div key={qs.levelNumber} className="rounded-md bg-purple-800/30 border border-purple-400/10 px-2.5 py-2">
+                                    <p className="text-[10px] font-bold text-purple-400">Level {qs.levelNumber}</p>
+                                    <p className={`text-sm font-black ${accColor}`}>{qs.correctAttempts}/{qs.totalAttempts} <span className="text-[10px] font-bold">({accuracy}%)</span></p>
+                                    <p className="text-[9px] text-purple-400 mt-0.5">Score: {qs.totalScore} • {new Date(qs.lastAttempt).toLocaleDateString()}</p>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Status Toggle */}
+                        <div className="mt-3 flex items-center justify-between rounded-lg border border-purple-400/15 bg-purple-950/30 px-3 py-2">
+                          <p className="text-xs text-purple-200 flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Account Status: <span className="font-bold text-white capitalize ml-1">{student.enrollmentStatus}</span></p>
+                          <button
+                            onClick={() => updateStudent(student.id, { enrollmentStatus: student.enrollmentStatus === 'enrolled' ? 'disabled' : 'enrolled' })}
+                            disabled={saving}
+                            className={[
+                              'rounded-lg px-3 py-1.5 text-xs font-bold transition',
+                              student.enrollmentStatus === 'enrolled'
+                                ? 'bg-red-500/20 border border-red-400/30 text-red-200 hover:bg-red-500/30'
+                                : 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 hover:bg-emerald-500/30',
+                            ].join(' ')}
+                          >
+                            {student.enrollmentStatus === 'enrolled' ? 'Disable Account' : 'Enable Account'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filtered.length > ITEMS_PER_PAGE && (
+          <div className="flex items-center justify-between border-t border-purple-400/15 px-4 py-3">
+            <p className="text-xs text-purple-400">
+              Showing {(page - 1) * ITEMS_PER_PAGE + 1} to {Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} students
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/20 disabled:opacity-30 transition"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = i + 1
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={[
+                      'h-8 w-8 rounded-lg text-xs font-bold transition',
+                      page === pageNum ? 'bg-purple-500 text-white' : 'text-purple-300 hover:bg-purple-500/20',
+                    ].join(' ')}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              })}
+              {totalPages > 5 && <span className="text-purple-400 px-1">...</span>}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/20 disabled:opacity-30 transition"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
