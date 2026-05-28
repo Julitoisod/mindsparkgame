@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 
   const {
     characterId, positionX, positionY, positionZ,
-    stats, currentZone, questFlags, completedLevels, playtimeSeconds, starsEarned, levelStars,
+    stats, currentZone, questFlags, completedLevels, playtimeSeconds, levelStars,
   } = body
 
   // Verify ownership

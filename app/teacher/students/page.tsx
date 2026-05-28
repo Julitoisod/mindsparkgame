@@ -10,7 +10,6 @@ import {
   ChevronUp,
   Filter,
   KeyRound,
-  Lock,
   Mail,
   Search,
   Shield,
@@ -20,7 +19,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import type { EnrollmentStatus, PublicUser } from '@/types/user'
+import type { PublicUser } from '@/types/user'
 
 type StudentProgress = {
   levelsCompleted: number
@@ -61,7 +60,7 @@ const perfConfig: Record<string, { dot: string; bg: string; label: string; text:
 }
 
 export default function TeacherStudentsPage() {
-  const { user } = useAuth()
+  useAuth()
   const [students, setStudents] = useState<Student[]>([])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [loading, setLoading] = useState(true)
