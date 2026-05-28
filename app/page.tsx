@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { BookOpen, GraduationCap, Star, Swords, Trophy, Users, Zap } from 'lucide-react'
 import type { Metadata } from 'next'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'MindSpark — Math Adventure Game for Kids',
   description: 'An immersive RPG math game for Grade 1-3 students. Defeat bosses by solving math problems!',
