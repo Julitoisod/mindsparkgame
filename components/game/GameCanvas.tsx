@@ -54,7 +54,7 @@ export default function GameCanvas({ characterData, debugMode = false }: GameCan
           // Limit pixel ratio for performance on mobile
         }}
         dpr={[1, 2]}
-        style={{ background: '#041008' }}
+        style={{ background: '#1a1233' }}
       >
         {/* Lower DPR when GPU is stressed */}
         <PerformanceMonitor
@@ -64,8 +64,8 @@ export default function GameCanvas({ characterData, debugMode = false }: GameCan
         <Suspense fallback={null}>
           <Environment />
 
-          <Particles color="#74c476" size={0.04} />
-          <Particles color="#c7e9c0" size={0.025} radius={15} />
+          <Particles color="#c084fc" size={0.04} />
+          <Particles color="#e9d5ff" size={0.025} radius={15} />
 
           <Character
             initialData={characterData}

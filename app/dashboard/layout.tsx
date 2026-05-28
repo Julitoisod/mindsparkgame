@@ -96,8 +96,8 @@ export default function DashboardLayout({
 
   if (authLoading || !isAuthed || user?.role === 'teacher') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#07170d]">
-        <div className="flex items-center gap-3 text-[#74c476]">
+      <div className="flex min-h-screen items-center justify-center bg-[#0f0a1f]">
+        <div className="flex items-center gap-3 text-[#c084fc]">
           <Gamepad2 className="h-6 w-6 animate-pulse" />
           <span className="font-game text-sm">Loading...</span>
         </div>
@@ -106,19 +106,19 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="h-[100dvh] bg-[#f7fcf5] text-[#041008] overflow-hidden flex flex-col">
+    <div className="h-[100dvh] bg-gradient-to-br from-[#1a1233] via-[#3b2a73] to-[#6b21a8] text-white overflow-hidden flex flex-col">
       {/* Mobile Header */}
-      <header className="shrink-0 z-30 flex items-center justify-between border-b border-[#006d2c]/15 bg-[#00441b] px-4 py-2 lg:hidden">
+      <header className="shrink-0 z-30 flex items-center justify-between border-b border-purple-500/30 bg-gradient-to-r from-[#1a1233] via-[#3b2a73] to-[#581c87] px-4 py-2 lg:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#41ab5d] text-[#041008]"
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 text-white shadow-lg shadow-purple-500/40"
           >
             <Menu className="h-6 w-6" />
           </button>
           <div>
-            <h1 className="font-game text-lg font-black text-[#f7fcf5]">MindSpark</h1>
-            <p className="text-xs text-[#c7e9c0]">Student hub</p>
+            <h1 className="font-game text-lg font-black bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 bg-clip-text text-transparent">MindSpark</h1>
+            <p className="text-xs text-purple-200">Student hub</p>
           </div>
         </div>
         <MobileStats />
@@ -145,21 +145,21 @@ export default function DashboardLayout({
             animate={{ x: 0 }}
             exit={{ x: -280 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 top-0 z-50 w-[280px] border-r border-[#006d2c]/15 bg-[#00441b] p-4 text-[#f7fcf5] lg:relative lg:block lg:translate-x-0 lg:border-b-0 lg:bg-transparent lg:p-0 lg:pr-4"
+            className="fixed bottom-0 left-0 top-0 z-50 w-[280px] border-r border-purple-500/30 bg-gradient-to-b from-[#1a1233] via-[#3b2a73] to-[#581c87] p-4 text-white lg:relative lg:block lg:translate-x-0 lg:border-b-0 lg:bg-transparent lg:p-0 lg:pr-4"
           >
             <div className="flex items-center justify-between lg:hidden mb-6">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#41ab5d] text-[#041008]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 text-white shadow-lg shadow-purple-500/40">
                   <Gamepad2 className="h-6 w-6" />
                 </span>
                 <div>
-                  <h1 className="font-game text-lg font-black">MindSpark</h1>
-                  <p className="text-xs text-[#c7e9c0]">Student hub</p>
+                  <h1 className="font-game text-lg font-black bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 bg-clip-text text-transparent">MindSpark</h1>
+                  <p className="text-xs text-purple-200">Student hub</p>
                 </div>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary-200/15 text-[#e5f5e0]"
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-purple-400/30 text-purple-100"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -167,32 +167,42 @@ export default function DashboardLayout({
 
             {/* Desktop Logo - Hidden on mobile */}
             <div className="hidden lg:flex items-center gap-3 mb-6">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#41ab5d] text-[#041008]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 text-white shadow-lg shadow-purple-500/40">
                 <Gamepad2 className="h-6 w-6" />
               </span>
               <div>
-                <h1 className="font-game text-lg font-black">MindSpark</h1>
-                <p className="text-xs text-[#c7e9c0]">Student hub</p>
+                <h1 className="font-game text-lg font-black bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 bg-clip-text text-transparent">MindSpark</h1>
+                <p className="text-xs text-purple-200">Student hub</p>
               </div>
             </div>
 
             {/* Navigation */}
             <nav className="space-y-2">
-              {navItems.map(item => {
+              {navItems.map((item, idx) => {
                 const Icon = item.icon
                 const active = activeItem === item.id
+                // Colorful icon backgrounds for each nav item
+                const navColors = [
+                  'bg-gradient-to-br from-[#9333ea]lue-500 to-[#c084fc]yan-500 shadow-blue-500/40',     // Map
+                  'bg-gradient-to-br from-purple-500 to-pink-500 shadow-purple-500/40', // Profile
+                  'bg-gradient-to-br from-orange-500 to-red-500 shadow-orange-500/40',  // Store
+                  'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-500/40', // Attempts
+                ]
+                const iconBg = navColors[idx % navColors.length]
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
                     className={[
-                      'flex h-11 items-center gap-3 rounded-lg px-4 text-sm font-black transition',
+                      'flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-black transition',
                       active
-                        ? 'bg-[#74c476] text-[#041008]'
-                        : 'text-[#e5f5e0] hover:bg-primary-200/10',
+                        ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg shadow-purple-500/40'
+                        : 'text-purple-100 hover:bg-purple-500/20',
                     ].join(' ')}
                   >
-                    <Icon className="h-5 w-5" />
+                    <span className={`flex h-7 w-7 items-center justify-center rounded-md text-white shadow-md ${iconBg}`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
                     <span>{item.label}</span>
                   </Link>
                 )
@@ -207,7 +217,7 @@ export default function DashboardLayout({
             {/* Sign Out */}
             <button
               onClick={logout}
-              className="mt-6 w-full flex items-center justify-center gap-2 rounded-lg border border-primary-200/15 py-3 text-sm font-bold text-[#e5f5e0] transition hover:bg-primary-200/10"
+              className="mt-6 w-full flex items-center justify-center gap-2 rounded-lg border border-pink-400/30 bg-pink-500/10 py-3 text-sm font-bold text-pink-100 transition hover:bg-pink-500/25"
             >
               <Play className="h-4 w-4" />
               Sign Out
@@ -247,12 +257,12 @@ function MobileStats() {
   const unlockedLevel = Math.min(5, completedLevels.length + 1)
 
   return (
-    <div className="flex items-center gap-3 text-[#f7fcf5]">
-      <div className="flex items-center gap-1.5 rounded-lg bg-[#041008]/40 px-3 py-1.5">
-        <Star className="h-4 w-4 fill-current text-[#c7e9c0]" />
+    <div className="flex items-center gap-2 text-white">
+      <div className="flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 px-3 py-1.5 shadow-md shadow-yellow-500/40">
+        <Star className="h-4 w-4 fill-current text-white" />
         <span className="text-sm font-black">{access.starBalance}</span>
       </div>
-      <div className="flex items-center gap-1.5 rounded-lg bg-[#041008]/40 px-3 py-1.5">
+      <div className="flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 px-3 py-1.5 shadow-md shadow-purple-500/40">
         <span className="text-sm font-black">{unlockedLevel}/5</span>
       </div>
     </div>
@@ -284,17 +294,17 @@ function DashboardStats() {
   const unlockedLevel = Math.min(5, completedLevels.length + 1)
 
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-lg border border-primary-200/15 bg-[#041008]/20 p-3 text-center">
-      <div>
-        <p className="text-[10px] font-black uppercase text-[#a1d99b]">Stars</p>
-        <p className="mt-1 flex items-center justify-center gap-1 text-xl font-black">
-          <Star className="h-4 w-4 fill-current text-[#c7e9c0]" />
+    <div className="grid grid-cols-2 gap-2 rounded-lg border border-purple-400/20 bg-purple-950/30 p-3 text-center">
+      <div className="rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 p-3 shadow-lg shadow-yellow-500/40">
+        <p className="text-[10px] font-black uppercase text-white">⭐ Stars</p>
+        <p className="mt-1 flex items-center justify-center gap-1 text-xl font-black text-white">
+          <Star className="h-4 w-4 fill-current" />
           {access.starBalance}
         </p>
       </div>
-      <div>
-        <p className="text-[10px] font-black uppercase text-[#a1d99b]">Unlocked</p>
-        <p className="mt-1 text-xl font-black">{unlockedLevel}/5</p>
+      <div className="rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 p-3 shadow-lg shadow-purple-500/40">
+        <p className="text-[10px] font-black uppercase text-white">🗝️ Unlocked</p>
+        <p className="mt-1 text-xl font-black text-white">{unlockedLevel}/5</p>
       </div>
     </div>
   )

@@ -178,6 +178,9 @@ npx cap open android
   set PORT=3001 && npm run dev
   ```
 
+  npm run dev
+  ngrok.exe http 3000
+
 ### "Module not found" errors
 - Delete `node_modules` and reinstall:
   ```bash

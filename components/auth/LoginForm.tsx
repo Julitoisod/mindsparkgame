@@ -34,7 +34,7 @@ export default function LoginForm() {
     setLoading(false)
 
     if (user?.role === 'teacher') {
-      router.replace('/teacher/students')
+      router.replace('/teacher/dashboard')
     } else if (user?.role === 'student') {
       const charRes = await fetch('/api/character', { credentials: 'include' })
       const charJson = await charRes.json()

@@ -112,11 +112,11 @@ export default function CharacterSelectPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#07170d] text-white">
-      <nav className="sticky top-0 z-20 border-b border-primary-200/10 bg-[#041008]/90 px-4 py-3 backdrop-blur-md">
+    <main className="min-h-screen bg-[#0f0a1f] text-white">
+      <nav className="sticky top-0 z-20 border-b border-primary-200/10 bg-[#1a1233]/90 px-4 py-3 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <Gamepad2 className="h-6 w-6 shrink-0 text-[#74c476]" />
+            <Gamepad2 className="h-6 w-6 shrink-0 text-[#c084fc]" />
             <div className="min-w-0">
               <h1 className="truncate text-lg font-black font-game">Choose Character</h1>
               <p className="truncate text-xs text-primary-100/45">{user.username} adventure profile</p>
@@ -131,7 +131,7 @@ export default function CharacterSelectPage() {
       <section className="mx-auto max-w-7xl px-4 py-6">
         <div className="mb-5 flex flex-col gap-4 rounded-lg border border-primary-200/15 bg-[#0f2116]/90 p-5 shadow-card backdrop-blur-md md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#74c476]">
+            <p className="text-xs font-bold uppercase tracking-wide text-[#c084fc]">
               {existingCharacter ? 'Current avatar' : 'First login setup'}
             </p>
             <h2 className="mt-1 text-2xl font-black">Select your player avatar before entering the dashboard</h2>
@@ -151,7 +151,7 @@ export default function CharacterSelectPage() {
             />
             <div className="rounded-lg border border-primary-200/15 bg-primary-950/30 px-4 py-3 text-center">
               <p className="text-[10px] font-black uppercase tracking-wide text-primary-100/55">Stars</p>
-              <p className="flex items-center justify-center gap-1 text-xl font-black text-[#c7e9c0]">
+              <p className="flex items-center justify-center gap-1 text-xl font-black text-[#e9d5ff]">
                 <Star className="h-4 w-4 fill-current" />
                 {access.starBalance}
               </p>
@@ -181,12 +181,12 @@ export default function CharacterSelectPage() {
                   'group relative min-h-[440px] rounded-lg border bg-[#0f2116]/90 p-4 text-left shadow-card backdrop-blur-md transition',
                   locked && !canAfford ? 'cursor-not-allowed opacity-70' : '',
                   selected
-                    ? 'border-[#74c476]/80 ring-2 ring-[#74c476]/25'
+                    ? 'border-[#c084fc]/80 ring-2 ring-[#c084fc]/25'
                     : 'border-primary-200/10 hover:border-primary-200/30 hover:bg-[#14331f]/90',
                 ].join(' ')}
               >
                 {selected && (
-                  <span className="absolute right-3 top-3 rounded-full bg-[#74c476] p-1.5 text-[#041008]">
+                  <span className="absolute right-3 top-3 rounded-full bg-[#c084fc] p-1.5 text-white">
                     <CheckCircle2 className="h-4 w-4" />
                   </span>
                 )}
@@ -221,7 +221,7 @@ export default function CharacterSelectPage() {
                     <span className="rounded-md bg-primary-950/30 px-2 py-2 text-primary-100">ATK {option.stats.attack}</span>
                     <span className="rounded-md bg-primary-950/30 px-2 py-2 text-primary-100">SPD {option.stats.speed}</span>
                   </div>
-                  <p className="mt-3 rounded-md bg-primary-950/30 px-3 py-2 text-xs font-bold text-[#c7e9c0]">
+                  <p className="mt-3 rounded-md bg-primary-950/30 px-3 py-2 text-xs font-bold text-[#e9d5ff]">
                     {owned ? 'Owned' : canAfford ? 'Ready to unlock' : `${Math.max(0, price - access.starBalance)} more stars needed`}
                   </p>
                 </div>

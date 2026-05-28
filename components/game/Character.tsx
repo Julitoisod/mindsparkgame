@@ -145,7 +145,7 @@ export default function Character({
       <planeGeometry args={[1, 1]} />
       <meshStandardMaterial
         map={texture ?? undefined}
-        color={texture ? '#ffffff' : '#74c476'}
+        color={texture ? '#ffffff' : '#c084fc'}
         transparent={Boolean(texture)}
         alphaTest={texture ? 0.1 : 0}
         depthWrite={!texture}

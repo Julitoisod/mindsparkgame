@@ -19,7 +19,7 @@ interface ParticlesProps {
 
 export default function Particles({
   radius = 12,
-  color  = '#74c476',
+  color  = '#c084fc',
   size   = 0.035,
 }: ParticlesProps) {
   const pointsRef = useRef<THREE.Points>(null)

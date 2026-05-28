@@ -93,7 +93,7 @@ export default function DashboardAttemptsPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-sm font-game text-[#006d2c]">Loading attempts...</div>
+        <div className="text-sm font-game text-purple-300">Loading attempts...</div>
       </div>
     )
   }
@@ -102,9 +102,9 @@ export default function DashboardAttemptsPage() {
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-4">
         {/* Level Overview */}
-        <div className="rounded-lg border border-[#006d2c]/15 bg-[#f7fcf5] p-5 shadow-sm">
+        <div className="rounded-lg border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <History className="h-5 w-5 text-[#238b45]" />
+            <History className="h-5 w-5 text-purple-300" />
             <h2 className="font-game text-2xl font-black">Level Progress</h2>
           </div>
           <div className="grid gap-3">
@@ -112,15 +112,15 @@ export default function DashboardAttemptsPage() {
               const complete = completedLevels.includes(level.id)
               const open = level.id === Math.min(5, completedLevels.length + 1) && !complete
               return (
-                <div key={level.id} className="flex items-center justify-between gap-3 rounded-lg border border-[#006d2c]/10 bg-[#f7fcf5] px-4 py-3">
+                <div key={level.id} className="flex items-center justify-between gap-3 rounded-lg border border-purple-400/20 bg-purple-950/40 backdrop-blur-md px-4 py-3">
                   <div>
                     <p className="font-black">Level {level.id}: {level.title}</p>
-                    <p className="text-sm font-semibold text-[#00441b]/60">{level.topic}</p>
+                    <p className="text-sm font-semibold text-purple-200">{level.topic}</p>
                   </div>
                   <span
                     className={[
                       'rounded-full px-3 py-1 text-xs font-black uppercase',
-                      complete ? 'bg-[#238b45] text-[#f7fcf5]' : open ? 'bg-[#c7e9c0] text-[#00441b]' : 'bg-[#e5f5e0] text-[#00441b]/65',
+                      complete ? 'bg-[#9333ea] text-[#faf5ff]' : open ? 'bg-purple-800/40 backdrop-blur-md text-purple-100' : 'bg-purple-900/40 backdrop-blur-md text-purple-200',
                     ].join(' ')}
                   >
                     {complete ? 'Boss cleared' : open ? 'Ready' : 'Locked'}
@@ -132,18 +132,18 @@ export default function DashboardAttemptsPage() {
         </div>
 
         {/* Attempt History Table */}
-        <div className="rounded-lg border border-[#006d2c]/15 bg-[#f7fcf5] p-5 shadow-sm">
+        <div className="rounded-lg border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-[#238b45]" />
+              <Clock className="h-5 w-5 text-purple-300" />
               <h2 className="font-game text-xl font-black">Attempt History</h2>
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-[#006d2c]/60" />
+              <Filter className="h-4 w-4 text-purple-300/60" />
               <select
                 value={filterLevel ?? ''}
                 onChange={e => setFilterLevel(e.target.value ? Number(e.target.value) : null)}
-                className="rounded-lg border border-[#006d2c]/20 bg-white px-3 py-1.5 text-sm font-bold text-[#00441b] focus:outline-none focus:ring-2 focus:ring-[#238b45]"
+                className="rounded-lg border border-purple-400/30 bg-white px-3 py-1.5 text-sm font-bold text-purple-100 focus:outline-none focus:ring-2 focus:ring-[#9333ea]"
               >
                 <option value="">All Levels</option>
                 {levelNodes.map(l => (
@@ -154,9 +154,9 @@ export default function DashboardAttemptsPage() {
           </div>
 
           {attemptsLoading ? (
-            <div className="py-8 text-center text-sm text-[#006d2c]/60">Loading attempts...</div>
+            <div className="py-8 text-center text-sm text-purple-300/60">Loading attempts...</div>
           ) : attempts.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[#006d2c]/20 p-8 text-center text-sm text-[#00441b]/50">
+            <div className="rounded-lg border border-dashed border-purple-400/30 p-8 text-center text-sm text-purple-100/50">
               No attempts recorded yet. Play the quiz to see your history here!
             </div>
           ) : (
@@ -180,7 +180,7 @@ export default function DashboardAttemptsPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-black text-[#00441b]">
+                      <span className="text-sm font-black text-purple-100">
                         {getLevelTitle(attempt.levelNumber)}
                       </span>
                       <span className={[
@@ -192,15 +192,15 @@ export default function DashboardAttemptsPage() {
                         {attempt.phase === 'boss' ? 'Boss' : 'Quiz'}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-[#00441b]/60">
+                    <p className="mt-0.5 truncate text-xs text-purple-200">
                       Answer: <span className="font-semibold">{attempt.selectedAnswer}</span>
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-xs font-bold text-[#00441b]/70">
+                    <p className="text-xs font-bold text-purple-100/70">
                       {attempt.scoreEarned > 0 ? `+${attempt.scoreEarned} pts` : '—'}
                     </p>
-                    <p className="text-[10px] text-[#00441b]/45">{formatDate(attempt.attemptedAt)}</p>
+                    <p className="text-[10px] text-purple-100/45">{formatDate(attempt.attemptedAt)}</p>
                   </div>
                 </div>
               ))}

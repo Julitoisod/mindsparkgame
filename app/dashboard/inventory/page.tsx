@@ -9,7 +9,7 @@ import { useGame } from '@/hooks/useGame'
 import type { CharacterData } from '@/types/character'
 
 const Inventory = dynamic(() => import('@/components/dashboard/Inventory'), {
-  loading: () => <div className="h-48 rounded-lg bg-[#e5f5e0] animate-pulse" />,
+  loading: () => <div className="h-48 rounded-lg bg-purple-900/40 backdrop-blur-md animate-pulse" />,
   ssr: false,
 })
 
@@ -45,7 +45,7 @@ export default function DashboardInventoryPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-sm font-game text-[#006d2c]">Loading inventory...</div>
+        <div className="text-sm font-game text-purple-300">Loading inventory...</div>
       </div>
     )
   }

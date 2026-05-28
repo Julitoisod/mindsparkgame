@@ -24,7 +24,7 @@ function Pillar({ position }: { position: [number, number, number] }) {
       castShadow
       receiveShadow
     >
-      <meshStandardMaterial color="#0d2b18" roughness={0.7} metalness={0.3} />
+      <meshStandardMaterial color="#2e215b" roughness={0.7} metalness={0.3} />
     </Cylinder>
   )
 }
@@ -35,7 +35,7 @@ function DecorBox({ position, scale }: {
 }) {
   return (
     <Box args={scale} position={position} castShadow receiveShadow>
-      <meshStandardMaterial color="#123820" roughness={0.8} metalness={0.2} />
+      <meshStandardMaterial color="#3b2a73" roughness={0.8} metalness={0.2} />
     </Box>
   )
 }
@@ -52,8 +52,8 @@ function RotatingCrystal({ position }: { position: [number, number, number] }) {
     <mesh ref={ref} position={position} castShadow>
       <octahedronGeometry args={[0.25, 0]} />
       <meshStandardMaterial
-        color="#74c476"
-        emissive="#41ab5d"
+        color="#c084fc"
+        emissive="#a855f7"
         emissiveIntensity={0.6}
         roughness={0.1}
         metalness={0.9}
@@ -68,10 +68,10 @@ export default function Environment() {
   return (
     <>
       {/* ── Fog ──────────────────────────────────────────────────────────── */}
-      <fog attach="fog" args={['#041008', 15, 40]} />
+      <fog attach="fog" args={['#1a1233', 15, 40]} />
 
       {/* ── Lighting ─────────────────────────────────────────────────────── */}
-      <ambientLight intensity={0.4} color="#c7e9c0" />
+      <ambientLight intensity={0.4} color="#e9d5ff" />
 
       <directionalLight
         position={[5, 10, 5]}
@@ -87,9 +87,9 @@ export default function Environment() {
       />
 
       {/* Green fill lights */}
-      <pointLight position={[-8, 3, -8]} intensity={2} color="#74c476" distance={12} />
-      <pointLight position={[8,  3,  8]} intensity={2} color="#41ab5d" distance={12} />
-      <pointLight position={[0,  5,  0]} intensity={0.8} color="#c7e9c0" distance={15} />
+      <pointLight position={[-8, 3, -8]} intensity={2} color="#c084fc" distance={12} />
+      <pointLight position={[8,  3,  8]} intensity={2} color="#a855f7" distance={12} />
+      <pointLight position={[0,  5,  0]} intensity={0.8} color="#e9d5ff" distance={15} />
 
       {/* ── Floor ────────────────────────────────────────────────────────── */}
       <Plane
@@ -97,7 +97,7 @@ export default function Environment() {
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <meshStandardMaterial color="#06170c" roughness={0.9} metalness={0.1} />
+        <meshStandardMaterial color="#1a1233" roughness={0.9} metalness={0.1} />
       </Plane>
 
       {/* Grid overlay */}
@@ -106,10 +106,10 @@ export default function Environment() {
         position={[0, 0.001, 0]}
         cellSize={1}
         cellThickness={0.5}
-        cellColor="#1b4a2b"
+        cellColor="#4c3690"
         sectionSize={5}
         sectionThickness={1}
-        sectionColor="#238b45"
+        sectionColor="#9333ea"
         fadeDistance={20}
         fadeStrength={1}
         infiniteGrid={false}

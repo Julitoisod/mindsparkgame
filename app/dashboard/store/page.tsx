@@ -102,7 +102,7 @@ export default function DashboardStorePage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-sm font-game text-[#006d2c]">Loading store...</div>
+        <div className="text-sm font-game text-purple-300">Loading store...</div>
       </div>
     )
   }
@@ -111,17 +111,17 @@ export default function DashboardStorePage() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-wide text-[#238b45]">Store</p>
+          <p className="text-xs font-black uppercase tracking-wide text-purple-300">Store</p>
           <h2 className="font-game text-3xl font-black">Character Unlocks</h2>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 rounded-lg bg-[#e5f5e0] px-4 py-2">
-            <Star className="h-5 w-5 fill-current text-[#238b45]" />
-            <span className="text-lg font-black text-[#006d2c]">{access.starBalance}</span>
+          <div className="flex items-center gap-2 rounded-lg bg-purple-900/40 backdrop-blur-md px-4 py-2">
+            <Star className="h-5 w-5 fill-current text-purple-300" />
+            <span className="text-lg font-black text-purple-300">{access.starBalance}</span>
           </div>
           <Link
             href="/character-select"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#006d2c] px-5 text-sm font-black text-[#f7fcf5] transition hover:bg-[#238b45]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#7e22ce] px-5 text-sm font-black text-[#faf5ff] transition hover:bg-[#9333ea]"
           >
             <Store className="h-4 w-4" />
             Manage Characters
@@ -135,7 +135,7 @@ export default function DashboardStorePage() {
           const current = character?.class === option.class
           const price = access.prices[option.class] ?? option.unlockCost
           return (
-            <article key={option.class} className="rounded-lg border border-[#006d2c]/15 bg-[#f7fcf5] p-4 shadow-sm">
+            <article key={option.class} className="rounded-lg border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-4 shadow-sm">
               <div className="relative h-40 sm:h-48">
                 <Image
                   src={option.imagePath}
@@ -147,11 +147,11 @@ export default function DashboardStorePage() {
                 />
               </div>
               <h3 className="mt-3 text-xl font-black">{option.label}</h3>
-              <p className="mt-1 text-sm font-semibold text-[#00441b]/65">{option.description}</p>
-              <div className="mt-4 flex items-center justify-between rounded-lg bg-[#e5f5e0] px-3 py-2">
-                <span className="text-xs font-black uppercase text-[#006d2c]">{current ? 'Equipped' : owned ? 'Owned' : 'Locked'}</span>
+              <p className="mt-1 text-sm font-semibold text-purple-200">{option.description}</p>
+              <div className="mt-4 flex items-center justify-between rounded-lg bg-purple-900/40 backdrop-blur-md px-3 py-2">
+                <span className="text-xs font-black uppercase text-purple-300">{current ? 'Equipped' : owned ? 'Owned' : 'Locked'}</span>
                 <span className="flex items-center gap-1 text-sm font-black">
-                  <Star className="h-4 w-4 fill-current text-[#238b45]" />
+                  <Star className="h-4 w-4 fill-current text-purple-300" />
                   {owned ? 0 : price}
                 </span>
               </div>
@@ -159,7 +159,7 @@ export default function DashboardStorePage() {
                 <button
                   onClick={() => handlePurchase(option.class)}
                   disabled={purchasing === option.class || access.starBalance < price}
-                  className="mt-3 w-full rounded-lg bg-[#006d2c] py-2 text-sm font-black text-[#f7fcf5] transition hover:bg-[#238b45] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="mt-3 w-full rounded-lg bg-[#7e22ce] py-2 text-sm font-black text-[#faf5ff] transition hover:bg-[#9333ea] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {purchasing === option.class ? (
                     <>
@@ -182,7 +182,7 @@ export default function DashboardStorePage() {
               {owned && !current && (
                 <button
                   onClick={() => handlePurchase(option.class)}
-                  className="mt-3 w-full rounded-lg border-2 border-[#006d2c] py-2 text-sm font-black text-[#006d2c] transition hover:bg-[#e5f5e0] flex items-center justify-center gap-2"
+                  className="mt-3 w-full rounded-lg border-2 border-[#7e22ce] py-2 text-sm font-black text-purple-300 transition hover:bg-purple-900/40 backdrop-blur-md flex items-center justify-center gap-2"
                 >
                   <Check className="h-4 w-4" />
                   Select
