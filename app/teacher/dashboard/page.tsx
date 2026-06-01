@@ -179,14 +179,11 @@ export default function TeacherDashboardPage() {
         return
       }
 
-      // Map CSV columns to API fields — flexible column name matching
+      // Map CSV columns — only username and parent email needed
       const students = rows.map(row => {
-        // Try multiple possible column name variations
-        const name = row.name ?? row.username ?? row.student_name ?? row.fullname ?? row.full_name ?? ''
-        const email = row.gmail ?? row.email ?? row.student_gmail ?? row.student_email ?? ''
-        const password = row.password ?? row.pass ?? row.passwd ?? ''
-        const parentEmail = row.parents_gmail ?? row.parent_gmail ?? row.parentsgmail ?? row.parentgmail ?? row.parent_email ?? row.parents_email ?? row.parentemail ?? ''
-        return { name, email, password, parentEmail }
+        const username = row.username ?? row.name ?? row.student_name ?? ''
+        const parentEmail = row.parent_gmail ?? row.parentgmail ?? row.parents_gmail ?? row.parent_email ?? row.parentemail ?? ''
+        return { username, parentEmail }
       })
 
       const res = await fetch('/api/teacher/students/bulk', {
@@ -211,7 +208,7 @@ export default function TeacherDashboardPage() {
   }
 
   function downloadTemplate() {
-    const csv = 'Name,Gmail,Password,Parents Gmail\nJuan Dela Cruz,juan@gmail.com,password123,parent@gmail.com\nMaria Santos,maria@gmail.com,pass456,mom@gmail.com'
+    const csv = 'Username,Parent Gmail\njohnmark,parent@gmail.com\nmariasantos,mom@gmail.com'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -232,7 +229,7 @@ export default function TeacherDashboardPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-2xl font-black">Welcome back, {user?.username}! 👋</h2>
-          <p className="text-sm text-purple-300 mt-1">Here&apos;s your classroom overview</p>
+          <p className="mt-1 text-sm text-[#6B7280]">Here&apos;s your classroom overview</p>
         </motion.div>
 
         <motion.div
@@ -241,7 +238,7 @@ export default function TeacherDashboardPage() {
           transition={{ delay: 0.1 }}
           className="rounded-xl border border-purple-400/20 bg-gradient-to-br from-purple-900/60 to-pink-900/30 backdrop-blur-md p-4"
         >
-          <p className="text-xs font-bold text-purple-200 mb-2">✨ Welcome to Teacher Management</p>
+          <p className="mb-2 text-xs font-bold text-[#374151]">✨ Welcome to Teacher Management</p>
           <div className="space-y-1.5">
             {[
               'Create and manage classrooms',
@@ -250,8 +247,8 @@ export default function TeacherDashboardPage() {
               'Generate reports and insights',
               'Unlock levels for students',
             ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs text-purple-100">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <div key={i} className="flex items-center gap-2 text-xs text-[#4B5563]">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                 <span>{item}</span>
               </div>
             ))}
@@ -291,12 +288,12 @@ export default function TeacherDashboardPage() {
           className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5"
         >
           <div className="flex items-center gap-3 mb-4">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dbeafe] text-[#3B82F6]">
               <School className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="font-bold text-white">Create Classroom</h3>
-              <p className="text-[10px] text-purple-400">Add a new classroom</p>
+              <h3 className="font-bold text-[#111827]">Create Classroom</h3>
+              <p className="text-[10px] text-[#6B7280]">Add a new classroom</p>
             </div>
           </div>
           <form onSubmit={createClassroom} className="space-y-3">
@@ -307,12 +304,12 @@ export default function TeacherDashboardPage() {
           </form>
           {classrooms.length > 0 && (
             <div className="mt-4 pt-4 border-t border-purple-400/15">
-              <p className="text-xs font-bold text-purple-300 mb-2">Your Classrooms ({classrooms.length})</p>
+              <p className="mb-2 text-xs font-bold text-[#374151]">Your Classrooms ({classrooms.length})</p>
               <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
                 {classrooms.map(c => (
                   <div key={c.id} className="flex items-center justify-between rounded-lg bg-purple-900/30 px-3 py-2">
-                    <span className="text-xs font-bold text-white">{c.name}</span>
-                    <span className="text-[10px] text-purple-400">{c.studentCount} students</span>
+                    <span className="text-xs font-bold text-[#111827]">{c.name}</span>
+                    <span className="text-[10px] text-[#6B7280]">{c.studentCount} students</span>
                   </div>
                 ))}
               </div>
@@ -328,19 +325,19 @@ export default function TeacherDashboardPage() {
           className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5"
         >
           <div className="flex items-center gap-3 mb-4">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dcfce7] text-[#16A34A]">
               <UserPlus className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="font-bold text-white">Enroll Student</h3>
-              <p className="text-[10px] text-purple-400">Add one student manually</p>
+              <h3 className="font-bold text-[#111827]">Enroll Student</h3>
+              <p className="text-[10px] text-[#6B7280]">Add one student manually</p>
             </div>
           </div>
           <form onSubmit={enrollStudent} className="space-y-3">
             <select
               value={selectedClassroomId ?? ''}
               onChange={e => setSelectedClassroomId(Number(e.target.value) || null)}
-              className="w-full rounded-xl bg-purple-900/50 border border-purple-400/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full rounded-xl border border-purple-400/20 bg-white px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-purple-400"
             >
               <option value="">Select classroom...</option>
               {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -362,12 +359,12 @@ export default function TeacherDashboardPage() {
           className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5"
         >
           <div className="flex items-center gap-3 mb-4">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 text-white shadow-lg shadow-orange-500/30">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ffedd5] text-[#ea580c]">
               <FileSpreadsheet className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="font-bold text-white">CSV Bulk Enroll</h3>
-              <p className="text-[10px] text-purple-400">Upload multiple students at once</p>
+              <h3 className="font-bold text-[#111827]">CSV Bulk Enroll</h3>
+              <p className="text-[10px] text-[#6B7280]">Upload multiple students at once</p>
             </div>
           </div>
 
@@ -376,24 +373,24 @@ export default function TeacherDashboardPage() {
             <select
               value={csvClassroomId ?? ''}
               onChange={e => setCsvClassroomId(Number(e.target.value) || null)}
-              className="w-full rounded-xl bg-purple-900/50 border border-purple-400/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full rounded-xl border border-purple-400/20 bg-white px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-purple-400"
             >
               <option value="">Select classroom...</option>
               {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
             {/* CSV format info */}
-            <div className="rounded-lg bg-purple-900/30 border border-purple-400/15 p-3 text-xs text-purple-300 space-y-1">
-              <p className="font-bold text-purple-200">📋 Required CSV columns:</p>
-              <p className="font-mono text-[10px] bg-purple-950/50 rounded px-2 py-1">Name, Gmail, Password, Parents Gmail</p>
-              <p className="text-[10px] text-purple-400">Parents Gmail is optional. Max 100 students per file.</p>
+            <div className="space-y-1 rounded-lg border border-purple-400/15 bg-purple-900/30 p-3 text-xs text-[#4B5563]">
+              <p className="font-bold text-[#374151]">📋 Required CSV columns:</p>
+              <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Username, Parent Gmail</p>
+              <p className="text-[10px] text-[#6B7280]">Parent Gmail is optional. Password is auto-generated. Max 100 students per file.</p>
             </div>
 
             {/* Download template */}
             <button
               type="button"
               onClick={downloadTemplate}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-purple-400/30 bg-purple-900/30 px-3 py-2 text-xs font-bold text-purple-200 hover:bg-purple-800/40 transition"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-purple-400/30 bg-white px-3 py-2 text-xs font-bold text-[#374151] transition hover:bg-[#f4efff]"
             >
               <Download className="h-3.5 w-3.5" />
               Download CSV Template
@@ -431,8 +428,8 @@ export default function TeacherDashboardPage() {
                 className="mt-4 pt-4 border-t border-purple-400/15"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-white">📊 Upload Results</p>
-                  <span className="text-[10px] text-purple-400">{csvSummary}</span>
+                  <p className="text-xs font-bold text-[#111827]">📊 Upload Results</p>
+                  <span className="text-[10px] text-[#6B7280]">{csvSummary}</span>
                 </div>
                 <div className="max-h-[160px] overflow-y-auto space-y-1">
                   {csvResults.map((r, i) => (
@@ -440,8 +437,8 @@ export default function TeacherDashboardPage() {
                       {r.status === 'enrolled'
                         ? <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
                         : <AlertTriangle className="h-3 w-3 text-red-400 shrink-0" />}
-                      <span className={`font-bold ${r.status === 'enrolled' ? 'text-emerald-300' : 'text-red-300'}`}>Row {r.row}</span>
-                      <span className="text-purple-200 truncate">{r.name}</span>
+                      <span className={`font-bold ${r.status === 'enrolled' ? 'text-emerald-700' : 'text-red-700'}`}>Row {r.row}</span>
+                      <span className="truncate text-[#374151]">{r.name}</span>
                       {r.reason && <span className="text-red-400 ml-auto shrink-0">{r.reason}</span>}
                     </div>
                   ))}
@@ -461,18 +458,18 @@ export default function TeacherDashboardPage() {
           className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5"
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-white">Recent Enrollments</h3>
-            <Link href="/teacher/students" className="text-xs text-purple-300 hover:text-white flex items-center gap-1 transition">
+            <h3 className="font-bold text-[#111827]">Recent Enrollments</h3>
+            <Link href="/teacher/students" className="flex items-center gap-1 text-xs text-[#6B7280] transition hover:text-[#374151]">
               View All <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           {recentStudents.length === 0 ? (
-            <p className="text-sm text-purple-400 text-center py-6">No students enrolled yet</p>
+            <p className="py-6 text-center text-sm text-[#6B7280]">No students enrolled yet</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-purple-400/15 text-xs font-bold uppercase text-purple-400">
+                  <tr className="border-b border-purple-400/15 text-xs font-bold uppercase text-[#4B5563]">
                     <th className="pb-2 text-left">Student</th>
                     <th className="pb-2 text-left">Classroom</th>
                     <th className="pb-2 text-left">Stars</th>
@@ -481,16 +478,16 @@ export default function TeacherDashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-purple-400/10">
                   {recentStudents.map(s => (
-                    <tr key={s.id} className="text-purple-100">
+                    <tr key={s.id} className="text-[#374151]">
                       <td className="py-2.5">
-                        <p className="font-bold text-white text-xs">{s.username}</p>
-                        <p className="text-[10px] text-purple-400">{s.email}</p>
+                        <p className="text-xs font-bold text-[#111827]">{s.username}</p>
+                        <p className="text-[10px] text-[#6B7280]">{s.email}</p>
                       </td>
                       <td className="py-2.5 text-xs">{s.classroomName ?? '—'}</td>
                       <td className="py-2.5 text-xs flex items-center gap-1 text-yellow-300">
                         <Star className="h-3 w-3 fill-current" /> {s.progress.starBalance}
                       </td>
-                      <td className="py-2.5 text-[10px] text-purple-400">
+                      <td className="py-2.5 text-[10px] text-[#6B7280]">
                         {s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString() : '—'}
                       </td>
                     </tr>
@@ -513,7 +510,7 @@ export default function TeacherDashboardPage() {
           <button
             onClick={loadData}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-400/20 bg-purple-950/30 px-4 py-3 text-xs font-bold text-purple-200 transition hover:bg-purple-500/15"
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-400/20 bg-white px-4 py-3 text-xs font-bold text-[#374151] transition hover:bg-[#f4efff]"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh Data
@@ -527,37 +524,76 @@ export default function TeacherDashboardPage() {
 // ─── Components ───────────────────────────────────────────────────────────────
 
 function StatCard({ icon, label, value, sub, color, delay }: { icon: React.ReactNode; label: string; value: number; sub: string; color: string; delay: number }) {
+  const statStyles: Record<string, { card: string; border: string; iconWrap: string; iconColor: string }> = {
+    'from-blue-500 to-cyan-500': {
+      card: 'bg-[#eef5ff]',
+      border: 'border-[#d8e6ff]',
+      iconWrap: 'bg-[#dbeafe]',
+      iconColor: 'text-[#3B82F6]',
+    },
+    'from-purple-500 to-pink-500': {
+      card: 'bg-[#f5efff]',
+      border: 'border-[#e8dcff]',
+      iconWrap: 'bg-[#e6dcff]',
+      iconColor: 'text-[#7C58D8]',
+    },
+    'from-yellow-400 to-orange-500': {
+      card: 'bg-[#fff9ec]',
+      border: 'border-[#fce7ba]',
+      iconWrap: 'bg-[#fdecc8]',
+      iconColor: 'text-[#d97706]',
+    },
+    'from-emerald-500 to-teal-500': {
+      card: 'bg-[#eefaf2]',
+      border: 'border-[#d4efd9]',
+      iconWrap: 'bg-[#d9f3df]',
+      iconColor: 'text-[#16A34A]',
+    },
+  }
+
+  const style = statStyles[color] ?? statStyles['from-purple-500 to-pink-500']
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay }}
-      className={`rounded-xl bg-gradient-to-br ${color} p-4 shadow-lg`}
+      className={`stat-card rounded-xl border p-4 shadow-lg ${style.card} ${style.border}`}
     >
-      <div className="flex items-center gap-2 text-white/80">
-        {icon}
-        <span className="text-[10px] font-bold uppercase">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className={`icon-circle flex h-9 w-9 items-center justify-center rounded-full ${style.iconWrap} ${style.iconColor}`}>
+          {icon}
+        </span>
+        <span className="stat-title text-[10px] font-bold uppercase text-[#374151]">{label}</span>
       </div>
-      <p className="mt-1 text-3xl font-black text-white">{value}</p>
-      <p className="text-[10px] text-white/60">{sub}</p>
+      <p className="stat-number mt-1 text-3xl font-black text-[#111827]">{value}</p>
+      <p className="stat-subtitle text-[10px] text-[#6B7280]">{sub}</p>
     </motion.div>
   )
 }
 
 function QuickLink({ href, icon, label, sub, color }: { href: string; icon: React.ReactNode; label: string; sub: string; color: string }) {
+  const iconStyles: Record<string, { wrap: string; icon: string }> = {
+    'from-purple-500 to-pink-500': { wrap: 'bg-[#e6dcff]', icon: 'text-[#7C58D8]' },
+    'from-blue-500 to-cyan-500': { wrap: 'bg-[#dbeafe]', icon: 'text-[#3B82F6]' },
+    'from-orange-500 to-red-500': { wrap: 'bg-[#ffedd5]', icon: 'text-[#ea580c]' },
+  }
+
+  const style = iconStyles[color] ?? iconStyles['from-purple-500 to-pink-500']
+
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-xl border border-purple-400/20 bg-purple-950/40 backdrop-blur-md p-3 transition hover:bg-purple-500/15 hover:border-purple-400/40 group"
+      className="group flex items-center gap-3 rounded-xl border border-purple-400/20 bg-purple-950/40 p-3 transition hover:bg-[#f4efff] hover:border-purple-400/40"
     >
-      <span className={`flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br ${color} text-white shadow-md`}>
+      <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${style.wrap} ${style.icon}`}>
         {icon}
       </span>
       <div className="flex-1">
-        <p className="text-sm font-bold text-white">{label}</p>
-        <p className="text-[10px] text-purple-400">{sub}</p>
+        <p className="text-sm font-bold text-[#111827]">{label}</p>
+        <p className="text-[10px] text-[#6B7280]">{sub}</p>
       </div>
-      <ArrowRight className="h-4 w-4 text-purple-400 group-hover:text-white transition" />
+      <ArrowRight className="h-4 w-4 text-[#6B7280] transition group-hover:text-[#374151]" />
     </Link>
   )
 }

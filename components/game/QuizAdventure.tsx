@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -19,6 +20,7 @@ import {
   Flame,
   Lock,
   Map as MapIcon,
+  Menu,
   RotateCcw,
   Shield, // eslint-disable-line @typescript-eslint/no-unused-vars
   Sparkles,
@@ -471,6 +473,7 @@ export default function QuizAdventure({
   characterStats,
   initialLevel = 1,
 }: QuizAdventureProps) {
+  const router = useRouter()
   const levels = useMemo(() => {
     const exportedLevels = getExportedLevels()
     const normalized = FALLBACK_LEVELS.map((fallback, index) =>
@@ -508,6 +511,16 @@ export default function QuizAdventure({
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [scorePopup, setScorePopup] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [screen, setScreen] = useState<Screen>('map')
+
+  // Hide dashboard header when in battle/game screens
+  useEffect(() => {
+    if (screen !== 'map') {
+      document.body.classList.add('game-battle-active')
+    } else {
+      document.body.classList.remove('game-battle-active')
+    }
+    return () => document.body.classList.remove('game-battle-active')
+  }, [screen])
   const [normalCorrectCount, setNormalCorrectCount] = useState(0)
   const [completedLevels, setCompletedLevels] = useState<number[]>([])
   const [teacherUnlockedLevels, setTeacherUnlockedLevels] = useState<number[]>([])
@@ -528,10 +541,10 @@ export default function QuizAdventure({
   const phaseLabel = phase === 'boss' ? 'Boss Battle' : 'Quiz Run' // eslint-disable-line @typescript-eslint/no-unused-vars
   const progressLabel = // eslint-disable-line @typescript-eslint/no-unused-vars
     phase === 'boss' ? `Boss ${questionIndex + 1}/${QUESTIONS_PER_PHASE}` : `Correct ${normalCorrectCount}/${QUESTIONS_PER_PHASE}`
-  // Merge automatic progression with teacher-granted unlocks
-  const automaticUnlocked = Math.min(MAX_LEVELS, completedLevels.length + 1)
-  const teacherMaxUnlocked = teacherUnlockedLevels.length > 0 ? Math.max(...teacherUnlockedLevels) : 0
-  const unlockedLevelNumber = Math.max(automaticUnlocked, teacherMaxUnlocked)
+  // A level is accessible only if teacher explicitly unlocked it, or student already completed it (for replay)
+  function isLevelAccessible(lvlNum: number): boolean {
+    return teacherUnlockedLevels.includes(lvlNum) || completedLevels.includes(lvlNum)
+  }
   const shouldShowBoss = phase === 'boss' || phase === 'levelComplete' || phase === 'gameComplete'
   const heroAction: SpriteAction =
     feedback === 'correct' ? 'attack' : feedback === 'wrong' || phase === 'gameOver' ? 'hurt' : 'idle'
@@ -735,7 +748,7 @@ export default function QuizAdventure({
     const targetLevel = levels[targetIndex]
     if (!targetLevel) return
 
-    const unlocked = targetLevel.number <= unlockedLevelNumber || completedLevels.includes(targetLevel.number) || teacherUnlockedLevels.includes(targetLevel.number)
+    const unlocked = isLevelAccessible(targetLevel.number)
     if (!unlocked) return
 
     setLevelIndex(targetIndex)
@@ -798,12 +811,9 @@ export default function QuizAdventure({
 
     window.setTimeout(() => {
       if (phase === 'normal') {
-        const nextCorrectCount = correct ? Math.min(QUESTIONS_PER_PHASE, normalCorrectCount + 1) : normalCorrectCount
-
         if (correct) {
           setScore(current => current + NORMAL_POINTS)
           setStars(current => current + 1)
-          setNormalCorrectCount(nextCorrectCount)
           setScorePopup(`+${NORMAL_POINTS} ⭐+1`)
           window.setTimeout(() => setScorePopup(null), 1500)
         } else {
@@ -817,10 +827,11 @@ export default function QuizAdventure({
           }
         }
 
-        if (nextCorrectCount >= QUESTIONS_PER_PHASE) {
+        // Fixed 5 questions — advance regardless of right/wrong
+        if (questionIndex >= QUESTIONS_PER_PHASE - 1) {
           startBossPhase()
         } else {
-          setQuestionIndex(current => (current + 1) % QUESTIONS_PER_PHASE)
+          setQuestionIndex(current => current + 1)
           setSelectedAnswer(null)
           setFeedback(null)
         }
@@ -831,16 +842,10 @@ export default function QuizAdventure({
       if (phase === 'boss') {
         if (correct) {
           const nextBossHp = Math.max(0, bossHp - BOSS_DAMAGE)
+          setBossHp(nextBossHp)
           setScore(current => current + NORMAL_POINTS * 2)
           setScorePopup(`+${NORMAL_POINTS * 2} 💥${BOSS_DAMAGE}dmg`)
           window.setTimeout(() => setScorePopup(null), 1500)
-
-          if (nextBossHp === 0) {
-            completeLevel(nextBossHp)
-            return
-          }
-
-          setBossHp(nextBossHp)
         } else {
           const nextHearts = Math.max(0, hearts - 1)
           setHearts(nextHearts)
@@ -852,12 +857,13 @@ export default function QuizAdventure({
           }
         }
 
-        if (questionIndex >= QUESTIONS_PER_PHASE - 1 && bossHp > BOSS_DAMAGE) {
-          setQuestionIndex(0)
-        } else {
-          setQuestionIndex(current => Math.min(current + 1, QUESTIONS_PER_PHASE - 1))
+        // Fixed 5 boss questions — complete level after last question
+        if (questionIndex >= QUESTIONS_PER_PHASE - 1) {
+          completeLevel(Math.max(0, bossHp - (correct ? BOSS_DAMAGE : 0)))
+          return
         }
 
+        setQuestionIndex(current => current + 1)
         setSelectedAnswer(null)
         setFeedback(null)
       }
@@ -884,7 +890,7 @@ export default function QuizAdventure({
 
     function getLevelStatus(lvlNum: number): 'cleared' | 'open' | 'locked' {
       if (completedLevels.includes(lvlNum)) return 'cleared'
-      if (lvlNum <= unlockedLevelNumber) return 'open'
+      if (teacherUnlockedLevels.includes(lvlNum)) return 'open'
       return 'locked'
     }
 
@@ -895,27 +901,6 @@ export default function QuizAdventure({
         <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'url(/BACKGROUND FOREST 1/FOREST 1/2304x1296.png)', backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(4px)' }} />
 
         <div className="relative z-10 flex h-full w-full flex-col">
-          {/* Header */}
-          <header className="shrink-0 flex items-center justify-between gap-2 px-2 py-1 sm:px-4 sm:py-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 shadow-lg shadow-purple-500/40">
-                <MapIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
-              </span>
-              <h1 className="font-game text-xs sm:text-base font-black bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-200 bg-clip-text text-transparent drop-shadow-md">MindSpark Isles</h1>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <div className="rounded-md bg-gradient-to-br from-yellow-400 to-orange-500 px-1.5 py-0.5 text-center shadow-md shadow-yellow-500/40">
-                <p className="text-[6px] sm:text-[7px] font-bold uppercase text-white leading-none">⭐ Stars</p>
-                <p className="text-[10px] sm:text-xs font-black text-white leading-tight">{stars}</p>
-              </div>
-              <div className="rounded-md bg-gradient-to-br from-purple-500 to-pink-500 px-1.5 py-0.5 text-center shadow-md shadow-purple-500/40">
-                <p className="text-[6px] sm:text-[7px] font-bold uppercase text-white leading-none">🏅 Badges</p>
-                <p className="text-[10px] sm:text-xs font-black text-white leading-tight">{earnedBadges.length}/6</p>
-              </div>
-            </div>
-          </header>
-
           {/* Horizontal S-curve map - fits viewport on all screens */}
           <div
             className="flex-1 min-h-0 flex items-start justify-center px-2 sm:px-4 pt-4 sm:pt-8 relative"
@@ -1038,7 +1023,7 @@ export default function QuizAdventure({
                       <span className={[
                         'inline-block mt-0.5 sm:mt-1 rounded px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7px] lg:text-[8px] font-black uppercase tracking-wider shadow-sm',
                         status === 'cleared' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' : '',
-                        status === 'open' ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white' : '',
+                        status === 'open' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : '',
                         status === 'locked' ? 'bg-[#37474f] text-[#b0bec5]' : '',
                       ].join(' ')}>
                         {status === 'cleared' && '✨ Cleared'}
@@ -1082,26 +1067,6 @@ export default function QuizAdventure({
       />
       <div className="absolute inset-0 bg-gradient-to-b from-[#1a1233]/45 via-[#1a1233]/10 to-[#1a1233]/72" />
       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#1a1233] to-transparent" />
-
-      {/* Floating ambient particles - gems/sparkles */}
-      <div className="absolute inset-0 pointer-events-none z-[1] overflow-hidden">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <motion.div
-            key={`particle-${i}`}
-            className="absolute text-2xl sm:text-3xl"
-            style={{ left: `${5 + (i * 8) % 90}%`, top: `${10 + (i * 17) % 75}%` }}
-            animate={{
-              y: [0, -25, 0],
-              x: [0, (i % 2 === 0 ? 10 : -10), 0],
-              opacity: [0.6, 1, 0.6],
-              scale: [0.9, 1.2, 0.9],
-            }}
-            transition={{ duration: 3 + i * 0.4, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 }}
-          >
-            {['💎', '✨', '🔮', '⭐', '💫', '🌟', '💰', '🪙', '✨', '💎', '⭐', '🌟'][i]}
-          </motion.div>
-        ))}
-      </div>
 
       {/* Screen flash on correct answer */}
       <AnimatePresence>
@@ -1182,6 +1147,15 @@ export default function QuizAdventure({
           )}
         </AnimatePresence>
         <div className="shrink-0 flex flex-row items-center gap-1.5 sm:gap-2 lg:gap-2.5">
+          <button
+            type="button"
+            onClick={() => setScreen('map')}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-amber-700/60 bg-gradient-to-b from-[#4a3118] via-[#2f1d0f] to-[#1c1208] text-amber-200 shadow-[0_3px_0_#1a0f05,inset_0_1px_0_rgba(255,255,255,0.12)] hover:brightness-110"
+            aria-label="Open map"
+            title="Map"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
           <StatPill
             icon={<Crown className="h-4 w-4 sm:h-5 sm:w-5" />}
             label="Level"
@@ -1192,7 +1166,7 @@ export default function QuizAdventure({
             icon={<Swords className="h-4 w-4 sm:h-5 sm:w-5" />}
             label="Quiz"
             value={`${questionIndex + 1}/${QUESTIONS_PER_PHASE}`}
-            tone="bg-gradient-to-br from-[#9333ea]lue-500 to-[#c084fc]yan-500 text-white shadow-lg shadow-blue-500/40"
+            tone="bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/40"
           />
           <StatPill
             icon={<Star className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />}
@@ -1208,11 +1182,11 @@ export default function QuizAdventure({
           />
         </div>
 
-        <main className="flex-1 min-h-0 flex flex-col relative pt-0.5 sm:pt-1">
+        <main className="relative flex min-h-0 flex-1 flex-col pt-0.5 sm:pt-1">
           {/* Characters at bottom of screen - expand when answering */}
-          <div className={`absolute bottom-0 left-0 right-0 flex items-end justify-between px-2 sm:px-8 pointer-events-none z-0 transition-all duration-300 ${isResolving ? 'h-[75%]' : 'h-[40%]'}`}>
+          <div className={`pointer-events-none absolute bottom-0 left-0 right-0 z-[8] flex items-end justify-between px-2 sm:px-8 transition-all duration-300 ${isResolving ? 'h-[30%]' : 'h-[30%]'}`}>
             {/* Hero - left side */}
-            <div className="relative h-full w-[35%] sm:w-[30%]" style={{ transform: 'translateY(10%)' }}>
+            <div className="relative h-[clamp(200px,46vh,260px)] w-[38%] sm:w-[34%]" style={{ transform: 'translate(-40%, 62px)' }}>
               <motion.div
                 key={`hero-${level.id}`}
                 className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.45)]"
@@ -1226,7 +1200,7 @@ export default function QuizAdventure({
                   alt="Player character"
                   fill
                   sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
-                  className="object-contain object-bottom scale-[1.5] origin-bottom sm:scale-[1.3]"
+                  className="origin-bottom object-contain object-bottom scale-[2.75]"
                   fps={12}
                   loop={heroAction === 'idle'}
                 />
@@ -1235,7 +1209,7 @@ export default function QuizAdventure({
 
             {/* Boss - right side */}
             {shouldShowBoss && (
-              <div className="relative h-full w-[35%] sm:w-[30%]" style={{ transform: 'translateY(10%)' }}>
+              <div className="relative h-[clamp(200px,46vh,260px)] w-[38%] sm:w-[34%]" style={{ transform: 'translate(40%, 82px)' }}>
                 <motion.div
                   key={`boss-${level.id}`}
                   className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.55)]"
@@ -1258,7 +1232,7 @@ export default function QuizAdventure({
                     alt={level.bossName}
                     fill
                     sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
-                    className="object-contain object-bottom -scale-x-100 scale-y-[1.3] origin-bottom sm:scale-y-[1.2]"
+                    className="origin-bottom object-contain object-bottom -scale-x-100 scale-[2.24]"
                     fps={bossAction === 'idle' ? 10 : 14}
                     loop={bossAction === 'idle'}
                   />
@@ -1267,16 +1241,42 @@ export default function QuizAdventure({
             )}
           </div>
 
-          {/* HP bars - floating above characters during boss */}
+          {/* HP bars - compact floating above each character */}
           {phase === 'boss' && (
-            <div className="absolute bottom-[63%] left-3 right-3 sm:left-8 sm:right-8 z-10 flex items-center gap-3 sm:gap-6">
-              <div className="flex-1 min-w-0">
-                <ProgressBar value={hearts * 20} max={MAX_HEARTS * 20} color="from-cyan-400 to-blue-500" label="⚡ HP" />
+            <>
+              {/* Hero HP - above hero (left) */}
+              <div className="absolute bottom-[calc(38%+100px)] left-1 z-10 w-[14%] min-w-[56px]">
+                <div className="rounded-lg border border-white/20 bg-black/50 px-1.5 py-1 backdrop-blur-sm">
+                  <div className="mb-0.5 flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-cyan-300">❤️ HP</span>
+                    <span className="text-[9px] font-bold tabular-nums text-white">{hearts * 20} / {MAX_HEARTS * 20}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-black/40">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
+                      animate={{ width: `${Math.max(0, Math.min(100, (hearts / MAX_HEARTS) * 100))}%` }}
+                      transition={{ duration: 0.4 }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <ProgressBar value={bossHp} max={MAX_BOSS_HP} color="from-red-500 to-orange-500" label="👹 Boss" />
+              {/* Boss HP - above boss (right) */}
+              <div className="absolute bottom-[calc(38%+100px)] right-1 z-10 w-[14%] min-w-[56px]">
+                <div className="rounded-lg border border-white/20 bg-black/50 px-1.5 py-1 backdrop-blur-sm">
+                  <div className="mb-0.5 flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-red-300">💀 Boss</span>
+                    <span className="text-[9px] font-bold tabular-nums text-white">{bossHp} / {MAX_BOSS_HP}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-black/40">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-500"
+                      animate={{ width: `${Math.max(0, Math.min(100, (bossHp / MAX_BOSS_HP) * 100))}%` }}
+                      transition={{ duration: 0.4 }}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Feedback popup - centered overlay */}
@@ -1305,7 +1305,7 @@ export default function QuizAdventure({
           </AnimatePresence>
 
           {/* Question + Answers - overlaid on top, hidden during feedback so characters are visible */}
-          <div className={`relative z-10 flex flex-col items-center w-full max-w-lg mx-auto px-2 sm:px-4 transition-all duration-300 ${isResolving ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
+          <div className={`relative z-[20] mx-auto flex w-[62%] max-w-[780px] min-w-[270px] translate-y-11 flex-col items-center px-2 transition-all duration-300 sm:translate-y-9 sm:px-3 ${isResolving ? 'pointer-events-none scale-95 opacity-0' : 'scale-[1.1] opacity-100'}`}>
             <AnimatePresence mode="wait">
               {(phase === 'normal' || phase === 'boss') && (
                 <motion.div
@@ -1320,20 +1320,20 @@ export default function QuizAdventure({
                   <motion.div
                     animate={{ boxShadow: ['0 0 15px rgba(251,191,36,0.2)', '0 0 25px rgba(251,191,36,0.4)', '0 0 15px rgba(251,191,36,0.2)'] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                    className="relative rounded-2xl border-[3px] border-amber-600/60 bg-gradient-to-b from-[#fff8e7] via-[#fff3cd] to-[#ffeaa7] px-4 py-3 sm:px-5 sm:py-4 shadow-[inset_0_2px_0_rgba(255,255,255,0.6)]"
+                    className="relative z-[30] rounded-2xl border-[3px] border-amber-600/60 bg-gradient-to-b from-[#fff8e7] via-[#fff3cd] to-[#ffeaa7] px-4 py-1.5 sm:px-5 sm:py-2 shadow-[inset_0_2px_0_rgba(255,255,255,0.6)]"
                   >
                     {/* Inner highlight */}
                     <div className="absolute inset-[3px] rounded-xl border border-amber-200/50 pointer-events-none" />
                     <p className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-amber-700/80">
                       {phase === 'boss' ? `⚔️ ${level.bossName} challenges you!` : `✨ Question ${questionIndex + 1}:`}
                     </p>
-                    <h2 className="mt-1 sm:mt-1.5 text-sm sm:text-lg lg:text-xl font-black leading-snug text-gray-800">
+                    <h2 className="mt-1 text-sm font-black leading-snug text-gray-800 sm:text-base lg:text-lg">
                       {question.prompt}
                     </h2>
                   </motion.div>
 
                   {/* 2x2 Answer Grid - Glossy RPG pill buttons */}
-                  <div className="mt-2 sm:mt-3 grid grid-cols-2 gap-2 sm:gap-3">
+                  <div className="relative z-[22] mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2 sm:mt-1.5 sm:gap-x-4 sm:gap-y-2.5">
                     {question.options.map((option, optionIndex) => {
                       const selected = selectedAnswer === option
                       const correct = isCorrectAnswer(question, option, optionIndex)
@@ -1358,7 +1358,7 @@ export default function QuizAdventure({
                           whileTap={{ scale: 0.92, y: 3 }}
                           whileHover={{ scale: 1.03 }}
                           className={[
-                            'relative flex items-center justify-center rounded-full border-2 px-3 py-3 sm:py-3.5 text-center font-black text-white transition-all overflow-hidden',
+                            'relative flex min-h-[50px] w-full max-w-[30vw] items-center justify-center overflow-hidden rounded-full border-2 px-4 py-2 text-center font-black text-white transition-all sm:min-h-[56px] sm:py-2.5',
                             showCorrect
                               ? 'border-yellow-300 bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-500 scale-105 shadow-[0_4px_0_#b45309,0_0_20px_rgba(250,204,21,0.6)] ring-2 ring-yellow-200'
                               : showWrong
@@ -1442,6 +1442,46 @@ export default function QuizAdventure({
                   <p className="text-[10px] uppercase text-white/50 font-bold leading-none">❤️ Hearts</p>
                   <p className="text-lg font-black text-cyan-300">{hearts}/{MAX_HEARTS}</p>
                 </div>
+              </div>
+
+              {/* Badges Section */}
+              <div className="mt-2 rounded-md border border-yellow-400/20 bg-yellow-400/5 px-2.5 py-2">
+                <p className="mb-2 text-[10px] uppercase font-bold text-yellow-300/70 leading-none">🏅 Badges</p>
+                {earnedBadges.length === 0 ? (
+                  <p className="text-[11px] text-white/40 italic">No badges yet — keep playing!</p>
+                ) : (
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {BADGES.filter(b => earnedBadges.includes(b.id)).map(badge => {
+                      const isNew = badge.id === newBadgeNotification
+                      return (
+                        <motion.div
+                          key={badge.id}
+                          animate={isNew ? { scale: [1, 1.15, 1] } : {}}
+                          transition={{ repeat: Infinity, duration: 1.2 }}
+                          className="flex flex-col items-center gap-0.5"
+                        >
+                          {/* Rosette ribbon badge */}
+                          <div className="relative flex items-center justify-center">
+                            {/* Ribbon tails */}
+                            <div className="absolute bottom-[-10px] left-[50%] -translate-x-[9px] w-0 h-0 border-l-[9px] border-r-[0px] border-t-[12px] border-l-transparent border-r-transparent border-t-green-600" />
+                            <div className="absolute bottom-[-10px] left-[50%] translate-x-[0px] w-0 h-0 border-l-[0px] border-r-[9px] border-t-[12px] border-l-transparent border-r-transparent border-t-green-600" />
+                            {/* Rosette outer ring */}
+                            <div className={`relative flex items-center justify-center rounded-full ${isNew ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-green-400 to-green-600'} shadow-md`} style={{ width: 44, height: 44 }}>
+                              {/* Scalloped edge effect */}
+                              <div className={`absolute inset-[3px] rounded-full ${isNew ? 'bg-gradient-to-br from-yellow-300 to-orange-400' : 'bg-gradient-to-br from-green-300 to-green-500'}`} />
+                              {/* Inner circle */}
+                              <div className="relative z-10 flex items-center justify-center rounded-full bg-white shadow-inner" style={{ width: 28, height: 28 }}>
+                                <span className="text-base leading-none">{badge.icon}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="mt-2 text-[9px] font-bold text-center leading-tight text-white/80 max-w-[48px]">{badge.name}</span>
+                          {isNew && <span className="rounded-full bg-yellow-400 px-1.5 text-[7px] font-black text-black">NEW!</span>}
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               <p className="mt-2 text-sm font-semibold text-purple-200/80">🎉 Amazing job!</p>

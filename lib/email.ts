@@ -10,6 +10,47 @@ const transporter = nodemailer.createTransport({
   },
 })
 
+/**
+ * Sent to parents right after their child's account is created via CSV bulk enroll.
+ */
+export async function sendEnrollmentEmail(
+  parentEmail: string,
+  username: string,
+  password: string,
+  classroomName: string,
+) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('[email] SMTP not configured, skipping enrollment email')
+    return false
+  }
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f0f4ff; border-radius: 12px;">
+      <h1 style="color: #3730a3; font-size: 22px; margin-bottom: 4px;">🎮 MindSpark – Student Account Created</h1>
+      <p style="color: #374151; margin-bottom: 16px;">Your child has been enrolled in <strong>${classroomName}</strong>. Here are their login credentials:</p>
+      <div style="background: #ffffff; border: 1px solid #c7d2fe; padding: 20px; border-radius: 8px; margin-bottom: 16px;">
+        <p style="margin: 6px 0; font-size: 16px;"><strong>👤 Username:</strong> <span style="color: #4f46e5;">${username}</span></p>
+        <p style="margin: 6px 0; font-size: 16px;"><strong>🔑 Password:</strong> <span style="color: #4f46e5;">${password}</span></p>
+      </div>
+      <p style="color: #6b7280; font-size: 13px;">Please keep these credentials safe. You may change the password after first login.</p>
+      <p style="color: #9ca3af; font-size: 11px; margin-top: 16px;">This is an automated message from MindSpark Game.</p>
+    </div>
+  `
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || 'MindSpark Game <mindspark40000@gmail.com>',
+      to: parentEmail,
+      subject: `🎮 MindSpark – ${username}'s Account for ${classroomName}`,
+      html,
+    })
+    return true
+  } catch (error) {
+    console.error('[email] Failed to send enrollment email:', error)
+    return false
+  }
+}
+
 export async function sendProgressEmail(to: string, studentName: string, data: {
   levelsCompleted: number
   totalLevels: number

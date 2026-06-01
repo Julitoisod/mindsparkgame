@@ -338,37 +338,75 @@ export default function TeacherReportsPage() {
 // ─── Components ───────────────────────────────────────────────────────────────
 
 function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string; sub: string; color: string }) {
+  const statStyles: Record<string, { card: string; border: string; iconWrap: string; iconColor: string }> = {
+    'from-emerald-500 to-teal-500': {
+      card: 'bg-[#eefaf2]',
+      border: 'border-[#d4efd9]',
+      iconWrap: 'bg-[#d9f3df]',
+      iconColor: 'text-[#16A34A]',
+    },
+    'from-blue-500 to-cyan-500': {
+      card: 'bg-[#eef5ff]',
+      border: 'border-[#d8e6ff]',
+      iconWrap: 'bg-[#dbeafe]',
+      iconColor: 'text-[#3B82F6]',
+    },
+    'from-orange-500 to-red-500': {
+      card: 'bg-[#fff9ec]',
+      border: 'border-[#fce7ba]',
+      iconWrap: 'bg-[#fdecc8]',
+      iconColor: 'text-[#d97706]',
+    },
+    'from-purple-500 to-pink-500': {
+      card: 'bg-[#f5efff]',
+      border: 'border-[#e8dcff]',
+      iconWrap: 'bg-[#e6dcff]',
+      iconColor: 'text-[#7C58D8]',
+    },
+  }
+
+  const style = statStyles[color] ?? statStyles['from-purple-500 to-pink-500']
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`rounded-xl bg-gradient-to-br ${color} p-4 shadow-lg`}
+      className={`stat-card rounded-xl border p-4 shadow-lg ${style.card} ${style.border}`}
     >
-      <div className="flex items-center gap-2 text-white/80">
-        {icon}
-        <span className="text-[10px] font-bold uppercase">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className={`icon-circle flex h-9 w-9 items-center justify-center rounded-full ${style.iconWrap} ${style.iconColor}`}>
+          {icon}
+        </span>
+        <span className="stat-title text-[10px] font-bold uppercase text-[#374151]">{label}</span>
       </div>
-      <p className="mt-1 text-2xl font-black text-white">{value}</p>
-      <p className="text-[10px] text-white/60">{sub}</p>
+      <p className="stat-number mt-1 text-2xl font-black text-[#111827]">{value}</p>
+      <p className="stat-subtitle text-[10px] text-[#6B7280]">{sub}</p>
     </motion.div>
   )
 }
 
 function InterventionCard({ icon, title, count, total, color, description }: { icon: React.ReactNode; title: string; count: number; total: number; color: string; description: string }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
+  const iconStyles: Record<string, { wrap: string; icon: string }> = {
+    'from-red-500 to-orange-500': { wrap: 'bg-[#fde2d6]', icon: 'text-[#dc2626]' },
+    'from-yellow-400 to-orange-400': { wrap: 'bg-[#fdecc8]', icon: 'text-[#d97706]' },
+    'from-emerald-500 to-teal-500': { wrap: 'bg-[#d9f3df]', icon: 'text-[#16A34A]' },
+  }
+  const style = iconStyles[color] ?? iconStyles['from-emerald-500 to-teal-500']
+
   return (
     <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-4">
       <div className="flex items-center gap-3">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${color} text-white shadow-lg`}>
+        <span className={`icon-circle flex h-10 w-10 items-center justify-center rounded-xl ${style.wrap} ${style.icon}`}>
           {icon}
         </span>
         <div>
-          <p className="text-xs font-bold text-purple-200">{title}</p>
-          <p className="text-2xl font-black text-white">{count}</p>
+          <p className="text-xs font-bold text-[#374151]">{title}</p>
+          <p className="text-2xl font-black text-[#111827]">{count}</p>
         </div>
       </div>
-      <p className="mt-2 text-xs text-purple-400">{pct}% of total students</p>
-      <p className="mt-1 text-[10px] text-purple-500">{description}</p>
+      <p className="mt-2 text-xs text-[#6B7280]">{pct}% of total students</p>
+      <p className="mt-1 text-[10px] text-[#6B7280]">{description}</p>
     </div>
   )
 }

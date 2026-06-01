@@ -108,7 +108,7 @@ export default function DashboardLayout({
   return (
     <div className="h-[100dvh] bg-gradient-to-br from-[#1a1233] via-[#3b2a73] to-[#6b21a8] text-white overflow-hidden flex flex-col">
       {/* Mobile Header */}
-      <header className="shrink-0 z-30 flex items-center justify-between border-b border-purple-500/30 bg-gradient-to-r from-[#1a1233] via-[#3b2a73] to-[#581c87] px-4 py-2 lg:hidden">
+      <header id="dashboard-mobile-header" className="shrink-0 z-30 flex items-center justify-between border-b border-purple-500/30 bg-gradient-to-r from-[#1a1233] via-[#3b2a73] to-[#581c87] px-4 py-2 lg:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(true)}

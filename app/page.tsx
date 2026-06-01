@@ -7,12 +7,12 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'MindSpark — Math Adventure Game for Kids',
-  description: 'An immersive RPG math game for Grade 1-3 students. Defeat bosses by solving math problems!',
+  description: 'An immersive RPG math game for Grade 3 students. Battle enemies by solving math problems!',
 }
 
 const features = [
   { icon: Swords,        color: 'text-purple-400', title: 'Boss Battle Quizzes',    desc: 'Answer math questions to attack bosses and progress through levels.' },
-  { icon: BookOpen,      color: 'text-cyan-400',   title: 'Grade 1–3 Math',         desc: 'Multiplication, division, fractions, shapes, and more — aligned to curriculum.' },
+  { icon: BookOpen,      color: 'text-cyan-400',   title: 'Grade 3 Math',           desc: 'Multiplication, division, fractions, shapes, and more — aligned to curriculum.' },
   { icon: Trophy,        color: 'text-yellow-400', title: 'Stars & Rewards',        desc: 'Earn stars, unlock badges, and climb the leaderboard as you learn.' },
   { icon: GraduationCap, color: 'text-emerald-400',title: 'Teacher Dashboard',      desc: 'Track student progress, quiz scores, and unlock levels in real time.' },
 ]
@@ -49,7 +49,7 @@ export default function HomePage() {
         <div className="relative z-10 max-w-3xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 bg-purple-500/15 border border-purple-300/30 rounded-full px-4 py-1.5 text-sm text-purple-200 mb-2">
             <Zap className="w-3.5 h-3.5 text-yellow-400" />
-            Math RPG Adventure · Grade 1–3
+            Math RPG Adventure · Grade 3
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black leading-tight">
@@ -60,8 +60,8 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg md:text-xl text-purple-100/70 max-w-2xl mx-auto leading-relaxed">
-            An immersive fantasy RPG where kids defeat dragons and bosses by solving math problems.
-            Learn multiplication, division, and more — through epic adventures!
+            An immersive math RPG where kids battle powerful enemies by solving math challenges.
+            Learn multiplication, division, and more — through exciting quiz adventures!
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -101,7 +101,7 @@ export default function HomePage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-purple-400/10 py-6 text-center text-xs text-purple-100/40">
-        MindSpark Game · Math Adventure for Grade 1–3 · Built with Next.js &amp; MySQL
+        MindSpark Game · Math Adventure for Grade 3 · Built with Next.js &amp; MySQL
       </footer>
     </main>
   )

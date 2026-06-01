@@ -206,24 +206,24 @@ export default function TeacherStudentsPage() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 p-3 shadow-lg shadow-blue-500/20">
-          <p className="text-[10px] font-bold uppercase text-white/70">Total Students</p>
-          <p className="text-2xl font-black text-white">{totalStudents}</p>
+        <div className="stat-card rounded-xl border border-[#d8e6ff] bg-[#eef5ff] p-3 shadow-lg">
+          <p className="stat-title text-[10px] font-bold uppercase text-[#374151]">Total Students</p>
+          <p className="stat-number text-2xl font-black text-[#111827]">{totalStudents}</p>
         </div>
-        <div className="rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 p-3 shadow-lg shadow-purple-500/20">
-          <p className="text-[10px] font-bold uppercase text-white/70">Active</p>
-          <p className="text-2xl font-black text-white">{activeStudents}</p>
-          <p className="text-[9px] text-white/60">{totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0}% of total</p>
+        <div className="stat-card rounded-xl border border-[#e8dcff] bg-[#f5efff] p-3 shadow-lg">
+          <p className="stat-title text-[10px] font-bold uppercase text-[#374151]">Active</p>
+          <p className="stat-number text-2xl font-black text-[#111827]">{activeStudents}</p>
+          <p className="stat-subtitle text-[9px] text-[#6B7280]">{totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0}% of total</p>
         </div>
-        <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 p-3 shadow-lg shadow-emerald-500/20">
-          <p className="text-[10px] font-bold uppercase text-white/70">Performing Well</p>
-          <p className="text-2xl font-black text-white">{greenCount}</p>
-          <p className="text-[9px] text-white/60">3+ levels completed</p>
+        <div className="stat-card rounded-xl border border-[#d4efd9] bg-[#eefaf2] p-3 shadow-lg">
+          <p className="stat-title text-[10px] font-bold uppercase text-[#374151]">Performing Well</p>
+          <p className="stat-number text-2xl font-black text-[#111827]">{greenCount}</p>
+          <p className="stat-subtitle text-[9px] text-[#6B7280]">3+ levels completed</p>
         </div>
-        <div className="rounded-xl bg-gradient-to-br from-orange-500 to-red-500 p-3 shadow-lg shadow-orange-500/20">
-          <p className="text-[10px] font-bold uppercase text-white/70">By Classroom</p>
-          <p className="text-2xl font-black text-white">{classrooms.length}</p>
-          <p className="text-[9px] text-white/60">{classrooms.length} classrooms</p>
+        <div className="stat-card rounded-xl border border-[#fce7ba] bg-[#fff9ec] p-3 shadow-lg">
+          <p className="stat-title text-[10px] font-bold uppercase text-[#374151]">By Classroom</p>
+          <p className="stat-number text-2xl font-black text-[#111827]">{classrooms.length}</p>
+          <p className="stat-subtitle text-[9px] text-[#6B7280]">{classrooms.length} classrooms</p>
         </div>
       </div>
 

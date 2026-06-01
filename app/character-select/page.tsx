@@ -168,62 +168,79 @@ export default function CharacterSelectPage() {
             const canAfford = access.starBalance >= price
             const locked = !owned
 
+            const classTheme: Record<string, { border: string; bg: string; labelColor: string; label: string; statBg: string; ring: string }> = {
+              warrior: { border: 'border-blue-500',    bg: 'bg-[#0a1a3a]', labelColor: 'text-blue-400',    label: 'WARRIOR', statBg: 'bg-blue-900/40',    ring: 'ring-blue-400/40' },
+              mage:    { border: 'border-fuchsia-500', bg: 'bg-[#1a0a2e]', labelColor: 'text-fuchsia-400', label: 'MAGE',    statBg: 'bg-fuchsia-900/40', ring: 'ring-fuchsia-400/40' },
+              archer:  { border: 'border-green-500',   bg: 'bg-[#0a1f0a]', labelColor: 'text-green-400',   label: 'ARCHER',  statBg: 'bg-green-900/40',   ring: 'ring-green-400/40' },
+            }
+            const theme = classTheme[option.class] ?? classTheme['warrior']
+
             return (
               <button
                 key={option.class}
                 type="button"
-                onClick={() => {
-                  if (locked && !canAfford) return
-                  setSelectedClass(option.class)
-                }}
+                onClick={() => { if (locked && !canAfford) return; setSelectedClass(option.class) }}
                 disabled={locked && !canAfford}
                 className={[
-                  'group relative min-h-[440px] rounded-lg border bg-[#0f2116]/90 p-4 text-left shadow-card backdrop-blur-md transition',
-                  locked && !canAfford ? 'cursor-not-allowed opacity-70' : '',
-                  selected
-                    ? 'border-[#c084fc]/80 ring-2 ring-[#c084fc]/25'
-                    : 'border-primary-200/10 hover:border-primary-200/30 hover:bg-[#14331f]/90',
+                  'relative flex flex-col rounded-xl border-2 p-5 text-left transition',
+                  theme.border, theme.bg,
+                  locked && !canAfford ? 'cursor-not-allowed opacity-50' : 'hover:brightness-110',
+                  selected ? `ring-4 ${theme.ring}` : '',
                 ].join(' ')}
               >
+                {/* Selected badge */}
                 {selected && (
-                  <span className="absolute right-3 top-3 rounded-full bg-[#c084fc] p-1.5 text-white">
-                    <CheckCircle2 className="h-4 w-4" />
+                  <span className="absolute right-3 top-3 rounded-full bg-white/20 p-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-white" />
                   </span>
                 )}
+                {/* Lock badge */}
                 {locked && (
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-primary-200/20 bg-primary-950/60 px-3 py-1 text-xs font-black text-primary-50">
-                    <Lock className="h-3.5 w-3.5" />
-                    {price} stars
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/50 px-3 py-1 text-xs font-black text-white">
+                    <Lock className="h-3 w-3" /> {price} stars
                   </span>
                 )}
-                <div className="relative mx-auto h-64 w-full">
+
+                {/* Character image */}
+                <div className="relative h-44 w-full overflow-hidden rounded-lg">
                   <Image
                     src={option.imagePath}
                     alt={option.label}
                     fill
-                    sizes="(min-width: 768px) 30vw, 90vw"
-                    className="object-contain object-bottom drop-shadow-[0_18px_24px_rgba(0,0,0,0.45)]"
+                    sizes="(min-width: 768px) 28vw, 90vw"
+                    className="object-contain object-center scale-[1.9] origin-center drop-shadow-[0_12px_20px_rgba(0,0,0,0.6)]"
                     unoptimized
                     priority={option.class === 'warrior'}
                   />
                   {locked && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-primary-950/40">
-                      <Lock className="h-10 w-10 text-white/90" />
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
+                      <Lock className="h-10 w-10 text-white/80" />
                     </div>
                   )}
                 </div>
-                <div className="mt-4">
-                  <p className="text-xs font-bold uppercase tracking-wide text-primary-100/45">{option.class}</p>
-                  <h3 className="mt-1 text-xl font-black">{option.label}</h3>
-                  <p className="mt-2 min-h-12 text-sm font-semibold text-primary-100/65">{option.description}</p>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-xs font-bold">
-                    <span className="rounded-md bg-primary-950/30 px-2 py-2 text-primary-100">HP {option.stats.maxHp}</span>
-                    <span className="rounded-md bg-primary-950/30 px-2 py-2 text-primary-100">ATK {option.stats.attack}</span>
-                    <span className="rounded-md bg-primary-950/30 px-2 py-2 text-primary-100">SPD {option.stats.speed}</span>
+
+                {/* Info */}
+                <div className="mt-4 flex-1 flex flex-col">
+                  <p className={`text-xs font-black uppercase tracking-widest ${theme.labelColor}`}>{theme.label}</p>
+                  <h3 className="mt-1 text-2xl font-black text-white">{option.label}</h3>
+                  <p className="mt-2 text-sm font-semibold text-white/65 flex-1">{option.description}</p>
+
+                  {/* Stats */}
+                  <div className="mt-4 flex gap-2">
+                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-3 py-1.5 text-xs font-black text-white`}>❤️ HP {option.stats.maxHp}</span>
+                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-3 py-1.5 text-xs font-black text-white`}>⚔️ ATK {option.stats.attack}</span>
+                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-3 py-1.5 text-xs font-black text-white`}>💨 SPD {option.stats.speed}</span>
                   </div>
-                  <p className="mt-3 rounded-md bg-primary-950/30 px-3 py-2 text-xs font-bold text-[#e9d5ff]">
-                    {owned ? 'Owned' : canAfford ? 'Ready to unlock' : `${Math.max(0, price - access.starBalance)} more stars needed`}
-                  </p>
+
+                  {/* Owned / status */}
+                  <div className="mt-4 flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2.5">
+                    {owned
+                      ? <><CheckCircle2 className="h-4 w-4 text-green-400" /><span className="text-sm font-black text-green-300">Owned</span></>
+                      : canAfford
+                        ? <><Star className="h-4 w-4 text-yellow-400" /><span className="text-sm font-black text-yellow-300">Ready to unlock</span></>
+                        : <><Lock className="h-4 w-4 text-white/50" /><span className="text-sm font-black text-white/50">{Math.max(0, price - access.starBalance)} more stars needed</span></>
+                    }
+                  </div>
                 </div>
               </button>
             )

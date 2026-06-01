@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { execute, query } from '@/lib/db'
 import { getSession, hashPassword } from '@/lib/auth'
+import { sendEnrollmentEmail } from '@/lib/email'
 import type { User } from '@/types/user'
 
 async function requireTeacher() {
@@ -16,8 +17,10 @@ async function requireTeacher() {
 
 /**
  * POST /api/teacher/students/bulk
- * Body: { classroomId: number, students: { name, email, password, parentEmail? }[] }
+ * Body: { classroomId: number, students: { username, parentEmail? }[] }
  * Bulk enroll students from CSV upload.
+ * Password is auto-generated as: username + "123"
+ * Parent is notified via email with credentials.
  */
 export async function POST(request: Request) {
   try {
@@ -36,14 +39,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Select a classroom first' }, { status: 400 })
     }
 
-    // Verify classroom belongs to teacher
-    const classroomRows = await query<{ id: number }>(
-      'SELECT id FROM classrooms WHERE id = ? AND teacher_id = ? LIMIT 1',
+    // Verify classroom belongs to teacher and get its name
+    const classroomRows = await query<{ id: number; name: string }>(
+      'SELECT id, name FROM classrooms WHERE id = ? AND teacher_id = ? LIMIT 1',
       [classroomId, teacher.id],
     )
     if (!classroomRows.length) {
       return NextResponse.json({ success: false, message: 'Classroom not found' }, { status: 404 })
     }
+    const classroomName = classroomRows[0].name
 
     const students = Array.isArray(body.students) ? body.students : []
     if (students.length === 0) {
@@ -59,53 +63,38 @@ export async function POST(request: Request) {
 
     for (let i = 0; i < students.length; i++) {
       const raw = students[i] as Record<string, unknown>
-      const name = String(raw.name ?? '').trim()
-      const email = String(raw.email ?? '').trim().toLowerCase()
-      const password = String(raw.password ?? '').trim()
+      const username = String(raw.username ?? raw.name ?? '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
       const parentEmail = String(raw.parentEmail ?? raw.parent_email ?? '').trim().toLowerCase() || null
 
-      // Validate
-      if (!name || name.length < 2) {
-        results.push({ row: i + 1, name: name || '(empty)', status: 'skipped', reason: 'Name too short' })
-        skippedCount++
-        continue
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        results.push({ row: i + 1, name, status: 'skipped', reason: 'Invalid email' })
-        skippedCount++
-        continue
-      }
-      if (password.length < 6) {
-        results.push({ row: i + 1, name, status: 'skipped', reason: 'Password too short (min 6 chars)' })
+      // Validate username
+      if (!username || username.length < 2) {
+        results.push({ row: i + 1, name: username || '(empty)', status: 'skipped', reason: 'Username too short' })
         skippedCount++
         continue
       }
 
-      // Generate username from name (lowercase, no spaces, add number if taken)
-      const baseUsername = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'student'
+      // Validate parent email if provided
+      if (parentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
+        results.push({ row: i + 1, name: username, status: 'skipped', reason: 'Invalid parent email' })
+        skippedCount++
+        continue
+      }
 
-      // Check if email already exists
-      const existing = await query<{ id: number }>(
-        'SELECT id FROM users WHERE email = ? LIMIT 1',
-        [email],
+      // Check if username already taken
+      const existingUser = await query<{ id: number }>(
+        'SELECT id FROM users WHERE username = ? LIMIT 1',
+        [username],
       )
-      if (existing.length > 0) {
-        results.push({ row: i + 1, name, status: 'skipped', reason: 'Email already registered' })
+      if (existingUser.length > 0) {
+        results.push({ row: i + 1, name: username, status: 'skipped', reason: 'Username already taken' })
         skippedCount++
         continue
       }
 
-      // Find unique username
-      let username = baseUsername
-      let suffix = 1
-      while (true) {
-        const taken = await query<{ id: number }>(
-          'SELECT id FROM users WHERE username = ? LIMIT 1',
-          [username],
-        )
-        if (!taken.length) break
-        username = `${baseUsername}${suffix++}`
-      }
+      // Auto-generate password: username + "123"
+      const password = `${username}123`
+      // Generate a placeholder email to satisfy NOT NULL constraint
+      const email = `${username}@student.mindspark`
 
       const passwordHash = await hashPassword(password)
       await execute(
@@ -115,7 +104,14 @@ export async function POST(request: Request) {
         [username, email, passwordHash, teacher.id, classroomId, parentEmail],
       )
 
-      results.push({ row: i + 1, name, status: 'enrolled' })
+      // Send credentials to parent email
+      if (parentEmail) {
+        sendEnrollmentEmail(parentEmail, username, password, classroomName).catch(err =>
+          console.error(`[bulk] Failed to email parent for ${username}:`, err)
+        )
+      }
+
+      results.push({ row: i + 1, name: username, status: 'enrolled' })
       enrolledCount++
     }
 
