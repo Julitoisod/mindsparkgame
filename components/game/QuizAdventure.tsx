@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -318,40 +317,6 @@ function nextPlayableLevelIndex(completedLevels: number[]): number {
   return Math.min(Math.max(...completedLevels), MAX_LEVELS - 1)
 }
 
-function ProgressBar({
-  value,
-  max,
-  color,
-  label,
-}: {
-  value: number
-  max: number
-  color: string
-  label: string
-}) {
-  const width = `${Math.max(0, Math.min(100, (value / max) * 100))}%`
-  const percentage = Math.round((value / max) * 100)
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between font-bold uppercase tracking-wide text-white" style={{ fontSize: 'clamp(10px, 2dvh, 13px)' }}>
-        <span>{label}</span>
-        <span className="tabular-nums">
-          {value} / {max} ({percentage}%)
-        </span>
-      </div>
-      <div className="h-4 sm:h-5 overflow-hidden rounded-full border-2 border-white/20 bg-black/30 shadow-inner">
-        <motion.div
-          className={`h-full rounded-full bg-gradient-to-r ${color} shadow-lg`}
-          initial={{ width: 0 }}
-          animate={{ width }}
-          transition={{ duration: 0.45, ease: 'easeOut' }}
-        />
-      </div>
-    </div>
-  )
-}
-
 function StatPill({
   icon,
   label,
@@ -473,7 +438,6 @@ export default function QuizAdventure({
   characterStats,
   initialLevel = 1,
 }: QuizAdventureProps) {
-  const router = useRouter()
   const levels = useMemo(() => {
     const exportedLevels = getExportedLevels()
     const normalized = FALLBACK_LEVELS.map((fallback, index) =>
