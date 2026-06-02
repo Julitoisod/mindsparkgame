@@ -47,6 +47,7 @@ export default function HomePage() {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto space-y-6">
+          <p className="text-sm md:text-base font-bold text-yellow-300">HI</p>
           <div className="inline-flex items-center gap-2 bg-purple-500/15 border border-purple-300/30 rounded-full px-4 py-1.5 text-sm text-purple-200 mb-2">
             <Zap className="w-3.5 h-3.5 text-yellow-400" />
             Math RPG Adventure · Grade 3
