@@ -190,7 +190,7 @@ export default function DashboardStorePage() {
                   <button
                     onClick={() => handlePurchase(option.class)}
                     disabled={purchasing === option.class || access.starBalance < price}
-                    className={`mt-4 w-full rounded-lg border-2 ${theme.border} py-2.5 text-sm font-black text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center gap-2`}
+                    className={`mt-4 w-full rounded-lg border-2 ${theme.border} py-2.5 text-sm font-black text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-purple-300/60 flex items-center justify-center gap-2`}
                   >
                     {purchasing === option.class ? (
                       <><Loader2 className="h-4 w-4 animate-spin" />Buying...</>

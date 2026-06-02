@@ -969,12 +969,12 @@ export default function QuizAdventure({
                         <Lock className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-[#78909c]" />
                       )}
                       <span className={[
-                        'absolute -bottom-1 right-0 sm:bottom-0.5 sm:right-0.5 lg:bottom-1 lg:right-1 rounded px-1 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-black leading-none shadow-md',
+                        'absolute -bottom-1 right-0 sm:bottom-0.5 sm:right-0.5 lg:bottom-1 lg:right-1 rounded px-1 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-bold leading-none shadow-md',
                         isUnlocked
                           ? status === 'cleared'
                             ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                            : 'bg-gradient-to-br from-[#9333ea]lue-500 to-purple-500 text-white'
-                          : 'bg-[#37474f]/90 text-[#90a4ae]',
+                            : 'bg-purple-600 text-white'
+                          : 'bg-[#1f2937] text-[#374151]',
                       ].join(' ')}>
                         L{lvl.number}
                       </span>
@@ -1326,7 +1326,7 @@ export default function QuizAdventure({
                             showCorrect
                               ? 'border-yellow-300 bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-500 scale-105 shadow-[0_4px_0_#b45309,0_0_20px_rgba(250,204,21,0.6)] ring-2 ring-yellow-200'
                               : showWrong
-                                ? 'border-gray-500 bg-gradient-to-b from-gray-500 via-gray-600 to-gray-700 scale-95 opacity-50 shadow-none'
+                                ? 'border-gray-500 bg-gradient-to-b from-gray-500 via-gray-600 to-gray-700 scale-95 opacity-70 shadow-none'
                                 : `${style.bg} ${style.border} ${style.shadow}`,
                             isResolving ? 'cursor-default' : 'cursor-pointer',
                           ].join(' ')}

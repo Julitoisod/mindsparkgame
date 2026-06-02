@@ -19,6 +19,68 @@ body {
 ::-webkit-scrollbar-thumb  { background: #9333ea; border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: #c084fc; }
 
+/* ── Gradient Shimmer Animation ────────────────────────────────────────────── */
+@keyframes gradient-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-shimmer {
+  background-size: 200% 200%;
+  animation: gradient-shimmer 3s ease-in-out infinite;
+}
+
+/* ── Button Glow Animation ─────────────────────────────────────────────────── */
+@keyframes button-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(192, 132, 252, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 30px rgba(192, 132, 252, 0.6);
+  }
+}
+
+@keyframes border-pulse {
+  0%, 100% {
+    border-color: rgb(192 132 252 / 0.3);
+    box-shadow: 0 0 0 0 rgba(192, 132, 252, 0.4);
+  }
+  50% {
+    border-color: rgb(192 132 252 / 0.8);
+    box-shadow: 0 0 15px 5px rgba(192, 132, 252, 0.2);
+  }
+}
+
+@keyframes shine {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.btn-glow {
+  animation: button-glow 2s ease-in-out infinite;
+}
+
+.btn-pulse-border {
+  animation: border-pulse 2s ease-in-out infinite;
+}
+
+.btn-shine {
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background-size: 1000px 100%;
+  animation: shine 3s infinite;
+}
+
 /* Hide dashboard header while in game battle screen */
 .game-battle-active #dashboard-mobile-header {
   display: none;
@@ -290,4 +352,30 @@ canvas {
 
 .teacher-theme .font-game {
   font-family: var(--font-inter), sans-serif;
+}
+
+/* Account status toggle — override .teacher-theme .text-white */
+.teacher-theme .btn-account-danger {
+  background: linear-gradient(135deg, #DC2626, #B91C1C) !important;
+  color: #ffffff !important;
+  border: 1px solid #EF4444 !important;
+}
+.teacher-theme .btn-account-danger:hover {
+  background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.5) !important;
+}
+.teacher-theme .btn-account-danger:active {
+  background: #991B1B !important;
+}
+.teacher-theme .btn-account-success {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  color: #ffffff !important;
+  border: 1px solid #10B981 !important;
+}
+.teacher-theme .btn-account-success:hover {
+  background: linear-gradient(135deg, #10B981, #059669) !important;
+  box-shadow: 0 0 12px rgba(5, 150, 105, 0.5) !important;
+}
+.teacher-theme .btn-account-success:active {
+  background: #065F46 !important;
 }

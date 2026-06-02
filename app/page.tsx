@@ -54,7 +54,7 @@ export default function HomePage() {
 
           <h1 className="text-5xl md:text-7xl font-black leading-tight">
             <span className="text-white">Mind</span>
-            <span className="bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300 bg-clip-text text-transparent animate-gradient-shimmer">
               Spark
             </span>
           </h1>

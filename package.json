@@ -23,6 +23,7 @@
     "next": "^15.5.16",
     "next-pwa": "^5.6.0",
     "nodemailer": "^8.0.7",
+    "opencode-image-vision": "^1.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.4.1",

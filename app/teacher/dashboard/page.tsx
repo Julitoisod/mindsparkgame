@@ -304,12 +304,12 @@ export default function TeacherDashboardPage() {
           </form>
           {classrooms.length > 0 && (
             <div className="mt-4 pt-4 border-t border-purple-400/15">
-              <p className="mb-2 text-xs font-bold text-[#374151]">Your Classrooms ({classrooms.length})</p>
+              <p className="mb-2 text-xs font-bold text-white">Your Classrooms ({classrooms.length})</p>
               <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
                 {classrooms.map(c => (
                   <div key={c.id} className="flex items-center justify-between rounded-lg bg-purple-900/30 px-3 py-2">
-                    <span className="text-xs font-bold text-[#111827]">{c.name}</span>
-                    <span className="text-[10px] text-[#6B7280]">{c.studentCount} students</span>
+                    <span className="text-xs font-bold text-white">{c.name}</span>
+                    <span className="text-[10px] text-purple-200">{c.studentCount} students</span>
                   </div>
                 ))}
               </div>
@@ -408,7 +408,7 @@ export default function TeacherDashboardPage() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={csvUploading || !csvClassroomId}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-500/30 hover:from-orange-400 hover:to-pink-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-500/30 hover:from-orange-400 hover:to-pink-400 disabled:cursor-not-allowed disabled:opacity-70 transition"
             >
               {csvUploading ? (
                 <><RefreshCw className="h-4 w-4 animate-spin" /> Uploading...</>

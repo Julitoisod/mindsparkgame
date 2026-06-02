@@ -356,21 +356,29 @@ export default function TeacherStudentsPage() {
                                 const isCompleted = student.progress.completedLevels.includes(lvl)
                                 const isUnlocked = student.teacherUnlockedLevels.includes(lvl)
                                 const isLoading = unlockingLevel === `${student.id}-${lvl}`
+                                const tipText = isCompleted ? `Level ${lvl} Completed` : isUnlocked ? `Level ${lvl} Unlocked` : `Level ${lvl} Locked`
                                 return (
                                   <button
                                     key={lvl}
                                     onClick={() => !isCompleted && toggleLevelUnlock(student.id, lvl, isUnlocked)}
                                     disabled={isCompleted || isLoading}
+                                    title={tipText}
+                                    aria-label={tipText}
                                     className={[
-                                      'flex h-9 w-9 items-center justify-center rounded-lg text-xs font-black transition',
-                                      isCompleted ? 'bg-emerald-500/30 text-emerald-300 cursor-default' :
-                                      isUnlocked ? 'bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 hover:bg-cyan-500/50' :
-                                      'bg-purple-800/40 border border-purple-400/20 text-purple-300 hover:bg-purple-500/30',
+                                      'group relative z-0 flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-950',
+                                      isCompleted ? 'bg-emerald-600 text-white cursor-default focus:ring-emerald-400' :
+                                      isUnlocked ? 'bg-purple-600 text-white hover:bg-purple-500 focus:ring-purple-300' :
+                                      'bg-purple-900/60 border border-purple-400/20 text-[#374151] hover:bg-purple-800/60 focus:ring-purple-400',
                                       isLoading ? 'animate-pulse' : '',
                                     ].join(' ')}
-                                    title={isCompleted ? `Level ${lvl} Completed` : isUnlocked ? `Level ${lvl} Unlocked` : `Level ${lvl} Locked`}
                                   >
-                                    {isCompleted ? '✓' : lvl}
+                                    <span className="font-bold">{isCompleted ? '✓' : lvl}</span>
+                                    <span
+                                      role="tooltip"
+                                      className="pointer-events-none absolute -top-9 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#1a1233] px-2 py-1 text-[10px] font-bold text-white opacity-0 shadow-lg ring-1 ring-purple-400/30 transition group-hover:opacity-100 group-focus:opacity-100"
+                                    >
+                                      {tipText}
+                                    </span>
                                   </button>
                                 )
                               })}
@@ -391,7 +399,7 @@ export default function TeacherStudentsPage() {
                               <button
                                 onClick={() => passwordDraft && updateStudent(student.id, { password: passwordDraft })}
                                 disabled={!passwordDraft || saving}
-                                className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500 disabled:opacity-50 transition"
+                                className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-70 transition"
                               >
                                 Save
                               </button>
@@ -412,7 +420,7 @@ export default function TeacherStudentsPage() {
                               <button
                                 onClick={() => parentEmailDraft && updateStudent(student.id, { parentEmail: parentEmailDraft })}
                                 disabled={!parentEmailDraft || saving}
-                                className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500 disabled:opacity-50 transition"
+                                className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-70 transition"
                               >
                                 Save
                               </button>
@@ -446,12 +454,15 @@ export default function TeacherStudentsPage() {
                           <button
                             onClick={() => updateStudent(student.id, { enrollmentStatus: student.enrollmentStatus === 'enrolled' ? 'disabled' : 'enrolled' })}
                             disabled={saving}
-                            className={[
-                              'rounded-lg px-3 py-1.5 text-xs font-bold transition',
-                              student.enrollmentStatus === 'enrolled'
-                                ? 'bg-red-500/20 border border-red-400/30 text-red-200 hover:bg-red-500/30'
-                                : 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 hover:bg-emerald-500/30',
-                            ].join(' ')}
+                            aria-label={student.enrollmentStatus === 'enrolled' ? 'Disable Account' : 'Enable Account'}
+                            className={student.enrollmentStatus === 'enrolled'
+                              ? 'btn-account-danger rounded-lg px-5 py-2.5 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:ring-offset-2 focus:ring-offset-white shadow-md shadow-red-500/30'
+                              : 'btn-account-success rounded-lg px-5 py-2.5 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-white shadow-md shadow-emerald-500/30'
+                            }
+                            style={student.enrollmentStatus === 'enrolled'
+                              ? { background: '#DC2626', color: '#ffffff', border: '1px solid #EF4444' }
+                              : { background: '#059669', color: '#ffffff', border: '1px solid #10B981' }
+                            }
                           >
                             {student.enrollmentStatus === 'enrolled' ? 'Disable Account' : 'Enable Account'}
                           </button>
@@ -475,7 +486,7 @@ export default function TeacherStudentsPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/20 disabled:opacity-30 transition"
+                className="rounded-lg p-1.5 text-purple-200 hover:bg-purple-500/20 disabled:cursor-not-allowed disabled:opacity-60 transition"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -498,7 +509,7 @@ export default function TeacherStudentsPage() {
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/20 disabled:opacity-30 transition"
+                className="rounded-lg p-1.5 text-purple-200 hover:bg-purple-500/20 disabled:cursor-not-allowed disabled:opacity-60 transition"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

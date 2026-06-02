@@ -257,11 +257,11 @@ export default function DashboardProfilePage() {
             return (
               <div
                 key={badge.id}
-                className={`relative rounded-xl border px-4 py-3 transition ${
-                  earned
-                    ? 'border-[#c084fc]/30 bg-[#241a47]'
-                    : 'border-[#c084fc]/10 bg-[#241a47]/50 opacity-50 grayscale'
-                }`}
+                  className={`relative rounded-xl border px-4 py-3 transition ${
+                    earned
+                      ? 'border-[#c084fc]/40 bg-[#241a47]'
+                      : 'border-[#c084fc]/25 bg-[#241a47]/80 opacity-80'
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">{badge.icon}</span>

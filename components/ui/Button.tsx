@@ -54,7 +54,9 @@ export default function Button({
         'select-none cursor-pointer',
         variantClasses[variant],
         sizeClasses[size],
-        isDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
+        isDisabled
+          ? 'cursor-not-allowed opacity-70'
+          : '',
         className,
       ].join(' ')}
       disabled={isDisabled}

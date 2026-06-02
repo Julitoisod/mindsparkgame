@@ -184,7 +184,9 @@ export default function CharacterSelectPage() {
                 className={[
                   'relative flex flex-col rounded-xl border-2 p-5 text-left transition',
                   theme.border, theme.bg,
-                  locked && !canAfford ? 'cursor-not-allowed opacity-50' : 'hover:brightness-110',
+                  locked && !canAfford
+                    ? 'cursor-not-allowed opacity-100 filter grayscale(20%) border-gray-700/60'
+                    : 'hover:brightness-110',
                   selected ? `ring-4 ${theme.ring}` : '',
                 ].join(' ')}
               >
