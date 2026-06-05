@@ -1,6 +1,7 @@
   import { NextResponse } from 'next/server'
   import { execute, query } from '@/lib/db'
   import { getSession, hashPassword } from '@/lib/auth'
+  import { sendEnrollmentEmail } from '@/lib/email'
   import type { EnrollmentStatus, User } from '@/types/user'
 
   interface StudentRow {
@@ -240,10 +241,17 @@
     const passwordHash = await hashPassword(password)
     const result = await execute(
       `INSERT INTO users
-        (username, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-      VALUES (?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-      [username, email, passwordHash, teacher.id, classroomId],
+        (username, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, parent_email, enrolled_at)
+      VALUES (?, ?, ?, 'student', 'enrolled', ?, ?, ?, NOW())`,
+      [username, email, passwordHash, teacher.id, classroomId, (typeof body.parentEmail === 'string' ? body.parentEmail : null)],
     )
+
+    // Fetch classroom name for the email
+    const classroomRows = await query<{ name: string }>(
+      'SELECT name FROM classrooms WHERE id = ? LIMIT 1',
+      [classroomId],
+    )
+    const classroomName = classroomRows[0]?.name ?? 'Your Classroom'
 
     const rows = await query<StudentRow>(
       `SELECT
@@ -268,8 +276,16 @@
       [result.insertId],
     )
 
+    // Send credentials to parent email if provided
+    const enrolledStudent = publicStudent(rows[0])
+    if (enrolledStudent.parentEmail) {
+      sendEnrollmentEmail(enrolledStudent.parentEmail, username, password, classroomName).catch(err =>
+        console.error('[teacher/students] Failed to send enrollment email:', err)
+      )
+    }
+
     return NextResponse.json(
-      { success: true, message: 'Student enrolled', data: { ...publicStudent(rows[0]), teacherUnlockedLevels: [] } },
+      { success: true, message: 'Student enrolled', data: { ...enrolledStudent, teacherUnlockedLevels: [] } },
       { status: 201 },
     )
   }

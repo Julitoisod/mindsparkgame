@@ -6,7 +6,7 @@ import type { User, PublicUser } from '@/types/user'
 
 /**
  * POST /api/auth/login
- * Body: { email, password }
+ * Body: { identifier, password } | { email, password }
  */
 export async function POST(request: Request) {
   let body: unknown
@@ -21,24 +21,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: 'Validation failed', data: errors }, { status: 422 })
   }
 
-  const { email, password } = body as { email: string; password: string }
+  const data = body as Record<string, string>
+  const identifier = (data.identifier ?? data.email ?? '').trim()
+  const password = data.password
 
   try {
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
     const rows = await query<User>(
       `SELECT
          id, username, email, password_hash, role, enrollment_status, enrolled_by, enrolled_at,
          avatar_url, created_at, updated_at
        FROM users
-       WHERE email = ?
+       WHERE ${isEmail ? 'email = ?' : 'username = ?'}
        LIMIT 1`,
-      [email.toLowerCase()],
+      [isEmail ? identifier.toLowerCase() : identifier],
     )
 
     // Constant-time response for non-existent users (prevent user enumeration)
     if (!rows.length || !rows[0].password_hash) {
-      // Still hash to prevent timing attacks
       await verifyPassword(password, '$2a$12$invalidsaltplaceholderinvalid00')
-      return NextResponse.json({ success: false, message: 'Invalid email or password' }, { status: 401 })
+      return NextResponse.json({ success: false, message: 'Invalid username or password' }, { status: 401 })
     }
 
     const user = rows[0]

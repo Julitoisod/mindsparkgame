@@ -64,10 +64,161 @@ body {
   }
 }
 
+/* ── Character Store showcase ─────────────────────────────────────────────── */
+.character-showcase {
+  flex: 0 0 42%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.character-showcase::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.28), transparent 65%);
+  filter: blur(2px);
+}
+
+.character-sprite {
+  position: relative;
+  z-index: 2;
+  height: clamp(150px, 30vw, 220px);
+  width: auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform: scale(1.4);
+  filter: drop-shadow(0 0 18px currentColor);
+  animation: floatCharacter 2.4s ease-in-out infinite;
+}
+
+@keyframes floatCharacter {
+  0%, 100% { transform: scale(1.4) translateY(0); }
+  50% { transform: scale(1.4) translateY(-8px); }
+}
+
 /* ── Canvas full-screen fix ────────────────────────────────────────────────── */
 canvas {
   display: block;
   outline: none;
+}
+
+/* Student mobile app shell — full-viewport, no body scroll */
+body:has(.student-app-shell) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.student-app-shell {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(to bottom right, #1a1233, #3b2a73, #6b21a8);
+}
+
+.student-header {
+  flex-shrink: 0;
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  overflow: hidden;
+}
+
+.student-content {
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Contained scroll area for list screens (attempts, inventory, etc.) */
+.student-scroll-area {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Landscape helper */
+@media (max-height: 480px) and (orientation: landscape) {
+  .student-header { height: 40px; min-height: 40px; }
+}
+
+/* Hide default scrollbar within student scroll areas */
+.student-scroll-area::-webkit-scrollbar { width: 4px; }
+.student-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 10px;
+}
+
+/* Prevent image overflow on mobile */
+.student-content img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GAME SCREEN FULL-BLEED LAYOUT
+   ══════════════════════════════════════════════════════════════════ */
+.game-screen {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.game-stage,
+.map-stage,
+.quiz-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.background-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-size: cover;
+  background-position: center center;
+}
+
+/* Override global img rule ONLY inside game screens */
+.game-screen img,
+.game-screen .background-layer {
+  object-fit: cover !important;
+  object-position: center center !important;
+  max-width: none !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.ui-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
 }
 
 /* ── Teacher SaaS Theme (light lavender) ─────────────────────────────────── */
@@ -291,3 +442,137 @@ canvas {
 .teacher-theme .font-game {
   font-family: var(--font-inter), sans-serif;
 }
+
+/* ── Success notification fixes (teacher light theme) ──────────────────────── */
+/* Force black text on all emerald/green success notifications */
+.teacher-theme .bg-emerald-500\/20 {
+  color: #000000 !important;
+}
+
+.teacher-theme .bg-emerald-500\/20 *,
+.teacher-theme .bg-emerald-500\/10 *,
+.teacher-theme .bg-emerald-500\/30 {
+  color: #000000 !important;
+}
+
+.teacher-theme .bg-emerald-500\/20 .text-emerald-200,
+.teacher-theme .bg-emerald-500\/20 .text-emerald-300,
+.teacher-theme .bg-emerald-500\/20 .text-emerald-400,
+.teacher-theme .bg-emerald-500\/10 .text-emerald-200,
+.teacher-theme .bg-emerald-500\/10 .text-emerald-300,
+.teacher-theme .bg-emerald-500\/10 .text-emerald-400,
+.teacher-theme .bg-emerald-500\/30 .text-emerald-200,
+.teacher-theme .bg-emerald-500\/30 .text-emerald-300,
+.teacher-theme .bg-emerald-500\/30 .text-emerald-400 {
+  color: #000000 !important;
+}
+
+/* Specific success alert selector for motion.div on teacher dashboard */
+.teacher-theme div[class*="bg-emerald-500/20"][class*="text-emerald-200"] {
+  color: #000000 !important;
+}
+
+.teacher-theme div[class*="bg-emerald-500/20"][class*="text-emerald-200"] * {
+  color: #000000 !important;
+}
+
+/* Fix the CheckCircle2 icon in success alert */
+.teacher-theme .bg-emerald-500\/20 svg {
+  color: #000000 !important;
+}
+
+/* Selection override for success text */
+.teacher-theme .bg-emerald-500\/20::selection,
+.teacher-theme .bg-emerald-500\/10::selection {
+  color: #000000 !important;
+  background: #a7f3d0 !important;
+}
+
+/* Force black on hover/focus/active states */
+.teacher-theme .bg-emerald-500\/20:hover,
+.teacher-theme .bg-emerald-500\/20:focus,
+.teacher-theme .bg-emerald-500\/20:active {
+  color: #000000 !important;
+}
+.teacher-theme .bg-emerald-500\/20:hover *,
+.teacher-theme .bg-emerald-500\/20:focus *,
+.teacher-theme .bg-emerald-500\/20:active * {
+  color: #000000 !important;
+}
+
+/* Also fix inline student status badges */
+.teacher-theme span[class*="text-emerald-300"] {
+  color: #000000 !important;
+}
+.teacher-theme span[class*="bg-emerald-500/10"] {
+  color: #000000 !important;
+}
+.teacher-theme span[class*="bg-emerald-500/10"] span {
+  color: #000000 !important;
+}
+
+/* Keep label text in perf config readable */
+.teacher-theme div[class*="text-emerald-300"][class*="bg-emerald-500"] {
+  color: #000000 !important;
+}
+
+/* Override any link colors inside success alerts */
+.teacher-theme .bg-emerald-500\/20 a,
+.teacher-theme .bg-emerald-500\/10 a {
+  color: #000000 !important;
+}
+
+/* Override inherited text-purple variants that might override */
+.teacher-theme .bg-emerald-500\/20[class*="text-purple"],
+.teacher-theme .bg-emerald-500\/10[class*="text-purple"] {
+  color: #000000 !important;
+}
+
+/* ── General notification color override (teacher light theme) ──────────────── */
+/* Catch-all for any green/emerald success text patterns */
+.teacher-theme [class*="text-emerald-200"],
+.teacher-theme [class*="text-emerald-300"],
+.teacher-theme [class*="text-emerald-400"],
+.teacher-theme [class*="text-emerald-100"] {
+  color: #000000 !important;
+}
+
+/* ── Student page scoped overrides ─────────────────────────────────────────── */
+/* Ensure light-theme colors on teacher students page for elements that might
+   still inherit dark-theme translucent utilities */
+.teacher-theme [data-page="teacher-students"] .bg-purple-900\/50,
+.teacher-theme [data-page="teacher-students"] .bg-purple-800\/40,
+.teacher-theme [data-page="teacher-students"] .bg-purple-950\/30,
+.teacher-theme [data-page="teacher-students"] .bg-purple-950\/40 {
+  background-color: #ffffff !important;
+}
+
+.teacher-theme [data-page="teacher-students"] .text-purple-200,
+.teacher-theme [data-page="teacher-students"] .text-purple-300,
+.teacher-theme [data-page="teacher-students"] .text-purple-400 {
+  color: #374151 !important; /* gray-700 */
+}
+
+.teacher-theme [data-page="teacher-students"] .text-white {
+  color: #111827 !important; /* gray-900 */
+}
+
+.teacher-theme [data-page="teacher-students"] .border-purple-400\/15,
+.teacher-theme [data-page="teacher-students"] .border-purple-400\/20,
+.teacher-theme [data-page="teacher-students"] .border-purple-400\/10 {
+  border-color: #e5e7eb !important; /* gray-200 */
+}
+
+.teacher-theme [data-page="teacher-students"] .divide-purple-400\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e5e7eb !important;
+}
+
+/* Red error notifications: ensure dark red text for contrast */
+.teacher-theme .text-red-200 { color: #7f1d1d !important; }
+.teacher-theme .text-red-300 { color: #7f1d1d !important; }
+.teacher-theme .text-red-400 { color: #991b1b !important; }
+
+/* Yellow notification text */
+.teacher-theme .text-yellow-200 { color: #713f12 !important; }
+.teacher-theme .text-yellow-300 { color: #713f12 !important; }
+.teacher-theme .text-yellow-400 { color: #854d0e !important; }

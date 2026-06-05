@@ -36,8 +36,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
   }
 
   // Verify teacher owns this student
-  const studentRows = await query<{ id: number; username: string; parent_email: string | null; enrolled_by: number }>(
-    'SELECT id, username, parent_email, enrolled_by FROM users WHERE id = ? AND role = \'student\' LIMIT 1',
+  const studentRows = await query<{ id: number; username: string; email: string; parent_email: string | null; enrolled_by: number }>(
+    'SELECT id, username, email, parent_email, enrolled_by FROM users WHERE id = ? AND role = \'student\' LIMIT 1',
     [studentId],
   )
 
@@ -76,6 +76,10 @@ export async function POST(_request: Request, ctx: RouteContext) {
     totalLevels: 5,
     starBalance,
     badges,
+    accountInfo: {
+      username: student.username,
+      email: student.email,
+    },
   })
 
   if (sent) {

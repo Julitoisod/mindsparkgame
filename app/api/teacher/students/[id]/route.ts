@@ -78,6 +78,14 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         { status: 422 },
       )
     }
+    // Duplicate check
+    const dupRows = await query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM users WHERE username = ? AND id != ?',
+      [username, studentId],
+    )
+    if (dupRows[0]?.count > 0) {
+      return NextResponse.json({ success: false, message: 'Username already taken' }, { status: 409 })
+    }
     updates.push('username = ?')
     params.push(username)
   }

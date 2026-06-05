@@ -15,7 +15,7 @@ import type { CharacterData }  from '@/types/character'
 const QuizAdventure = dynamic(() => import('@/components/game/QuizAdventure'), {
   ssr: false,
   loading: () => (
-    <div className="flex min-h-screen items-center justify-center bg-dark-900">
+    <div className="flex h-full items-center justify-center bg-dark-900">
       <span className="font-game text-sm text-primary-300 animate-pulse">Loading adventure...</span>
     </div>
   ),
@@ -79,14 +79,14 @@ export default function GamePage() {
 
   if (loading || (!ready && isAuthed)) {
     return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
-        <span className="text-primary-300 font-game animate-pulse">Initialising…</span>
+      <div className="h-full bg-dark-900 flex items-center justify-center">
+        <span className="text-primary-300 font-game animate-pulse">Initialising...</span>
       </div>
     )
   }
 
   return (
-    <div className="relative min-h-screen w-screen overflow-x-hidden bg-dark-900">
+    <div className="relative min-h-[100dvh] min-w-[100vw] overflow-hidden bg-dark-900">
       {/* Dashboard shortcut */}
       <Link
         href="/dashboard"

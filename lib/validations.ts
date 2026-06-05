@@ -39,8 +39,9 @@ export function validateLogin(body: unknown): ValidationResult {
   const errors: Record<string, string> = {}
   const data = body as Record<string, unknown>
 
-  if (!data.email || typeof data.email !== 'string') {
-    errors.email = 'Email is required.'
+  const identifier = data.identifier ?? data.email
+  if (!identifier || typeof identifier !== 'string' || identifier.trim().length === 0) {
+    errors.identifier = 'Username is required.'
   }
   if (!data.password || typeof data.password !== 'string') {
     errors.password = 'Password is required.'

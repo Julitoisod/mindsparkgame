@@ -16,7 +16,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f0a1f]">
+      <div className="flex h-full items-center justify-center bg-[#0f0a1f]">
         <div className="text-sm font-game text-[#c084fc]">Loading...</div>
       </div>
     )

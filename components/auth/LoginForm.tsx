@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react'
 import Input  from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
@@ -14,7 +14,7 @@ export default function LoginForm() {
   const router = useRouter()
   const { login } = useAuth({ checkSession: false })
 
-  const [email,       setEmail]       = useState('')
+  const [identifier,   setIdentifier]   = useState('')
   const [password,    setPassword]    = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors,      setErrors]      = useState<Record<string, string>>({})
@@ -24,13 +24,13 @@ export default function LoginForm() {
     e.preventDefault()
     const errs: Record<string, string> = {}
 
-    if (!email)    errs.email    = 'Email is required'
+    if (!identifier) errs.identifier = 'Username is required'
     if (!password) errs.password = 'Password is required'
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
     setLoading(true)
     setErrors({})
-    const user = await login({ email, password })
+    const user = await login({ identifier, password })
     setLoading(false)
 
     if (user?.role === 'teacher') {
@@ -52,14 +52,14 @@ export default function LoginForm() {
       noValidate
     >
       <Input
-        label="Email"
-        type="email"
-        placeholder="hero@example.com"
-        autoComplete="email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        error={errors.email}
-        icon={<Mail className="w-4 h-4" />}
+        label="Username"
+        type="text"
+        placeholder="hero123"
+        autoComplete="username"
+        value={identifier}
+        onChange={e => setIdentifier(e.target.value)}
+        error={errors.identifier}
+        icon={<User className="w-4 h-4" />}
       />
       <div className="space-y-1.5">
         <label className="block text-sm font-medium text-primary-100">Password</label>

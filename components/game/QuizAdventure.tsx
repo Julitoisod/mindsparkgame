@@ -859,19 +859,19 @@ export default function QuizAdventure({
     }
 
     return (
-      <section className="relative h-full overflow-hidden text-white">
+      <section className="game-screen map-stage text-white">
         {/* Magical purple/pink sky background - kid-friendly */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#3b2a73] via-[#6b21a8] to-[#a855f7]" />
-        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'url(/BACKGROUND FOREST 1/FOREST 1/2304x1296.png)', backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(4px)' }} />
+        <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#3b2a73] via-[#6b21a8] to-[#a855f7]" />
+        <div className="background-layer z-0 opacity-[0.06]" style={{ backgroundImage: 'url(/BACKGROUND FOREST 1/FOREST 1/2304x1296.png)', filter: 'blur(4px)' }} />
 
-        <div className="relative z-10 flex h-full w-full flex-col">
+        <div className="ui-layer flex flex-col">
           {/* Horizontal S-curve map - fits viewport on all screens */}
           <div
-            className="flex-1 min-h-0 flex items-start justify-center px-2 sm:px-4 pt-4 sm:pt-8 relative"
+            className="absolute inset-0 z-[5] flex items-start justify-center px-2 sm:px-4 pt-4 sm:pt-8"
             style={{
               backgroundImage: "url('/vecteezy_deep-forest-scene-with-trail-in-the-woods-illustration_6079540.jpg')",
               backgroundSize: 'cover',
-              backgroundPosition: 'center',
+              backgroundPosition: 'center center',
               backgroundRepeat: 'no-repeat',
             }}
           >
@@ -1019,18 +1019,19 @@ export default function QuizAdventure({
   }
 
   return (
-    <section className="relative h-full overflow-hidden bg-[#1a1233] text-white">
+    <section className="game-screen quiz-stage bg-[#1a1233] text-white">
       <Image
         src={level.backgroundImage}
         alt=""
         fill
         priority
         sizes="100vw"
-        className="absolute inset-0 h-full w-full object-cover"
+        className="background-layer"
+        style={{ objectFit: 'cover', objectPosition: 'center center' }}
         draggable={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#1a1233]/45 via-[#1a1233]/10 to-[#1a1233]/72" />
-      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#1a1233] to-transparent" />
+      <div className="absolute inset-0 z-[1] bg-gradient-to-b from-[#1a1233]/45 via-[#1a1233]/10 to-[#1a1233]/72" />
+      <div className="absolute inset-x-0 bottom-0 z-[1] h-20 bg-gradient-to-t from-[#1a1233] to-transparent" />
 
       {/* Screen flash on correct answer */}
       <AnimatePresence>
@@ -1046,7 +1047,7 @@ export default function QuizAdventure({
         )}
       </AnimatePresence>
 
-      <div className={`relative z-10 flex h-full w-full flex-col px-1.5 py-1 sm:px-4 sm:py-2 lg:px-6 transition-transform ${screenShake ? 'animate-[wiggle_0.3s_ease-in-out]' : ''}`}>
+      <div className={`ui-layer flex flex-col px-1.5 py-1 sm:px-4 sm:py-2 lg:px-6 transition-transform ${screenShake ? 'animate-[wiggle_0.3s_ease-in-out]' : ''}`}>
         {/* Particle effects overlay - enhanced celebrations */}
         <AnimatePresence>
           {showParticles === 'correct' && (

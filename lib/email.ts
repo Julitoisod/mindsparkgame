@@ -57,6 +57,7 @@ export async function sendProgressEmail(to: string, studentName: string, data: {
   starBalance: number
   badges: string[]
   latestAchievement?: string
+  accountInfo?: { username: string; email: string }
 }) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn('[email] SMTP not configured, skipping email')
@@ -67,6 +68,15 @@ export async function sendProgressEmail(to: string, studentName: string, data: {
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f7fcf5; border-radius: 12px;">
       <h1 style="color: #00441b; font-size: 24px;">🎮 MindSpark Progress Update</h1>
       <p style="color: #333;">Hello! Here's ${studentName}'s latest progress:</p>
+
+      <!-- Login Account Section -->
+      <div style="background: #e0f2fe; border: 1px solid #7dd3fc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <h2 style="color: #0369a1; font-size: 16px; margin: 0 0 8px 0;">🔐 Student Login Account</h2>
+        <p style="margin: 4px 0; font-size: 15px;"><strong>👤 Username:</strong> <span style="color: #0c4a6e; font-size: 16px;">${data.accountInfo?.username ?? studentName}</span></p>
+        <p style="margin: 4px 0; font-size: 15px;"><strong>📧 Student Email:</strong> <span style="color: #0c4a6e;">${data.accountInfo?.email ?? 'N/A'}</span></p>
+        <p style="margin: 4px 0; font-size: 13px; color: #64748b;">💡 <em>Your password was sent in the enrollment email. Contact your teacher if you need a password reset.</em></p>
+      </div>
+
       <div style="background: #e5f5e0; padding: 16px; border-radius: 8px; margin: 16px 0;">
         <p style="margin: 4px 0;"><strong>📚 Levels Completed:</strong> ${data.levelsCompleted}/${data.totalLevels}</p>
         <p style="margin: 4px 0;"><strong>⭐ Stars Earned:</strong> ${data.starBalance}</p>

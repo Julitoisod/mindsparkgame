@@ -44,15 +44,17 @@ export default function DashboardInventoryPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex h-full items-center justify-center">
         <div className="text-sm font-game text-purple-300">Loading inventory...</div>
       </div>
     )
   }
 
   return (
-    <section>
-      <Inventory slots={inventory} onToggleEquip={toggleEquip} loading={loadingInv} />
-    </section>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="student-scroll-area">
+        <Inventory slots={inventory} onToggleEquip={toggleEquip} loading={loadingInv} />
+      </div>
+    </div>
   )
 }

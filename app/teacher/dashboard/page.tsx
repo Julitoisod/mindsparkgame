@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
+  Copy,
   Download,
   FileSpreadsheet,
   GraduationCap,
@@ -22,7 +23,6 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 
 type Classroom = { id: number; name: string; studentCount: number; createdAt: string }
@@ -36,11 +36,12 @@ export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [classroomName, setClassroomName] = useState('')
   const [creatingClassroom, setCreatingClassroom] = useState(false)
-  const [enrollForm, setEnrollForm] = useState({ username: '', email: '', password: '' })
+  const [enrollForm, setEnrollForm] = useState({ username: '', email: '', password: '', parentEmail: '' })
   const [selectedClassroomId, setSelectedClassroomId] = useState<number | null>(null)
   const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [enrolledCredentials, setEnrolledCredentials] = useState<{ username: string; email: string; password: string; parentEmail: string } | null>(null)
 
   // CSV bulk upload state
   const [csvClassroomId, setCsvClassroomId] = useState<number | null>(null)
@@ -115,9 +116,15 @@ export default function TeacherDashboardPage() {
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
       setStudents(prev => [json.data, ...prev])
-      setEnrollForm({ username: '', email: '', password: '' })
-      setSuccess('Student enrolled successfully!')
-      setTimeout(() => setSuccess(null), 3000)
+      setEnrolledCredentials({
+        username: enrollForm.username,
+        email: enrollForm.email,
+        password: enrollForm.password,
+        parentEmail: enrollForm.parentEmail,
+      })
+      setEnrollForm({ username: '', email: '', password: '', parentEmail: '' })
+      setSuccess('Student enrolled successfully! Credentials shown below.')
+      setTimeout(() => setSuccess(null), 6000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to enroll student')
     } finally {
@@ -278,6 +285,66 @@ export default function TeacherDashboardPage() {
         </motion.div>
       )}
 
+      {/* New Student Credentials Card */}
+      <AnimatePresence>
+        {enrolledCredentials && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-xl border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-white p-5 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-purple-600" />
+                <h3 className="text-sm font-black text-purple-800">New Student Credentials</h3>
+              </div>
+              <button
+                onClick={() => setEnrolledCredentials(null)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-purple-100 hover:text-purple-600 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg bg-white border border-purple-200 p-3">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">Username</p>
+                <p className="text-sm font-black text-purple-700">{enrolledCredentials.username}</p>
+              </div>
+              <div className="rounded-lg bg-white border border-purple-200 p-3">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">Email</p>
+                <p className="text-sm font-black text-purple-700">{enrolledCredentials.email}</p>
+              </div>
+              <div className="rounded-lg bg-white border border-purple-200 p-3 relative">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">Password</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-black text-purple-700">{enrolledCredentials.password}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(enrolledCredentials.password)
+                        .then(() => alert('Password copied to clipboard!'))
+                        .catch(() => alert('Failed to copy'))
+                    }}
+                    className="rounded-md p-1 text-purple-400 hover:bg-purple-100 hover:text-purple-600 transition"
+                    title="Copy password"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {enrolledCredentials.parentEmail && (
+                <div className="rounded-lg bg-white border border-purple-200 p-3">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Parent Email</p>
+                  <p className="text-sm font-black text-purple-700">{enrolledCredentials.parentEmail}</p>
+                  <p className="text-[10px] text-emerald-600 font-bold mt-1">✓ Credentials sent to parent</p>
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-[10px] text-gray-500">Share these credentials with the student. This card will disappear when you close it.</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Quick Actions — 3 columns */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Create Classroom */}
@@ -297,7 +364,13 @@ export default function TeacherDashboardPage() {
             </div>
           </div>
           <form onSubmit={createClassroom} className="space-y-3">
-            <Input placeholder="e.g. Grade 3 Math" value={classroomName} onChange={e => setClassroomName(e.target.value)} />
+            <input
+              type="text"
+              placeholder="e.g. Grade 3 Math"
+              value={classroomName}
+              onChange={e => setClassroomName(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
             <Button type="submit" loading={creatingClassroom} icon={<PlusCircle className="h-4 w-4" />} className="w-full">
               Create Classroom
             </Button>
@@ -337,14 +410,39 @@ export default function TeacherDashboardPage() {
             <select
               value={selectedClassroomId ?? ''}
               onChange={e => setSelectedClassroomId(Number(e.target.value) || null)}
-              className="w-full rounded-xl border border-purple-400/20 bg-white px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
             >
-              <option value="">Select classroom...</option>
-              {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="" className="text-gray-500">Select classroom...</option>
+              {classrooms.map(c => <option key={c.id} value={c.id} className="text-gray-900">{c.name}</option>)}
             </select>
-            <Input placeholder="Username" value={enrollForm.username} onChange={e => setEnrollForm(f => ({ ...f, username: e.target.value }))} />
-            <Input placeholder="Email (Gmail)" type="email" value={enrollForm.email} onChange={e => setEnrollForm(f => ({ ...f, email: e.target.value }))} />
-            <Input placeholder="Assigned Password" type="password" value={enrollForm.password} onChange={e => setEnrollForm(f => ({ ...f, password: e.target.value }))} />
+            <input
+              type="text"
+              placeholder="Username"
+              value={enrollForm.username}
+              onChange={e => setEnrollForm(f => ({ ...f, username: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+            <input
+              type="email"
+              placeholder="Email (Gmail)"
+              value={enrollForm.email}
+              onChange={e => setEnrollForm(f => ({ ...f, email: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+            <input
+              type="text"
+              placeholder="Assigned Password"
+              value={enrollForm.password}
+              onChange={e => setEnrollForm(f => ({ ...f, password: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+            <input
+              type="email"
+              placeholder="Parent Email (optional)"
+              value={enrollForm.parentEmail}
+              onChange={e => setEnrollForm(f => ({ ...f, parentEmail: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
             <Button type="submit" loading={enrolling} icon={<UserPlus className="h-4 w-4" />} className="w-full">
               Enroll Student
             </Button>
@@ -373,10 +471,10 @@ export default function TeacherDashboardPage() {
             <select
               value={csvClassroomId ?? ''}
               onChange={e => setCsvClassroomId(Number(e.target.value) || null)}
-              className="w-full rounded-xl border border-purple-400/20 bg-white px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
             >
-              <option value="">Select classroom...</option>
-              {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="" className="text-gray-500">Select classroom...</option>
+              {classrooms.map(c => <option key={c.id} value={c.id} className="text-gray-900">{c.name}</option>)}
             </select>
 
             {/* CSV format info */}

@@ -104,7 +104,7 @@ export default function CharacterSelectPage() {
 
   if (authLoading || loadingCharacter || user?.role !== 'student') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-game-gradient text-primary-300">
+      <main className="flex h-full items-center justify-center bg-game-gradient text-primary-300">
         <Sparkles className="mr-3 h-5 w-5 animate-pulse" />
         <span className="font-game text-sm">Preparing character selection...</span>
       </main>
@@ -112,7 +112,7 @@ export default function CharacterSelectPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0f0a1f] text-white">
+    <main className="h-full bg-[#0f0a1f] text-white overflow-hidden flex flex-col">
       <nav className="sticky top-0 z-20 border-b border-primary-200/10 bg-[#1a1233]/90 px-4 py-3 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -128,7 +128,7 @@ export default function CharacterSelectPage() {
         </div>
       </nav>
 
-      <section className="mx-auto max-w-7xl px-4 py-6">
+      <section className="mx-auto max-w-7xl px-4 py-6 student-scroll-area">
         <div className="mb-5 flex flex-col gap-4 rounded-lg border border-primary-200/15 bg-[#0f2116]/90 p-5 shadow-card backdrop-blur-md md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-wide text-[#c084fc]">

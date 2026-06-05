@@ -40,7 +40,7 @@ export interface AuthPayload {
 }
 
 export interface LoginInput {
-  email: string
+  identifier: string
   password: string
 }
 
