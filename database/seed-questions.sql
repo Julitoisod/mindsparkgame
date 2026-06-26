@@ -10,7 +10,7 @@
 --  Run AFTER 2026-06-revision.sql.
 -- ============================================================
 
-USE mindsparkgame;
+-- Runs against the database selected in phpMyAdmin (no USE needed).
 
 DELETE FROM quiz_questions WHERE created_by IS NULL;
 

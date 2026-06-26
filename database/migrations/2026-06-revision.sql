@@ -13,7 +13,8 @@
 --    P3.2  level_deadlines table (per-student per-level due dates)
 -- ============================================================
 
-USE mindsparkgame;
+-- Runs against the database selected in phpMyAdmin (no USE needed — DB names
+-- differ per host, e.g. mindsparkgame locally vs u574655838_mindspark on Hostinger).
 
 -- ── Full name for students (CSV: Full Name + Username) ────────────────────────
 -- NOTE: MySQL 8 has no "ADD COLUMN IF NOT EXISTS"; this is a one-time migration.
