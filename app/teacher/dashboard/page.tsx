@@ -265,7 +265,7 @@ export default function TeacherDashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={<School className="h-5 w-5" />} label="Classrooms" value={classrooms.length} sub="Total sections" color="from-blue-500 to-cyan-500" delay={0} />
+        <StatCard icon={<School className="h-5 w-5" />} label="Sections" value={classrooms.length} sub="Total sections" color="from-blue-500 to-cyan-500" delay={0} />
         <StatCard icon={<Users className="h-5 w-5" />} label="All Students" value={totalStudents} sub="Total enrolled" color="from-purple-500 to-pink-500" delay={0.05} />
         <StatCard icon={<TrendingUp className="h-5 w-5" />} label="Active" value={activeStudents} sub={`${totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0}% playing`} color="from-yellow-400 to-orange-500" delay={0.1} />
         <StatCard icon={<GraduationCap className="h-5 w-5" />} label="Performing Well" value={greenStudents} sub="3+ levels done" color="from-emerald-500 to-teal-500" delay={0.15} />

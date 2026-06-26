@@ -919,7 +919,7 @@ export default function QuizAdventure({
 
     function getLevelStatus(lvlNum: number): 'cleared' | 'open' | 'locked' {
       if (completedLevels.includes(lvlNum)) return 'cleared'
-      if (teacherUnlockedLevels.includes(lvlNum)) return 'open'
+      if (isLevelAccessible(lvlNum)) return 'open' // teacher unlock OR prev level cleared (auto-progress)
       return 'locked'
     }
 
