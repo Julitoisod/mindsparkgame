@@ -17,9 +17,9 @@
 -- differ per host, e.g. mindsparkgame locally vs u574655838_mindspark on Hostinger).
 
 -- ── Full name for students (CSV: Full Name + Username) ────────────────────────
--- NOTE: MySQL 8 has no "ADD COLUMN IF NOT EXISTS"; this is a one-time migration.
+-- IF NOT EXISTS makes re-runs safe on MariaDB (Hostinger/XAMPP).
 ALTER TABLE users
-  ADD COLUMN full_name VARCHAR(120) DEFAULT NULL AFTER username;
+  ADD COLUMN IF NOT EXISTS full_name VARCHAR(120) DEFAULT NULL AFTER username;
 
 -- ── Question Bank (DB-backed quiz content) ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS quiz_questions (
