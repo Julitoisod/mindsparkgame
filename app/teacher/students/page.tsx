@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart3,
+  CalendarClock,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -11,10 +12,11 @@ import {
   ChevronUp,
   Edit3,
   Filter,
+  Lightbulb,
   Search,
-  Send,
   Shield,
   Star,
+  Trash2,
   Unlock,
   UserPlus,
   Users,
@@ -40,11 +42,31 @@ type QuizScore = {
   lastAttempt: string
 }
 
+type CategoryStat = { category: string; levelNumber: number; correct: number; total: number; accuracy: number }
+type InsightData = {
+  overall: { band: string; tone: 'gray' | 'red' | 'yellow' | 'blue' | 'green'; accuracy: number }
+  categories: CategoryStat[]
+  weakLessons: CategoryStat[]
+  recommendation: string
+}
+type Deadline = { levelNumber: number; dueAt: string }
+
+const toneStyles: Record<string, string> = {
+  gray: 'bg-gray-100 text-gray-700 border-gray-300',
+  red: 'bg-red-100 text-red-700 border-red-300',
+  yellow: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+  blue: 'bg-blue-100 text-blue-700 border-blue-300',
+  green: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+}
+const toneBar: Record<string, string> = {
+  gray: 'bg-gray-400', red: 'bg-red-500', yellow: 'bg-yellow-500', blue: 'bg-blue-500', green: 'bg-emerald-500',
+}
+
 type Student = PublicUser & {
   enrolledAt: string | null
   classroomId: number | null
   classroomName: string | null
-  parentEmail: string | null
+  fullName: string | null
   progress: StudentProgress
   teacherUnlockedLevels: number[]
   quizScores: QuizScore[]
@@ -83,18 +105,83 @@ export default function TeacherStudentsPage() {
   // Action states
   const [savingId, setSavingId] = useState<number | null>(null)
   const [unlockingLevel, setUnlockingLevel] = useState<string | null>(null)
-  const [notifyingParent, setNotifyingParent] = useState<number | null>(null)
-  const [notifySuccess, setNotifySuccess] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Insight + deadlines (loaded lazily when a student is expanded)
+  const [insightMap, setInsightMap] = useState<Record<number, InsightData>>({})
+  const [insightLoading, setInsightLoading] = useState<number | null>(null)
+  const [deadlineMap, setDeadlineMap] = useState<Record<number, Deadline[]>>({})
+  const [deadlineDraft, setDeadlineDraft] = useState<{ level: number; value: string }>({ level: 1, value: '' })
+  const [savingDeadline, setSavingDeadline] = useState(false)
+
   /** Form state for the currently expanded student's account edit. */
-  const [draft, setDraft] = useState({ username: '', password: '', parentEmail: '' })
+  const [draft, setDraft] = useState({ username: '', password: '', fullName: '' })
+
+  const loadInsight = useCallback(async (studentId: number) => {
+    setInsightLoading(studentId)
+    try {
+      const res = await fetch(`/api/teacher/students/${studentId}/insight`, { credentials: 'include' })
+      const json = await res.json()
+      if (json.success) setInsightMap(prev => ({ ...prev, [studentId]: json.data }))
+    } catch { /* silent */ }
+    finally { setInsightLoading(null) }
+  }, [])
+
+  const loadDeadlines = useCallback(async (studentId: number) => {
+    try {
+      const res = await fetch(`/api/teacher/students/${studentId}/deadline`, { credentials: 'include' })
+      const json = await res.json()
+      if (json.success) setDeadlineMap(prev => ({ ...prev, [studentId]: json.data.deadlines }))
+    } catch { /* silent */ }
+  }, [])
+
   useEffect(() => {
     if (expandedId !== null) {
       const s = students.find(st => st.id === expandedId)
-      if (s) setDraft({ username: s.username, password: '', parentEmail: s.parentEmail ?? '' })
+      if (s) setDraft({ username: s.username, password: '', fullName: s.fullName ?? '' })
+      loadInsight(expandedId)
+      loadDeadlines(expandedId)
     }
-  }, [expandedId, students])
+  }, [expandedId, students, loadInsight, loadDeadlines])
+
+  async function setDeadline(studentId: number) {
+    if (!deadlineDraft.value) { toast.error('Pick a date first'); return }
+    setSavingDeadline(true)
+    try {
+      const res = await fetch(`/api/teacher/students/${studentId}/deadline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ levelNumber: deadlineDraft.level, dueAt: new Date(deadlineDraft.value).toISOString() }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.message)
+      setDeadlineMap(prev => ({ ...prev, [studentId]: json.data.deadlines }))
+      setDeadlineDraft({ level: 1, value: '' })
+      toast.success(json.message ?? 'Deadline set')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to set deadline')
+    } finally {
+      setSavingDeadline(false)
+    }
+  }
+
+  async function clearDeadline(studentId: number, levelNumber: number) {
+    try {
+      const res = await fetch(`/api/teacher/students/${studentId}/deadline`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ levelNumber }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.message)
+      setDeadlineMap(prev => ({ ...prev, [studentId]: json.data.deadlines }))
+      toast.success('Deadline cleared')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed')
+    }
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -121,7 +208,7 @@ export default function TeacherStudentsPage() {
     return students.filter(s => {
       if (search) {
         const q = search.toLowerCase()
-        if (!s.username.toLowerCase().includes(q) && !s.email.toLowerCase().includes(q)) return false
+        if (!s.username.toLowerCase().includes(q) && !(s.fullName ?? '').toLowerCase().includes(q)) return false
       }
       if (filterClassroom && s.classroomId !== filterClassroom) return false
       if (filterPerformance && s.progress.performanceColor !== filterPerformance) return false
@@ -167,28 +254,6 @@ export default function TeacherStudentsPage() {
       toast.error(msg)
     } finally {
       setSavingId(null)
-    }
-  }
-
-  async function notifyParent(studentId: number) {
-    setNotifyingParent(studentId)
-    setNotifySuccess(null)
-    try {
-      const res = await fetch(`/api/teacher/students/${studentId}/notify-parent`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.message)
-      setNotifySuccess(`Email sent to parent of student #${studentId}`)
-      setTimeout(() => setNotifySuccess(null), 4000)
-      toast.success('Parent notified successfully')
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to notify parent'
-      setError(msg)
-      toast.error(msg)
-    } finally {
-      setNotifyingParent(null)
     }
   }
 
@@ -251,11 +316,6 @@ export default function TeacherStudentsPage() {
           <CheckCircle2 className="h-4 w-4" /> {success}
         </div>
       )}
-      {notifySuccess && (
-        <div className="rounded-lg bg-blue-100 border border-blue-300 px-4 py-2.5 text-sm text-blue-800 font-medium flex items-center gap-2">
-          <Send className="h-4 w-4" /> {notifySuccess}
-        </div>
-      )}
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -274,9 +334,9 @@ export default function TeacherStudentsPage() {
           <p className="stat-subtitle text-[9px] text-[#6B7280]">3+ levels completed</p>
         </div>
         <div className="stat-card rounded-xl border border-[#fce7ba] bg-[#fff9ec] p-3 shadow-lg">
-          <p className="stat-title text-[10px] font-bold uppercase text-[#374151]">By Classroom</p>
+          <p className="stat-title text-[10px] font-bold uppercase text-[#374151]">By Section</p>
           <p className="stat-number text-2xl font-black text-[#111827]">{classrooms.length}</p>
-          <p className="stat-subtitle text-[9px] text-[#6B7280]">{classrooms.length} classrooms</p>
+          <p className="stat-subtitle text-[9px] text-[#6B7280]">{classrooms.length} sections</p>
         </div>
       </div>
 
@@ -287,14 +347,14 @@ export default function TeacherStudentsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, email..."
+              placeholder="Search by name or username..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 pl-10 pr-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
           </div>
           <select value={filterClassroom} onChange={e => setFilterClassroom(Number(e.target.value) || '')} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
-            <option value="">All Classrooms</option>
+            <option value="">All Sections</option>
             {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select value={filterPerformance} onChange={e => setFilterPerformance(e.target.value)} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
@@ -325,7 +385,7 @@ export default function TeacherStudentsPage() {
         {/* Table Header (desktop) */}
         <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-2 px-4 py-2 border-b border-gray-200 text-xs font-bold uppercase text-gray-500">
           <span>Student</span>
-          <span>Classroom</span>
+          <span>Section</span>
           <span>Status</span>
           <span>Progress</span>
           <span>Stars</span>
@@ -360,8 +420,8 @@ export default function TeacherStudentsPage() {
                     <div className="flex items-center gap-3">
                       <span className={`h-3 w-3 rounded-full shrink-0 ${perf.dot}`} />
                       <div className="min-w-0">
-                        <p className="font-bold text-gray-900 truncate">{student.username}</p>
-                        <p className="text-xs text-gray-500 font-medium truncate">{student.email}</p>
+                        <p className="font-bold text-gray-900 truncate">{student.fullName ?? student.username}</p>
+                        <p className="text-xs text-gray-500 font-medium truncate">@{student.username}</p>
                       </div>
                     </div>
                     {/* Classroom */}
@@ -471,12 +531,12 @@ export default function TeacherStudentsPage() {
                                 <p className="text-[10px] text-gray-400 mt-0.5">Min 8 chars, with a letter & a number</p>
                               </div>
                               <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Parent Gmail</label>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Full Name</label>
                                 <input
-                                  type="email"
-                                  placeholder="parent@gmail.com"
-                                  value={draft.parentEmail}
-                                  onChange={e => setDraft(prev => ({ ...prev, parentEmail: e.target.value }))}
+                                  type="text"
+                                  placeholder="Student full name"
+                                  value={draft.fullName}
+                                  onChange={e => setDraft(prev => ({ ...prev, fullName: e.target.value }))}
                                   className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
                                 />
                               </div>
@@ -499,9 +559,8 @@ export default function TeacherStudentsPage() {
                                       return setError('Password must be at least 8 characters and include a letter and a number.')
                                     }
                                   }
-                                  const changes: Record<string, string | undefined> = { username: trimmedUsername }
+                                  const changes: Record<string, string | undefined> = { username: trimmedUsername, fullName: draft.fullName.trim() }
                                   if (draft.password) changes.password = draft.password
-                                  if (draft.parentEmail) changes.parentEmail = draft.parentEmail.trim()
                                   updateStudent(student.id, changes)
                                 }}
                                 disabled={savingId === student.id}
@@ -535,25 +594,110 @@ export default function TeacherStudentsPage() {
                           </div>
                         )}
 
-                        {/* Status Toggle + Notify Parent */}
+                        {/* Insight & Recommendation (reqs #11, #13, #14) */}
+                        <div className="mt-4 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+                          <p className="text-xs font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+                            <Lightbulb className="h-4 w-4 text-purple-600" /> Insight &amp; Recommendation
+                          </p>
+                          {insightLoading === student.id && !insightMap[student.id] ? (
+                            <p className="text-sm text-gray-400 animate-pulse">Analyzing performance...</p>
+                          ) : (() => {
+                            const ins = insightMap[student.id]
+                            if (!ins || ins.categories.length === 0) {
+                              return <p className="text-sm text-gray-400">No quiz data yet — insights appear after the student answers questions.</p>
+                            }
+                            return (
+                              <div className="space-y-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${toneStyles[ins.overall.tone]}`}>
+                                    {ins.overall.band}
+                                  </span>
+                                  <span className="text-xs text-gray-500">Overall accuracy: <span className="font-bold text-gray-800">{ins.overall.accuracy}%</span></span>
+                                </div>
+                                <p className="rounded-lg bg-purple-50 border border-purple-200 px-3 py-2 text-xs text-purple-900">
+                                  💡 {ins.recommendation}
+                                </p>
+                                {ins.weakLessons.length > 0 && (
+                                  <p className="text-xs text-gray-600">
+                                    Slowest in: {ins.weakLessons.map(w => <span key={w.category} className="font-bold text-red-600">{w.category} ({w.accuracy}%) </span>)}
+                                  </p>
+                                )}
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Per-lesson accuracy</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {ins.categories.map(c => {
+                                      const tone = c.accuracy >= 85 ? 'green' : c.accuracy >= 70 ? 'blue' : c.accuracy >= 50 ? 'yellow' : 'red'
+                                      return (
+                                        <div key={`${c.levelNumber}-${c.category}`} className="flex items-center gap-2">
+                                          <span className="w-28 shrink-0 truncate text-[11px] font-semibold text-gray-700" title={`L${c.levelNumber} · ${c.category}`}>{c.category}</span>
+                                          <div className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
+                                            <div className={`h-full rounded-full ${toneBar[tone]}`} style={{ width: `${c.accuracy}%` }} />
+                                          </div>
+                                          <span className="w-14 text-right text-[11px] font-bold text-gray-700">{c.correct}/{c.total}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+
+                        {/* Per-Level Deadlines (req #12) */}
+                        <div className="mt-4 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+                          <p className="text-xs font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+                            <CalendarClock className="h-4 w-4 text-purple-600" /> Level Deadlines
+                          </p>
+                          {(deadlineMap[student.id]?.length ?? 0) > 0 && (
+                            <div className="mb-3 space-y-1.5">
+                              {deadlineMap[student.id].map(d => {
+                                const overdue = new Date(d.dueAt).getTime() < Date.now() && !student.progress.completedLevels.includes(d.levelNumber)
+                                return (
+                                  <div key={d.levelNumber} className="flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-1.5 text-xs">
+                                    <span className="font-bold text-gray-700">Level {d.levelNumber}</span>
+                                    <span className={overdue ? 'text-red-600 font-bold' : 'text-gray-600'}>
+                                      due {new Date(d.dueAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                      {overdue && ' • OVERDUE'}
+                                    </span>
+                                    <button onClick={() => clearDeadline(student.id, d.levelNumber)} className="ml-auto rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600" title="Clear deadline">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <select
+                              value={deadlineDraft.level}
+                              onChange={e => setDeadlineDraft(d => ({ ...d, level: Number(e.target.value) }))}
+                              className="rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
+                            >
+                              {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>Level {l}</option>)}
+                            </select>
+                            <input
+                              type="datetime-local"
+                              value={deadlineDraft.value}
+                              onChange={e => setDeadlineDraft(d => ({ ...d, value: e.target.value }))}
+                              className="flex-1 min-w-[180px] rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
+                            />
+                            <button
+                              onClick={() => setDeadline(student.id)}
+                              disabled={savingDeadline}
+                              className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50"
+                            >
+                              {savingDeadline ? 'Saving...' : 'Set Deadline'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Status Toggle */}
                         <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
                           <div className="flex items-center gap-3 flex-wrap">
                             <p className="text-sm text-gray-700 flex items-center gap-1.5">
                               <Shield className="h-4 w-4 text-purple-600" /> Account Status: <span className="font-bold text-gray-900 capitalize">{student.enrollmentStatus}</span>
                             </p>
-                            {student.parentEmail && (
-                              <button
-                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); notifyParent(student.id) }}
-                                disabled={notifyingParent === student.id}
-                                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
-                              >
-                                {notifyingParent === student.id ? (
-                                  <><span className="animate-pulse">Sending...</span></>
-                                ) : (
-                                  <><Send className="h-3.5 w-3.5" /> Notify Parent</>
-                                )}
-                              </button>
-                            )}
                           </div>
                           <button
                             onClick={(e: React.MouseEvent) => {

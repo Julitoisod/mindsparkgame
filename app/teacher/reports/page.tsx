@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { AlertTriangle, BarChart3, CheckCircle2, TrendingUp, Users } from 'lucide-react'
+import { buildRecommendation, proficiencyFromAccuracy } from '@/lib/proficiency'
+
+const bandTone: Record<string, string> = {
+  gray: 'text-gray-400', red: 'text-red-400', yellow: 'text-yellow-400', blue: 'text-blue-400', green: 'text-emerald-400',
+}
 
 type QuizScore = {
   levelNumber: number
@@ -178,26 +183,27 @@ export default function TeacherReportsPage() {
             <thead>
               <tr className="border-b border-purple-400/20 text-left text-xs font-bold uppercase text-purple-400">
                 <th className="pb-3 pr-4">Student</th>
-                <th className="pb-3 pr-4">Classroom</th>
+                <th className="pb-3 pr-4">Section</th>
                 <th className="pb-3 pr-4">Levels</th>
                 <th className="pb-3 pr-4">Stars</th>
                 <th className="pb-3 pr-4">Quiz Accuracy</th>
                 <th className="pb-3 pr-4">Points</th>
-                <th className="pb-3 pr-4">Status</th>
-                <th className="pb-3">Intervention</th>
+                <th className="pb-3 pr-4">Proficiency</th>
+                <th className="pb-3">Recommendation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-purple-400/10">
               {students.map(student => {
-                const perf = student.progress.performanceColor
-                const statusLabel = perf === 'green' ? 'Good' : perf === 'yellow' ? 'Average' : perf === 'red' ? 'Low' : 'Not Started'
-                const statusColor = perf === 'green' ? 'text-emerald-400' : perf === 'yellow' ? 'text-yellow-400' : perf === 'red' ? 'text-red-400' : 'text-gray-400'
-                const intervention = perf === 'red' ? 'Teacher Intervention' : perf === 'yellow' ? 'Practice Recommended' : perf === 'green' ? 'None' : 'None'
                 const totalCorrect = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.correctAttempts, 0)
                 const totalAttempts = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.totalAttempts, 0)
                 const accuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0
                 const totalScoreEarned = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.totalScore, 0)
                 const accColor = accuracy >= 70 ? 'text-emerald-400' : accuracy >= 40 ? 'text-yellow-400' : totalAttempts > 0 ? 'text-red-400' : 'text-gray-400'
+                // Proficiency band from quiz accuracy (req #13) + recommendation (req #14)
+                const prof = proficiencyFromAccuracy(totalCorrect, totalAttempts)
+                const statusLabel = prof.band
+                const statusColor = bandTone[prof.tone] ?? 'text-gray-400'
+                const intervention = buildRecommendation(prof, [])
                 return (
                   <tr key={student.id} className="text-purple-100">
                     <td className="py-3 pr-4">
@@ -219,7 +225,7 @@ export default function TeacherReportsPage() {
                       <span className="font-bold text-white">{totalScoreEarned > 0 ? totalScoreEarned : '—'}</span>
                     </td>
                     <td className={`py-3 pr-4 font-bold text-xs ${statusColor}`}>{statusLabel}</td>
-                    <td className="py-3 text-xs text-purple-300">{intervention}</td>
+                    <td className="py-3 text-xs text-purple-300 min-w-[220px] max-w-[320px]">{intervention}</td>
                   </tr>
                 )
               })}
@@ -263,7 +269,7 @@ export default function TeacherReportsPage() {
                         </div>
                         <div>
                           <p className="font-bold text-white">{first.username}</p>
-                          <p className="text-[10px] text-purple-400">{first.classroom_name ?? 'No classroom'} • {userSessions.length} attempt{userSessions.length > 1 ? 's' : ''}</p>
+                          <p className="text-[10px] text-purple-400">{first.classroom_name ?? 'No section'} • {userSessions.length} attempt{userSessions.length > 1 ? 's' : ''}</p>
                         </div>
                       </div>
                       <div className="text-right">

@@ -8,6 +8,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id            INT UNSIGNED     NOT NULL AUTO_INCREMENT,
   username      VARCHAR(32)      NOT NULL,
+  full_name     VARCHAR(120)     DEFAULT NULL,
   email         VARCHAR(255)     NOT NULL,
   password_hash VARCHAR(255)     NOT NULL,
   role          ENUM('teacher','student') NOT NULL DEFAULT 'student',
@@ -220,4 +221,42 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   KEY idx_attempts_char_level (character_id, level_number),
   CONSTRAINT fk_attempts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_attempts_char FOREIGN KEY (character_id) REFERENCES character_data(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Question Bank (DB-backed quiz content, teacher-authored) ───────────────────
+CREATE TABLE IF NOT EXISTS quiz_questions (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  level_number  TINYINT      NOT NULL,
+  phase         ENUM('normal','boss') NOT NULL DEFAULT 'normal',
+  category      VARCHAR(40)  NOT NULL DEFAULT 'general',
+  prompt        TEXT         NOT NULL,
+  options       TEXT         NOT NULL,
+  correct_index TINYINT      NOT NULL DEFAULT 0,
+  is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  created_by    INT UNSIGNED DEFAULT NULL,
+  created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (id),
+  KEY idx_qq_level_phase_active (level_number, phase, is_active),
+  KEY idx_qq_category (category),
+  KEY idx_qq_created_by (created_by),
+  CONSTRAINT fk_qq_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Per-Level Deadlines ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS level_deadlines (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  student_id   INT UNSIGNED NOT NULL,
+  level_number TINYINT      NOT NULL,
+  due_at       DATETIME     NOT NULL,
+  set_by       INT UNSIGNED NOT NULL,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_deadline_student_level (student_id, level_number),
+  KEY idx_deadline_student (student_id),
+  CONSTRAINT fk_deadline_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_deadline_teacher FOREIGN KEY (set_by)     REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

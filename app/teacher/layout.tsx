@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart3,
+  FileQuestion,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -18,8 +19,9 @@ import { useAuth } from '@/hooks/useAuth'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/teacher/dashboard' },
-  { id: 'classrooms', label: 'Classrooms', icon: School, href: '/teacher/classrooms' },
+  { id: 'classrooms', label: 'Sections', icon: School, href: '/teacher/classrooms' },
   { id: 'students', label: 'Students', icon: Users, href: '/teacher/students' },
+  { id: 'questions', label: 'Question Bank', icon: FileQuestion, href: '/teacher/questions' },
   { id: 'reports', label: 'Reports', icon: BarChart3, href: '/teacher/reports' },
 ]
 
@@ -48,7 +50,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   // Auth guard
   useEffect(() => {
-    if (!authLoading && !isAuthed) router.replace('/login')
+    if (!authLoading && !isAuthed) router.replace('/teacher-login')
     if (!authLoading && isAuthed && user?.role !== 'teacher') router.replace('/dashboard/map')
   }, [authLoading, isAuthed, user?.role, router])
 
@@ -67,7 +69,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   function handleLogout() {
     logout()
-    router.replace('/login')
+    router.replace('/teacher-login')
   }
 
   return (
@@ -154,6 +156,7 @@ function SidebarContent({ activeItem, username, onLogout }: { activeItem: string
     'bg-[#eaf3ff] text-[#5a78cf]',
     'bg-[#fff8e9] text-[#c88a30]',
     'bg-[#edf9f1] text-[#3f9f69]',
+    'bg-[#fdeef6] text-[#c0568f]',
     'bg-[#f4efff] text-[#7c58d8]',
   ]
 
@@ -166,7 +169,7 @@ function SidebarContent({ activeItem, username, onLogout }: { activeItem: string
         </span>
         <div>
           <h1 className="text-sm font-bold text-[#1f2430]">MindSpark</h1>
-          <p className="text-[10px] text-[#8f88a1]">{username}&apos;s classroom</p>
+          <p className="text-[10px] text-[#8f88a1]">{username}&apos;s sections</p>
         </div>
       </div>
 

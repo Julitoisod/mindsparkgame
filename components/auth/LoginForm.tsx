@@ -2,23 +2,27 @@
 /**
  * components/auth/LoginForm.tsx
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react'
 import Input  from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
+import { isStudentApp } from '@/lib/appTarget'
 
 export default function LoginForm() {
   const router = useRouter()
-  const { login } = useAuth({ checkSession: false })
+  const { login, logout } = useAuth({ checkSession: false })
 
   const [identifier,   setIdentifier]   = useState('')
   const [password,    setPassword]    = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors,      setErrors]      = useState<Record<string, string>>({})
   const [loading,  setLoading]  = useState(false)
+  const [studentApp, setStudentApp] = useState(false)
+
+  useEffect(() => { setStudentApp(isStudentApp()) }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -31,6 +35,15 @@ export default function LoginForm() {
     setLoading(true)
     setErrors({})
     const user = await login({ identifier, password })
+
+    // The student app is student-only — block teacher sign-ins here (req #1)
+    if (studentApp && user?.role === 'teacher') {
+      await logout()
+      setLoading(false)
+      setErrors({ identifier: 'This app is for students. Teachers, please sign in on the web portal.' })
+      return
+    }
+
     setLoading(false)
 
     if (user?.role === 'teacher') {

@@ -6,3 +6,10 @@ node_modules/
 dist/
 build/
 .DS_Store
+
+# Build / tooling artifacts
+*.apk
+/graphify-out/
+android/app/build/
+android/build/
+android/.gradle/

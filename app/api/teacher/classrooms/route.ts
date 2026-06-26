@@ -86,7 +86,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, message: 'OK', data: rows.map(publicClassroom) })
   } catch (error) {
-    return serverError('GET', error, 'Failed to load classrooms')
+    return serverError('GET', error, 'Failed to load sections')
   }
 }
 
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json(
-        { success: false, message: 'Classroom name must be 2-80 characters.', data: { name: 'Classroom name must be 2-80 characters.' } },
+        { success: false, message: 'Section name must be 2-80 characters.', data: { name: 'Section name must be 2-80 characters.' } },
         { status: 422 },
       )
     }
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       [teacher.id, name],
     )
     if (existing.length > 0) {
-      return NextResponse.json({ success: false, message: 'Classroom already exists' }, { status: 409 })
+      return NextResponse.json({ success: false, message: 'Section already exists' }, { status: 409 })
     }
 
     const result = await execute(
@@ -124,9 +124,9 @@ export async function POST(request: Request) {
     )
 
     const classroom = await getClassroom(result.insertId, teacher.id)
-    return NextResponse.json({ success: true, message: 'Classroom created', data: classroom }, { status: 201 })
+    return NextResponse.json({ success: true, message: 'Section created', data: classroom }, { status: 201 })
   } catch (error) {
-    return serverError('POST', error, 'Failed to create classroom')
+    return serverError('POST', error, 'Failed to create section')
   }
 }
 
@@ -144,13 +144,13 @@ export async function PATCH(request: Request) {
 
     const classroomId = typeof body.id === 'number' ? body.id : Number(body.id)
     if (!Number.isInteger(classroomId) || classroomId <= 0) {
-      return NextResponse.json({ success: false, message: 'Invalid classroom ID' }, { status: 400 })
+      return NextResponse.json({ success: false, message: 'Invalid section ID' }, { status: 400 })
     }
 
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json(
-        { success: false, message: 'Classroom name must be 2-80 characters.', data: { name: 'Classroom name must be 2-80 characters.' } },
+        { success: false, message: 'Section name must be 2-80 characters.', data: { name: 'Section name must be 2-80 characters.' } },
         { status: 422 },
       )
     }
@@ -161,7 +161,7 @@ export async function PATCH(request: Request) {
       [teacher.id, name, classroomId],
     )
     if (duplicate.length > 0) {
-      return NextResponse.json({ success: false, message: 'A classroom with that name already exists' }, { status: 409 })
+      return NextResponse.json({ success: false, message: 'A section with that name already exists' }, { status: 409 })
     }
 
     const result = await execute(
@@ -170,12 +170,12 @@ export async function PATCH(request: Request) {
     )
 
     if (result.affectedRows === 0) {
-      return NextResponse.json({ success: false, message: 'Classroom not found' }, { status: 404 })
+      return NextResponse.json({ success: false, message: 'Section not found' }, { status: 404 })
     }
 
     const classroom = await getClassroom(classroomId, teacher.id)
-    return NextResponse.json({ success: true, message: 'Classroom renamed', data: classroom })
+    return NextResponse.json({ success: true, message: 'Section renamed', data: classroom })
   } catch (error) {
-    return serverError('PATCH', error, 'Failed to rename classroom')
+    return serverError('PATCH', error, 'Failed to rename section')
   }
 }

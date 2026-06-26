@@ -31,6 +31,7 @@ import {
 
 import * as quizContent from '@/lib/quizContent'
 import { BADGES } from '@/lib/badges'
+import { getLevelStory } from '@/lib/storyContent'
 import {
   bossSpriteAnimations,
   heroSpriteAnimationsByClass,
@@ -41,7 +42,7 @@ import {
 import type { CharacterClass, CharacterStats } from '@/types/character'
 
 type Phase = 'normal' | 'boss' | 'levelComplete' | 'gameComplete' | 'gameOver'
-type Screen = 'map' | 'battle'
+type Screen = 'map' | 'story' | 'battle'
 
 type RawRecord = Record<string, unknown>
 
@@ -497,19 +498,39 @@ export default function QuizAdventure({
   const [levelStars, setLevelStars] = useState<Record<number, number>>({})
   const [earnedBadges, setEarnedBadges] = useState<string[]>([])
   const [newBadgeNotification, setNewBadgeNotification] = useState<string | null>(null)
+  // Freshly sampled question sets from the DB question bank (shuffled, one-per-category)
+  const [dbSets, setDbSets] = useState<Record<number, { normal: QuizQuestion[]; boss: QuizQuestion[] }>>({})
+  // Wrong answers this run — drives the avatar fade (req #16)
+  const [wrongCount, setWrongCount] = useState(0)
 
   const level = levels[levelIndex] ?? levels[0]
-  const questions = phase === 'boss' ? level.bossQuestions : level.normalQuestions
+  const dbSet = dbSets[level.number]
+  const questions = phase === 'boss'
+    ? (dbSet?.boss ?? level.bossQuestions)
+    : (dbSet?.normal ?? level.normalQuestions)
   const question = questions[Math.min(questionIndex, questions.length - 1)]
   const isResolving = selectedAnswer !== null
   const phaseLabel = phase === 'boss' ? 'Boss Battle' : 'Quiz Run' // eslint-disable-line @typescript-eslint/no-unused-vars
   const progressLabel = // eslint-disable-line @typescript-eslint/no-unused-vars
     phase === 'boss' ? `Boss ${questionIndex + 1}/${QUESTIONS_PER_PHASE}` : `Correct ${normalCorrectCount}/${QUESTIONS_PER_PHASE}`
-  // A level is accessible only if teacher explicitly unlocked it, or student already completed it (for replay)
+  // Accessible if: already completed (replay), teacher unlocked the starting gate,
+  // or the previous level is completed — teacher unlocks once, then it auto-progresses (req #5).
   function isLevelAccessible(lvlNum: number): boolean {
-    return teacherUnlockedLevels.includes(lvlNum) || completedLevels.includes(lvlNum)
+    if (completedLevels.includes(lvlNum)) return true
+    if (teacherUnlockedLevels.includes(lvlNum)) return true
+    if (lvlNum > 1 && completedLevels.includes(lvlNum - 1)) return true
+    return false
   }
   const shouldShowBoss = phase === 'boss' || phase === 'levelComplete' || phase === 'gameComplete'
+  // The enemy is clearly "defeated" once its HP hits zero or the level is cleared (req #15)
+  const bossDefeated = phase === 'levelComplete' || phase === 'gameComplete' || (phase === 'boss' && bossHp <= 0)
+  // Avatar color fades with each wrong answer; turns fully gray when all are wrong (req #16)
+  const fadeRatio = Math.min(1, wrongCount / MAX_HEARTS)
+  const heroFadeStyle: React.CSSProperties = {
+    filter: `grayscale(${fadeRatio}) saturate(${Math.max(0, 1 - fadeRatio * 1.1)})`,
+    opacity: Math.max(0.4, 1 - wrongCount * 0.12),
+    transition: 'filter 0.5s ease, opacity 0.5s ease',
+  }
   const heroAction: SpriteAction =
     feedback === 'correct' ? 'attack' : feedback === 'wrong' || phase === 'gameOver' ? 'hurt' : 'idle'
   const bossAction: SpriteAction =
@@ -637,6 +658,34 @@ export default function QuizAdventure({
     }
   }
 
+  // Fetch a freshly sampled question set (shuffled, one-per-category, backup pool)
+  // for a level from the DB-backed question bank. Falls back to bundled content.
+  async function loadQuizSet(levelNumber: number) {
+    try {
+      const res = await fetch(`/api/quiz?level=${levelNumber}`, { credentials: 'include' })
+      const json = await res.json()
+      if (!json.success || !json.data) return
+      const mapDTO = (arr: unknown[]): QuizQuestion[] =>
+        (Array.isArray(arr) ? arr : []).map(raw => {
+          const d = asRecord(raw)
+          return {
+            id: String(d.id ?? ''),
+            prompt: String(d.prompt ?? '').replace(/\bblank\b/gi, '____'),
+            options: Array.isArray(d.options) ? d.options.map(o => String(o)) : [],
+            correctAnswer: typeof d.correctIndex === 'number' ? d.correctIndex : 0,
+          }
+        })
+      const normal = mapDTO(json.data.normal)
+      const boss = mapDTO(json.data.boss)
+      // Only adopt the DB set when both phases have a full fixed set of 5
+      if (normal.length === QUESTIONS_PER_PHASE && boss.length === QUESTIONS_PER_PHASE) {
+        setDbSets(prev => ({ ...prev, [levelNumber]: { normal, boss } }))
+      }
+    } catch {
+      /* keep bundled fallback content */
+    }
+  }
+
   function resetGame() {
     setLevelIndex(0)
     setPhase('normal')
@@ -646,9 +695,11 @@ export default function QuizAdventure({
     setStars(savedStarBalance)
     setBossHp(MAX_BOSS_HP)
     setNormalCorrectCount(0)
+    setWrongCount(0)
     setSelectedAnswer(null)
     setFeedback(null)
     setCompletedLevels([])
+    void loadQuizSet(1)
   }
 
   function retryLevel() {
@@ -658,8 +709,10 @@ export default function QuizAdventure({
     setHearts(MAX_HEARTS)
     setBossHp(MAX_BOSS_HP)
     setNormalCorrectCount(0)
+    setWrongCount(0)
     setSelectedAnswer(null)
     setFeedback(null)
+    void loadQuizSet(level.number) // re-sample so retries aren't memorized
   }
 
   function startBossPhase() {
@@ -697,6 +750,7 @@ export default function QuizAdventure({
   }
 
   function continueToNextLevel() {
+    const nextLevelNumber = Math.min(level.number + 1, MAX_LEVELS)
     setLevelIndex(current => Math.min(current + 1, MAX_LEVELS - 1))
     setPhase('normal')
     setScreen('map')
@@ -704,8 +758,10 @@ export default function QuizAdventure({
     setBossHp(MAX_BOSS_HP)
     setHearts(MAX_HEARTS)
     setNormalCorrectCount(0)
+    setWrongCount(0)
     setSelectedAnswer(null)
     setFeedback(null)
+    void loadQuizSet(nextLevelNumber) // preload the next level's fresh set
   }
 
   function enterLevel(targetIndex: number) {
@@ -717,13 +773,21 @@ export default function QuizAdventure({
 
     setLevelIndex(targetIndex)
     setPhase('normal')
-    setScreen('battle')
+    setScreen('story') // show the storyline before the battle begins (req #9)
     setQuestionIndex(0)
     setBossHp(MAX_BOSS_HP)
     setHearts(MAX_HEARTS)
     setNormalCorrectCount(0)
+    setWrongCount(0)
     setSelectedAnswer(null)
     setFeedback(null)
+    void loadQuizSet(targetLevel.number)
+  }
+
+  // Called from the story screen's "Begin Quest" button.
+  function beginBattleFromStory() {
+    playClickSound()
+    setScreen('battle')
   }
 
   function handleAnswer(option: string, optionIndex: number) {
@@ -739,6 +803,7 @@ export default function QuizAdventure({
       setFeedbackMessage(messages[Math.floor(Math.random() * messages.length)])
     } else {
       setFeedbackMessage('❌ Try again!')
+      setWrongCount(c => c + 1) // fades the avatar (req #16)
     }
 
     // Play sound effects
@@ -865,6 +930,13 @@ export default function QuizAdventure({
         <div className="background-layer z-0 opacity-[0.06]" style={{ backgroundImage: 'url(/BACKGROUND FOREST 1/FOREST 1/2304x1296.png)', filter: 'blur(4px)' }} />
 
         <div className="ui-layer flex flex-col">
+          {/* Keys collected banner (req #17) */}
+          <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2">
+            <div className="flex items-center gap-1.5 rounded-full border border-yellow-300/40 bg-black/40 px-3 py-1 backdrop-blur-sm">
+              <span className="text-sm">🗝️</span>
+              <span className="text-xs font-black text-yellow-200">Keys: {completedLevels.length}/{MAX_LEVELS}</span>
+            </div>
+          </div>
           {/* Horizontal S-curve map - fits viewport on all screens */}
           <div
             className="absolute inset-0 z-[5] flex items-start justify-center px-2 sm:px-4 pt-4 sm:pt-8"
@@ -1018,6 +1090,87 @@ export default function QuizAdventure({
     )
   }
 
+  if (screen === 'story') {
+    const story = getLevelStory(level.number)
+    return (
+      <section className="game-screen quiz-stage bg-[#1a1233] text-white">
+        <Image
+          src={level.backgroundImage}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="background-layer"
+          style={{ objectFit: 'cover', objectPosition: 'center center' }}
+          draggable={false}
+        />
+        <div className="absolute inset-0 z-[1] bg-gradient-to-b from-[#1a1233]/80 via-[#1a1233]/70 to-[#1a1233]/90" />
+
+        <div className="ui-layer flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+            className="relative w-full max-w-md rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-[#2e1065] via-[#3b0764] to-[#1e1b4b] p-5 sm:p-6 text-center shadow-[0_0_30px_rgba(168,85,247,0.4)]"
+          >
+            <button
+              type="button"
+              onClick={() => { playClickSound(); setScreen('map') }}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-purple-300/30 bg-purple-900/50 text-purple-200 hover:bg-purple-800/60"
+              aria-label="Back to map"
+            >
+              <MapIcon className="h-4 w-4" />
+            </button>
+
+            <span className="inline-block rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-200">
+              Level {level.number} • {story.place}
+            </span>
+
+            <h2 className="mt-3 text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
+              {level.title}
+            </h2>
+
+            <div className="relative mx-auto mt-4 h-32 w-32">
+              <AnimatedSprite
+                frames={level.bossFrames}
+                action="idle"
+                fallbackSrc={level.bossImage}
+                alt={story.enemy}
+                fill
+                sizes="128px"
+                className="object-contain object-bottom -scale-x-100 scale-[1.6] drop-shadow-[0_8px_12px_rgba(0,0,0,0.5)]"
+                fps={10}
+              />
+            </div>
+
+            <p className="mt-3 text-sm leading-relaxed text-purple-100/90">{story.intro}</p>
+
+            <div className="mt-4 flex items-center justify-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 rounded-lg bg-red-500/15 border border-red-400/30 px-2.5 py-1 font-bold text-red-200">
+                <Swords className="h-3.5 w-3.5" /> Enemy: {story.enemy}
+              </span>
+              <span className="flex items-center gap-1.5 rounded-lg bg-yellow-500/15 border border-yellow-400/30 px-2.5 py-1 font-bold text-yellow-200">
+                {story.keyEmoji} Save {story.rescue}
+              </span>
+            </div>
+
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-purple-200/70">
+              <span className="rounded-full bg-purple-500/20 px-2 py-0.5">🗝️ Keys collected: {completedLevels.length}/{MAX_LEVELS}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={beginBattleFromStory}
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 text-base font-black text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition"
+            >
+              <Flame className="h-5 w-5" /> Begin Quest — Answer 5 Questions
+            </button>
+          </motion.div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="game-screen quiz-stage bg-[#1a1233] text-white">
       <Image
@@ -1158,17 +1311,24 @@ export default function QuizAdventure({
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
               >
-                <AnimatedSprite
-                  frames={level.characterFrames}
-                  action={heroAction}
-                  fallbackSrc={level.characterImage}
-                  alt="Player character"
-                  fill
-                  sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
-                  className="origin-bottom object-contain object-bottom scale-[2.75]"
-                  fps={12}
-                  loop={heroAction === 'idle'}
-                />
+                <div className="relative h-full w-full" style={heroFadeStyle}>
+                  <AnimatedSprite
+                    frames={level.characterFrames}
+                    action={heroAction}
+                    fallbackSrc={level.characterImage}
+                    alt="Player character"
+                    fill
+                    sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
+                    className="origin-bottom object-contain object-bottom scale-[2.75]"
+                    fps={12}
+                    loop={heroAction === 'idle'}
+                  />
+                </div>
+                {wrongCount >= MAX_HEARTS && (
+                  <span className="absolute left-1/2 top-0 -translate-x-1/2 rounded-full bg-gray-700/90 px-2 py-0.5 text-[10px] font-black text-gray-200 shadow">
+                    Faded out!
+                  </span>
+                )}
               </motion.div>
             </div>
 
@@ -1190,17 +1350,36 @@ export default function QuizAdventure({
                     scale: { duration: 1.6, repeat: phase === 'boss' ? Infinity : 0 },
                   }}
                 >
-                  <AnimatedSprite
-                    frames={level.bossFrames}
-                    action={bossAction}
-                    fallbackSrc={level.bossImage}
-                    alt={level.bossName}
-                    fill
-                    sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
-                    className="origin-bottom object-contain object-bottom -scale-x-100 scale-[2.24]"
-                    fps={bossAction === 'idle' ? 10 : 14}
-                    loop={bossAction === 'idle'}
-                  />
+                  <div
+                    className="relative h-full w-full"
+                    style={{
+                      filter: bossDefeated ? 'grayscale(1) brightness(0.6)' : 'none',
+                      opacity: bossDefeated ? 0.7 : 1,
+                      transition: 'filter 0.5s ease, opacity 0.5s ease',
+                    }}
+                  >
+                    <AnimatedSprite
+                      frames={level.bossFrames}
+                      action={bossAction}
+                      fallbackSrc={level.bossImage}
+                      alt={level.bossName}
+                      fill
+                      sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
+                      className="origin-bottom object-contain object-bottom -scale-x-100 scale-[2.24]"
+                      fps={bossAction === 'idle' ? 10 : 14}
+                      loop={bossAction === 'idle'}
+                    />
+                  </div>
+                  {bossDefeated && (
+                    <motion.span
+                      initial={{ scale: 0, rotate: -8, opacity: 0 }}
+                      animate={{ scale: 1, rotate: -8, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 14 }}
+                      className="absolute left-1/2 top-2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-red-300 bg-gradient-to-b from-red-500 to-rose-700 px-3 py-1 text-xs font-black text-white shadow-[0_3px_0_#7f1d1d] sm:text-sm"
+                    >
+                      💀 {level.bossName} Defeated!
+                    </motion.span>
+                  )}
                 </motion.div>
               </div>
             )}
@@ -1293,7 +1472,7 @@ export default function QuizAdventure({
                       {phase === 'boss' ? `⚔️ ${level.bossName} challenges you!` : `✨ Question ${questionIndex + 1}:`}
                     </p>
                     <h2 className="mt-1 text-sm font-black leading-snug text-gray-800 sm:text-base lg:text-lg">
-                      {question.prompt}
+                      {question.prompt.replace(/\bblank\b/gi, '____')}
                     </h2>
                   </motion.div>
 
@@ -1447,6 +1626,14 @@ export default function QuizAdventure({
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Key reward + rescue beat (req #17) */}
+              <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/10 px-3 py-2">
+                <p className="text-sm font-black text-yellow-200">
+                  {getLevelStory(level.number).keyEmoji} You earned the {getLevelStory(level.number).keyName}!
+                </p>
+                <p className="text-[11px] text-purple-100/80">🗝️ You freed {getLevelStory(level.number).rescue}.</p>
               </div>
 
               <p className="mt-2 text-sm font-semibold text-purple-200/80">🎉 Amazing job!</p>

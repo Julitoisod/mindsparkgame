@@ -1,19 +1,18 @@
   import { NextResponse } from 'next/server'
   import { execute, query } from '@/lib/db'
   import { getSession, hashPassword } from '@/lib/auth'
-  import { sendEnrollmentEmail } from '@/lib/email'
   import type { EnrollmentStatus, User } from '@/types/user'
 
   interface StudentRow {
     id: number
     username: string
+    fullName: string | null
     email: string
     role: 'student'
     enrollmentStatus: EnrollmentStatus
     classroomId: number | null
     classroomName: string | null
     avatar_url: string | null
-    parent_email: string | null
     enrolledAt: string | null
     created_at: string
     completedLevels: string | null
@@ -62,13 +61,13 @@
     return {
       id: row.id,
       username: row.username,
+      fullName: row.fullName,
       email: row.email,
       role: row.role,
       enrollmentStatus: row.enrollmentStatus,
       classroomId: row.classroomId,
       classroomName: row.classroomName,
       avatar_url: row.avatar_url,
-      parentEmail: row.parent_email,
       created_at: row.created_at,
       enrolledAt: row.enrolledAt,
       progress: {
@@ -103,10 +102,10 @@
     if (classroomIdParam) {
       const classroomId = Number(classroomIdParam)
       if (!Number.isInteger(classroomId) || classroomId <= 0) {
-        return NextResponse.json({ success: false, message: 'Invalid classroom ID' }, { status: 400 })
+        return NextResponse.json({ success: false, message: 'Invalid section ID' }, { status: 400 })
       }
       if (!(await teacherOwnsClassroom(classroomId, teacher.id))) {
-        return NextResponse.json({ success: false, message: 'Classroom not found' }, { status: 404 })
+        return NextResponse.json({ success: false, message: 'Section not found' }, { status: 404 })
       }
       classroomFilter = 'AND u.classroom_id = ?'
       params.push(classroomId)
@@ -116,13 +115,13 @@
       `SELECT
         u.id,
         u.username,
+        u.full_name AS fullName,
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,
         u.classroom_id AS classroomId,
         c.name AS classroomName,
         u.avatar_url,
-        u.parent_email,
         u.enrolled_at AS enrolledAt,
         u.created_at,
         gp.completed_levels AS completedLevels,
@@ -205,19 +204,19 @@
     }
 
     const username = typeof body.username === 'string' ? body.username.trim() : ''
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const fullName = typeof body.fullName === 'string' ? body.fullName.trim().replace(/\s+/g, ' ') : ''
     const password = typeof body.password === 'string' ? body.password : ''
     const classroomId = typeof body.classroomId === 'number' ? body.classroomId : Number(body.classroomId)
 
     const errors: Record<string, string> = {}
     if (!Number.isInteger(classroomId) || classroomId <= 0) {
-      errors.classroomId = 'Create and select a classroom before enrolling students.'
+      errors.classroomId = 'Create and select a section before enrolling students.'
     }
     if (username.length < 3 || username.length > 32 || !/^[a-zA-Z0-9_]+$/.test(username)) {
       errors.username = 'Username must be 3-32 letters, numbers, or underscores.'
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = 'A valid email address is required.'
+    if (fullName.length > 120) {
+      errors.fullName = 'Full name is too long.'
     }
     if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
       errors.password = 'Password must be at least 8 characters and include a letter and a number.'
@@ -227,43 +226,39 @@
     }
 
     if (!(await teacherOwnsClassroom(classroomId, teacher.id))) {
-      return NextResponse.json({ success: false, message: 'Classroom not found' }, { status: 404 })
+      return NextResponse.json({ success: false, message: 'Section not found' }, { status: 404 })
     }
+
+    // Internal placeholder email (students no longer provide one)
+    const email = `${username.toLowerCase()}@student.mindspark`
 
     const existing = await query<Pick<User, 'id'>>(
       'SELECT id FROM users WHERE email = ? OR username = ? LIMIT 1',
       [email, username],
     )
     if (existing.length > 0) {
-      return NextResponse.json({ success: false, message: 'Email or username already in use' }, { status: 409 })
+      return NextResponse.json({ success: false, message: 'Username already in use' }, { status: 409 })
     }
 
     const passwordHash = await hashPassword(password)
     const result = await execute(
       `INSERT INTO users
-        (username, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, parent_email, enrolled_at)
-      VALUES (?, ?, ?, 'student', 'enrolled', ?, ?, ?, NOW())`,
-      [username, email, passwordHash, teacher.id, classroomId, (typeof body.parentEmail === 'string' ? body.parentEmail : null)],
+        (username, full_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+      VALUES (?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
+      [username, fullName || null, email, passwordHash, teacher.id, classroomId],
     )
-
-    // Fetch classroom name for the email
-    const classroomRows = await query<{ name: string }>(
-      'SELECT name FROM classrooms WHERE id = ? LIMIT 1',
-      [classroomId],
-    )
-    const classroomName = classroomRows[0]?.name ?? 'Your Classroom'
 
     const rows = await query<StudentRow>(
       `SELECT
         u.id,
         u.username,
+        u.full_name AS fullName,
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,
         u.classroom_id AS classroomId,
         c.name AS classroomName,
         u.avatar_url,
-        u.parent_email,
         u.enrolled_at AS enrolledAt,
         u.created_at,
         NULL AS completedLevels,
@@ -276,16 +271,8 @@
       [result.insertId],
     )
 
-    // Send credentials to parent email if provided
-    const enrolledStudent = publicStudent(rows[0])
-    if (enrolledStudent.parentEmail) {
-      sendEnrollmentEmail(enrolledStudent.parentEmail, username, password, classroomName).catch(err =>
-        console.error('[teacher/students] Failed to send enrollment email:', err)
-      )
-    }
-
     return NextResponse.json(
-      { success: true, message: 'Student enrolled', data: { ...enrolledStudent, teacherUnlockedLevels: [] } },
+      { success: true, message: 'Student enrolled', data: { ...publicStudent(rows[0]), teacherUnlockedLevels: [] } },
       { status: 201 },
     )
   }

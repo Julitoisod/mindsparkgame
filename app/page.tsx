@@ -2,7 +2,7 @@
  * app/page.tsx — Landing / Home page
  */
 import Link from 'next/link'
-import { BookOpen, GraduationCap, Star, Swords, Trophy, Users, Zap } from 'lucide-react'
+import { BookOpen, GraduationCap, Star, Swords, Trophy, Zap } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -29,8 +29,8 @@ export default function HomePage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/login" className="text-sm text-purple-200/70 hover:text-white transition-colors px-4 py-2">
-            Sign In
+          <Link href="/teacher-login" className="text-sm text-purple-200/70 hover:text-white transition-colors px-4 py-2">
+            Teacher Login
           </Link>
           <Link href="/register" className="text-sm font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-purple-500/30">
             Teacher Setup
@@ -66,11 +66,11 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <Link
-              href="/register"
+              href="/teacher-login"
               className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black px-8 py-4 rounded-xl text-base hover:opacity-90 transition-all hover:scale-105 shadow-lg shadow-purple-500/40"
             >
-              <Users className="w-5 h-5" />
-              Teacher Setup
+              <GraduationCap className="w-5 h-5" />
+              Teacher Login
             </Link>
             <Link
               href="/login"
@@ -80,6 +80,13 @@ export default function HomePage() {
               Student Sign In
             </Link>
           </div>
+
+          <p className="text-sm text-purple-100/55 pt-1">
+            New teacher?{' '}
+            <Link href="/register" className="text-purple-200 font-semibold hover:text-white underline underline-offset-2">
+              Set up your account
+            </Link>
+          </p>
         </div>
       </section>
 

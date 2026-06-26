@@ -25,7 +25,7 @@ export default function TeacherClassroomsPage() {
       const json = await res.json()
       if (json.success) setClassrooms(json.data)
     } catch {
-      setError('Failed to load classrooms')
+      setError('Failed to load sections')
     } finally {
       setLoading(false)
     }
@@ -82,8 +82,8 @@ export default function TeacherClassroomsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black">Classrooms</h2>
-          <p className="text-sm text-purple-300">Manage your classrooms</p>
+          <h2 className="text-2xl font-black">Sections</h2>
+          <p className="text-sm text-purple-300">Manage your sections</p>
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export default function TeacherClassroomsPage() {
 
       {/* Create */}
       <form onSubmit={createClassroom} className="flex gap-2">
-        <Input placeholder="New classroom name..." value={classroomName} onChange={e => setClassroomName(e.target.value)} className="flex-1" />
+        <Input placeholder="New section name..." value={classroomName} onChange={e => setClassroomName(e.target.value)} className="flex-1" />
         <Button type="submit" loading={creating} icon={<PlusCircle className="h-4 w-4" />}>Create</Button>
       </form>
 
@@ -101,8 +101,8 @@ export default function TeacherClassroomsPage() {
       ) : classrooms.length === 0 ? (
         <div className="rounded-xl border border-purple-400/20 bg-purple-950/30 p-8 text-center">
           <School className="mx-auto h-10 w-10 text-purple-400" />
-          <p className="mt-3 font-bold text-purple-200">No classrooms yet</p>
-          <p className="text-sm text-purple-400">Create your first classroom above</p>
+          <p className="mt-3 font-bold text-purple-200">No sections yet</p>
+          <p className="text-sm text-purple-400">Create your first section above</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

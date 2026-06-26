@@ -2,8 +2,6 @@ import { NextResponse }  from 'next/server'
 import { query, execute } from '@/lib/db'
 import { getSession }     from '@/lib/auth'
 import type { SavePayload } from '@/types/game'
-import { BADGES } from '@/lib/badges'
-import { sendProgressEmail } from '@/lib/email'
 
 /**
  * GET /api/progress?characterId=<id>
@@ -221,31 +219,6 @@ export async function POST(request: Request) {
       }
     } catch {
       // Skip if duplicate or error
-    }
-  }
-
-  // Send email to parent if new badges were earned and parent_email is set
-  if (awardedBadges.length > 0) {
-    const userRows = await query<{ username: string; parent_email: string | null }>(
-      'SELECT username, parent_email FROM users WHERE id = ? LIMIT 1',
-      [session.userId],
-    )
-    const userRow = userRows[0]
-    if (userRow?.parent_email) {
-      const allBadgeRows = await query<{ badge_id: string }>(
-        'SELECT badge_id FROM student_badges WHERE user_id = ? ORDER BY earned_at ASC',
-        [session.userId],
-      )
-      const allBadgeIds = allBadgeRows.map(r => r.badge_id)
-      const latestBadge = BADGES.find(b => b.id === awardedBadges[0])
-      // Fire-and-forget email send
-      sendProgressEmail(userRow.parent_email, userRow.username, {
-        levelsCompleted: completedArray.length,
-        totalLevels: 5,
-        starBalance: totalStars,
-        badges: allBadgeIds,
-        latestAchievement: latestBadge?.name,
-      }).catch(err => console.error('[progress] Email send failed:', err))
     }
   }
 

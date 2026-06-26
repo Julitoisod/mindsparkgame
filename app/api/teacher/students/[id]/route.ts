@@ -10,13 +10,13 @@ interface RouteContext {
 interface StudentRow {
   id: number
   username: string
+  fullName: string | null
   email: string
   role: 'student'
   enrollmentStatus: EnrollmentStatus
   classroomId: number | null
   classroomName: string | null
   avatar_url: string | null
-  parent_email: string | null
   enrolledAt: string | null
   created_at: string
 }
@@ -34,7 +34,7 @@ async function requireTeacher() {
   return rows[0]
 }
 
-function publicStudent(row: StudentRow): PublicUser & { enrolledAt: string | null; parentEmail: string | null } {
+function publicStudent(row: StudentRow): PublicUser & { enrolledAt: string | null; fullName: string | null } {
   return {
     id: row.id,
     username: row.username,
@@ -46,7 +46,7 @@ function publicStudent(row: StudentRow): PublicUser & { enrolledAt: string | nul
     avatar_url: row.avatar_url,
     created_at: row.created_at,
     enrolledAt: row.enrolledAt,
-    parentEmail: row.parent_email,
+    fullName: row.fullName,
   }
 }
 
@@ -102,16 +102,16 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
   }
 
-  if (typeof body.parentEmail === 'string') {
-    const parentEmail = body.parentEmail.trim()
-    if (parentEmail === '') {
-      updates.push('parent_email = NULL')
-    } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
-      updates.push('parent_email = ?')
-      params.push(parentEmail)
+  if (typeof body.fullName === 'string') {
+    const fullName = body.fullName.trim().replace(/\s+/g, ' ')
+    if (fullName === '') {
+      updates.push('full_name = NULL')
+    } else if (fullName.length <= 120) {
+      updates.push('full_name = ?')
+      params.push(fullName)
     } else {
       return NextResponse.json(
-        { success: false, message: 'Invalid parent email address' },
+        { success: false, message: 'Full name is too long.' },
         { status: 422 },
       )
     }
@@ -148,13 +148,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     `SELECT
        u.id,
        u.username,
+       u.full_name AS fullName,
        u.email,
        u.role,
        u.enrollment_status AS enrollmentStatus,
        u.classroom_id AS classroomId,
        c.name AS classroomName,
        u.avatar_url,
-       u.parent_email,
        u.enrolled_at AS enrolledAt,
        u.created_at
      FROM users u

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Copy,
   Download,
+  FileQuestion,
   FileSpreadsheet,
   GraduationCap,
   PlusCircle,
@@ -26,7 +27,7 @@ import { useAuth } from '@/hooks/useAuth'
 import Button from '@/components/ui/Button'
 
 type Classroom = { id: number; name: string; studentCount: number; createdAt: string }
-type Student = { id: number; username: string; email: string; classroomName: string | null; enrolledAt: string | null; progress: { performanceColor: string; levelsCompleted: number; starBalance: number } }
+type Student = { id: number; username: string; fullName: string | null; classroomName: string | null; enrolledAt: string | null; progress: { performanceColor: string; levelsCompleted: number; starBalance: number } }
 type BulkResult = { row: number; name: string; status: 'enrolled' | 'skipped'; reason?: string }
 
 export default function TeacherDashboardPage() {
@@ -36,12 +37,12 @@ export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [classroomName, setClassroomName] = useState('')
   const [creatingClassroom, setCreatingClassroom] = useState(false)
-  const [enrollForm, setEnrollForm] = useState({ username: '', email: '', password: '', parentEmail: '' })
+  const [enrollForm, setEnrollForm] = useState({ fullName: '', username: '', password: '' })
   const [selectedClassroomId, setSelectedClassroomId] = useState<number | null>(null)
   const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [enrolledCredentials, setEnrolledCredentials] = useState<{ username: string; email: string; password: string; parentEmail: string } | null>(null)
+  const [enrolledCredentials, setEnrolledCredentials] = useState<{ fullName: string; username: string; password: string } | null>(null)
 
   // CSV bulk upload state
   const [csvClassroomId, setCsvClassroomId] = useState<number | null>(null)
@@ -92,10 +93,10 @@ export default function TeacherDashboardPage() {
       setSelectedClassroomId(json.data.id)
       setCsvClassroomId(json.data.id)
       setClassroomName('')
-      setSuccess('Classroom created!')
+      setSuccess('Section created!')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create classroom')
+      setError(err instanceof Error ? err.message : 'Failed to create section')
     } finally {
       setCreatingClassroom(false)
     }
@@ -103,7 +104,7 @@ export default function TeacherDashboardPage() {
 
   async function enrollStudent(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedClassroomId) { setError('Select a classroom first'); return }
+    if (!selectedClassroomId) { setError('Select a section first'); return }
     setEnrolling(true)
     setError(null)
     try {
@@ -117,12 +118,11 @@ export default function TeacherDashboardPage() {
       if (!res.ok || !json.success) throw new Error(json.message)
       setStudents(prev => [json.data, ...prev])
       setEnrolledCredentials({
+        fullName: enrollForm.fullName,
         username: enrollForm.username,
-        email: enrollForm.email,
         password: enrollForm.password,
-        parentEmail: enrollForm.parentEmail,
       })
-      setEnrollForm({ username: '', email: '', password: '', parentEmail: '' })
+      setEnrollForm({ fullName: '', username: '', password: '' })
       setSuccess('Student enrolled successfully! Credentials shown below.')
       setTimeout(() => setSuccess(null), 6000)
     } catch (err) {
@@ -170,7 +170,7 @@ export default function TeacherDashboardPage() {
   async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!csvClassroomId) { setError('Select a classroom for CSV upload first'); return }
+    if (!csvClassroomId) { setError('Select a section for CSV upload first'); return }
 
     setCsvUploading(true)
     setCsvResults(null)
@@ -186,11 +186,11 @@ export default function TeacherDashboardPage() {
         return
       }
 
-      // Map CSV columns — only username and parent email needed
+      // Map CSV columns — full name + username
       const students = rows.map(row => {
-        const username = row.username ?? row.name ?? row.student_name ?? ''
-        const parentEmail = row.parent_gmail ?? row.parentgmail ?? row.parents_gmail ?? row.parent_email ?? row.parentemail ?? ''
-        return { username, parentEmail }
+        const fullName = row.full_name ?? row.fullname ?? row.name ?? row.student_name ?? ''
+        const username = row.username ?? row.user_name ?? ''
+        return { fullName, username }
       })
 
       const res = await fetch('/api/teacher/students/bulk', {
@@ -215,7 +215,7 @@ export default function TeacherDashboardPage() {
   }
 
   function downloadTemplate() {
-    const csv = 'Username,Parent Gmail\njohnmark,parent@gmail.com\nmariasantos,mom@gmail.com'
+    const csv = 'Full Name,Username\nJohn Mark Santos,johnmark\nMaria Santos,mariasantos'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -236,7 +236,7 @@ export default function TeacherDashboardPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-2xl font-black">Welcome back, {user?.username}! 👋</h2>
-          <p className="mt-1 text-sm text-[#6B7280]">Here&apos;s your classroom overview</p>
+          <p className="mt-1 text-sm text-[#6B7280]">Here&apos;s your sections overview</p>
         </motion.div>
 
         <motion.div
@@ -248,7 +248,7 @@ export default function TeacherDashboardPage() {
           <p className="mb-2 text-xs font-bold text-[#374151]">✨ Welcome to Teacher Management</p>
           <div className="space-y-1.5">
             {[
-              'Create and manage classrooms',
+              'Create and manage sections',
               'Add students one-by-one or via CSV',
               'Track and manage student accounts',
               'Generate reports and insights',
@@ -265,7 +265,7 @@ export default function TeacherDashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={<School className="h-5 w-5" />} label="Classrooms" value={classrooms.length} sub="Total classrooms" color="from-blue-500 to-cyan-500" delay={0} />
+        <StatCard icon={<School className="h-5 w-5" />} label="Classrooms" value={classrooms.length} sub="Total sections" color="from-blue-500 to-cyan-500" delay={0} />
         <StatCard icon={<Users className="h-5 w-5" />} label="All Students" value={totalStudents} sub="Total enrolled" color="from-purple-500 to-pink-500" delay={0.05} />
         <StatCard icon={<TrendingUp className="h-5 w-5" />} label="Active" value={activeStudents} sub={`${totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0}% playing`} color="from-yellow-400 to-orange-500" delay={0.1} />
         <StatCard icon={<GraduationCap className="h-5 w-5" />} label="Performing Well" value={greenStudents} sub="3+ levels done" color="from-emerald-500 to-teal-500" delay={0.15} />
@@ -306,14 +306,16 @@ export default function TeacherDashboardPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {enrolledCredentials.fullName && (
+                <div className="rounded-lg bg-white border border-purple-200 p-3">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Full Name</p>
+                  <p className="text-sm font-black text-purple-700">{enrolledCredentials.fullName}</p>
+                </div>
+              )}
               <div className="rounded-lg bg-white border border-purple-200 p-3">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">Username</p>
                 <p className="text-sm font-black text-purple-700">{enrolledCredentials.username}</p>
-              </div>
-              <div className="rounded-lg bg-white border border-purple-200 p-3">
-                <p className="text-[10px] font-bold text-gray-500 uppercase">Email</p>
-                <p className="text-sm font-black text-purple-700">{enrolledCredentials.email}</p>
               </div>
               <div className="rounded-lg bg-white border border-purple-200 p-3 relative">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">Password</p>
@@ -332,13 +334,6 @@ export default function TeacherDashboardPage() {
                   </button>
                 </div>
               </div>
-              {enrolledCredentials.parentEmail && (
-                <div className="rounded-lg bg-white border border-purple-200 p-3">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase">Parent Email</p>
-                  <p className="text-sm font-black text-purple-700">{enrolledCredentials.parentEmail}</p>
-                  <p className="text-[10px] text-emerald-600 font-bold mt-1">✓ Credentials sent to parent</p>
-                </div>
-              )}
             </div>
             <p className="mt-2 text-[10px] text-gray-500">Share these credentials with the student. This card will disappear when you close it.</p>
           </motion.div>
@@ -347,7 +342,7 @@ export default function TeacherDashboardPage() {
 
       {/* Quick Actions — 3 columns */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Create Classroom */}
+        {/* Create Section */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -359,25 +354,25 @@ export default function TeacherDashboardPage() {
               <School className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="font-bold text-[#111827]">Create Classroom</h3>
-              <p className="text-[10px] text-[#6B7280]">Add a new classroom</p>
+              <h3 className="font-bold text-[#111827]">Create Section</h3>
+              <p className="text-[10px] text-[#6B7280]">Add a new section</p>
             </div>
           </div>
           <form onSubmit={createClassroom} className="space-y-3">
             <input
               type="text"
-              placeholder="e.g. Grade 3 Math"
+              placeholder="e.g. Grade 3 - Section A"
               value={classroomName}
               onChange={e => setClassroomName(e.target.value)}
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
             <Button type="submit" loading={creatingClassroom} icon={<PlusCircle className="h-4 w-4" />} className="w-full">
-              Create Classroom
+              Create Section
             </Button>
           </form>
           {classrooms.length > 0 && (
             <div className="mt-4 pt-4 border-t border-purple-400/15">
-              <p className="mb-2 text-xs font-bold text-[#374151]">Your Classrooms ({classrooms.length})</p>
+              <p className="mb-2 text-xs font-bold text-[#374151]">Your Sections ({classrooms.length})</p>
               <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
                 {classrooms.map(c => (
                   <div key={c.id} className="flex items-center justify-between rounded-lg bg-purple-900/30 px-3 py-2">
@@ -412,9 +407,16 @@ export default function TeacherDashboardPage() {
               onChange={e => setSelectedClassroomId(Number(e.target.value) || null)}
               className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
             >
-              <option value="" className="text-gray-500">Select classroom...</option>
+              <option value="" className="text-gray-500">Select section...</option>
               {classrooms.map(c => <option key={c.id} value={c.id} className="text-gray-900">{c.name}</option>)}
             </select>
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={enrollForm.fullName}
+              onChange={e => setEnrollForm(f => ({ ...f, fullName: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
             <input
               type="text"
               placeholder="Username"
@@ -423,24 +425,10 @@ export default function TeacherDashboardPage() {
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
             <input
-              type="email"
-              placeholder="Email (Gmail)"
-              value={enrollForm.email}
-              onChange={e => setEnrollForm(f => ({ ...f, email: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
-            <input
               type="text"
               placeholder="Assigned Password"
               value={enrollForm.password}
               onChange={e => setEnrollForm(f => ({ ...f, password: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
-            <input
-              type="email"
-              placeholder="Parent Email (optional)"
-              value={enrollForm.parentEmail}
-              onChange={e => setEnrollForm(f => ({ ...f, parentEmail: e.target.value }))}
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
             <Button type="submit" loading={enrolling} icon={<UserPlus className="h-4 w-4" />} className="w-full">
@@ -473,15 +461,15 @@ export default function TeacherDashboardPage() {
               onChange={e => setCsvClassroomId(Number(e.target.value) || null)}
               className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
             >
-              <option value="" className="text-gray-500">Select classroom...</option>
+              <option value="" className="text-gray-500">Select section...</option>
               {classrooms.map(c => <option key={c.id} value={c.id} className="text-gray-900">{c.name}</option>)}
             </select>
 
             {/* CSV format info */}
             <div className="space-y-1 rounded-lg border border-purple-400/15 bg-purple-900/30 p-3 text-xs text-[#4B5563]">
               <p className="font-bold text-[#374151]">📋 Required CSV columns:</p>
-              <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Username, Parent Gmail</p>
-              <p className="text-[10px] text-[#6B7280]">Parent Gmail is optional. Password is auto-generated. Max 100 students per file.</p>
+              <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Full Name, Username</p>
+              <p className="text-[10px] text-[#6B7280]">Password is auto-generated as username + &quot;123&quot;. Max 100 students per file.</p>
             </div>
 
             {/* Download template */}
@@ -569,7 +557,7 @@ export default function TeacherDashboardPage() {
                 <thead>
                   <tr className="border-b border-purple-400/15 text-xs font-bold uppercase text-[#4B5563]">
                     <th className="pb-2 text-left">Student</th>
-                    <th className="pb-2 text-left">Classroom</th>
+                    <th className="pb-2 text-left">Section</th>
                     <th className="pb-2 text-left">Stars</th>
                     <th className="pb-2 text-left">Enrolled</th>
                   </tr>
@@ -578,8 +566,8 @@ export default function TeacherDashboardPage() {
                   {recentStudents.map(s => (
                     <tr key={s.id} className="text-[#374151]">
                       <td className="py-2.5">
-                        <p className="text-xs font-bold text-[#111827]">{s.username}</p>
-                        <p className="text-[10px] text-[#6B7280]">{s.email}</p>
+                        <p className="text-xs font-bold text-[#111827]">{s.fullName ?? s.username}</p>
+                        <p className="text-[10px] text-[#6B7280]">@{s.username}</p>
                       </td>
                       <td className="py-2.5 text-xs">{s.classroomName ?? '—'}</td>
                       <td className="py-2.5 text-xs flex items-center gap-1 text-yellow-300">
@@ -603,7 +591,8 @@ export default function TeacherDashboardPage() {
           className="space-y-3"
         >
           <QuickLink href="/teacher/students" icon={<Users className="h-4 w-4" />} label="Manage Students" sub="View all students" color="from-purple-500 to-pink-500" />
-          <QuickLink href="/teacher/classrooms" icon={<School className="h-4 w-4" />} label="Manage Classrooms" sub="Create & edit" color="from-blue-500 to-cyan-500" />
+          <QuickLink href="/teacher/classrooms" icon={<School className="h-4 w-4" />} label="Manage Sections" sub="Create & edit" color="from-blue-500 to-cyan-500" />
+          <QuickLink href="/teacher/questions" icon={<FileQuestion className="h-4 w-4" />} label="Question Bank" sub="Add & edit questions" color="from-purple-500 to-pink-500" />
           <QuickLink href="/teacher/reports" icon={<BarChart3 className="h-4 w-4" />} label="View Reports" sub="Performance data" color="from-orange-500 to-red-500" />
           <button
             onClick={loadData}
