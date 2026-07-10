@@ -24,6 +24,11 @@ body {
   display: none;
 }
 
+/* Hide the floating icon nav while in story/battle screens */
+.game-battle-active .student-nav-rail {
+  display: none;
+}
+
 /* ── Game-specific utilities ───────────────────────────────────────────────── */
 @layer utilities {
   .text-neon-glow {
@@ -205,14 +210,18 @@ body:has(.student-app-shell) {
   background-position: center center;
 }
 
-/* Override global img rule ONLY inside game screens */
+/* Override global img sizing ONLY inside game screens (keeps next/image fill working) */
 .game-screen img,
 .game-screen .background-layer {
-  object-fit: cover !important;
-  object-position: center center !important;
   max-width: none !important;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Full-bleed backdrop keeps cover; sprites keep their own object-fit/position */
+.game-screen .background-layer {
+  object-fit: cover !important;
+  object-position: center center !important;
 }
 
 .ui-layer {

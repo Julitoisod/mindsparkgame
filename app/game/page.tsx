@@ -86,7 +86,8 @@ export default function GamePage() {
   }
 
   return (
-    <div className="relative min-h-[100dvh] min-w-[100vw] overflow-hidden bg-dark-900">
+    // h (not min-h): QuizAdventure stages use height:100%, which collapses to 0 inside an auto-height parent
+    <div className="relative h-[100dvh] min-w-[100vw] overflow-hidden bg-dark-900">
       {/* Dashboard shortcut */}
       <Link
         href="/dashboard"

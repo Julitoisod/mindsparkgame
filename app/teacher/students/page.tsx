@@ -105,6 +105,7 @@ export default function TeacherStudentsPage() {
   // Action states
   const [savingId, setSavingId] = useState<number | null>(null)
   const [unlockingLevel, setUnlockingLevel] = useState<string | null>(null)
+  const [openingAll, setOpeningAll] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
 
   // Insight + deadlines (loaded lazily when a student is expanded)
@@ -257,6 +258,54 @@ export default function TeacherStudentsPage() {
     }
   }
 
+  /**
+   * Opens Level 1 for every student in the current filter in one click.
+   * The teacher only ever opens Level 1 — passing it auto-opens Levels 2–5
+   * in the game, so per-student unlocking is no longer needed.
+   */
+  async function openLevelOneForAll() {
+    const targets = filtered.filter(
+      s => !s.teacherUnlockedLevels.includes(1) && !s.progress.completedLevels.includes(1),
+    )
+    if (targets.length === 0) {
+      toast.success('Level 1 is already open for everyone here')
+      return
+    }
+    setOpeningAll(true)
+    try {
+      const results = await Promise.allSettled(
+        targets.map(async s => {
+          const res = await fetch(`/api/teacher/students/${s.id}/unlock-level`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ levelNumber: 1 }),
+          })
+          const json = await res.json()
+          if (!res.ok || !json.success) throw new Error(json.message)
+          return { id: s.id, unlockedLevels: (json.data?.unlockedLevels ?? []) as number[] }
+        }),
+      )
+      const ok = results
+        .filter((r): r is PromiseFulfilledResult<{ id: number; unlockedLevels: number[] }> => r.status === 'fulfilled')
+        .map(r => r.value)
+      setStudents(prev =>
+        prev.map(s => {
+          const hit = ok.find(o => o.id === s.id)
+          return hit ? { ...s, teacherUnlockedLevels: hit.unlockedLevels } : s
+        }),
+      )
+      const failedCount = results.length - ok.length
+      if (failedCount > 0) {
+        toast.error(`Level 1 opened for ${ok.length} students — ${failedCount} failed. Try again.`)
+      } else {
+        toast.success(`Level 1 opened for ${ok.length} student${ok.length === 1 ? '' : 's'}. Levels 2–5 open automatically once they pass it.`)
+      }
+    } finally {
+      setOpeningAll(false)
+    }
+  }
+
   async function toggleLevelUnlock(studentId: number, levelNumber: number, currentlyUnlocked: boolean) {
     const key = `${studentId}-${levelNumber}`
     setUnlockingLevel(key)
@@ -301,13 +350,24 @@ export default function TeacherStudentsPage() {
           <h2 className="text-2xl font-black">All Students</h2>
           <p className="text-sm text-gray-500">Manage and monitor student accounts</p>
         </div>
-        <button
-          onClick={() => window.location.href = '/teacher/dashboard'}
-          className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
-        >
-          <UserPlus className="h-4 w-4" />
-          Add Student
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={openLevelOneForAll}
+            disabled={openingAll}
+            title="Opens Level 1 for every student in the current filter. Levels 2–5 open automatically once a student passes Level 1."
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-emerald-700 transition disabled:opacity-50"
+          >
+            <Unlock className="h-4 w-4" />
+            {openingAll ? 'Opening…' : 'Open Level 1 for All'}
+          </button>
+          <button
+            onClick={() => window.location.href = '/teacher/dashboard'}
+            className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add Student
+          </button>
+        </div>
       </div>
 
       {error && <div className="rounded-lg bg-red-100 border border-red-300 px-4 py-2.5 text-sm text-red-800 font-medium">{error}</div>}
@@ -496,7 +556,7 @@ export default function TeacherStudentsPage() {
                                 )
                               })}
                             </div>
-                            <p className="mt-3 text-[10px] text-gray-500">Click a number to unlock/lock. ✓ = completed.</p>
+                            <p className="mt-3 text-[10px] text-gray-500">Click a number to unlock/lock. ✓ = completed. Only Level 1 is needed — Levels 2–5 open automatically after the student passes Level 1.</p>
                           </div>
 
                           {/* Account Details */}

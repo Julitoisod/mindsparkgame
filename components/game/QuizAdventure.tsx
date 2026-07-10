@@ -17,9 +17,9 @@ import {
   CheckCircle2,
   Crown,
   Flame,
+  Home,
   Lock,
   Map as MapIcon,
-  Menu,
   RotateCcw,
   Shield, // eslint-disable-line @typescript-eslint/no-unused-vars
   Sparkles,
@@ -31,7 +31,7 @@ import {
 
 import * as quizContent from '@/lib/quizContent'
 import { BADGES } from '@/lib/badges'
-import { getLevelStory } from '@/lib/storyContent'
+import { getLevelStory, overallStory } from '@/lib/storyContent'
 import {
   bossSpriteAnimations,
   heroSpriteAnimationsByClass,
@@ -111,6 +111,23 @@ const FALLBACK_BACKGROUNDS = [
   '/BG BATTLE GROUND ELVES 3/game_background_3/game_background_3.png',
 ]
 
+// Measured from each idle frame's alpha bounds (content height / bottom padding
+// as fractions of the frame). scale makes every fighter's VISIBLE height equal;
+// ty (translateY, % of the sprite box) plants their feet on the same grass line.
+const HERO_SPRITE_TUNING: Record<CharacterClass, { scale: number; ty: string }> = {
+  warrior: { scale: 4.0, ty: '99%' },
+  mage: { scale: 4.0, ty: '42%' },
+  rogue: { scale: 4.15, ty: '59%' },
+  archer: { scale: 4.15, ty: '59%' },
+}
+const BOSS_SPRITE_TUNING = [
+  { scale: 3.45, ty: '27%' }, // L1 forest golem
+  { scale: 3.75, ty: '35%' }, // L2 minotaur
+  { scale: 2.95, ty: '38%' }, // L3 wraith
+  { scale: 3.1, ty: '24%' },  // L4 fallen angel
+  { scale: 3.35, ty: '28%' }, // L5 dark oracle
+] as const
+
 const FALLBACK_CHARACTER =
   '/AVATAR CHARACTERS/3 AVATAR/2D-KNIGHT BOY CHARACTER/_PNG/1_KNIGHT_ AVATAR/Knight_01__IDLE_000.png'
 const FALLBACK_BOSS =
@@ -127,7 +144,7 @@ const FALLBACK_LEVELS: QuizLevel[] = Array.from({ length: MAX_LEVELS }, (_, inde
     backgroundImage: FALLBACK_BACKGROUNDS[index],
     characterImage: FALLBACK_CHARACTER,
     bossImage: FALLBACK_BOSS,
-    bossName: ['Root Warden', 'Rune Knight', 'Mirror Mage', 'Storm Captain', 'Dark Oracle'][index],
+    bossName: ['Golem', 'Minotaur', 'Wraith', 'Necromancer', 'Dark Oracle'][index],
     normalQuestions: Array.from({ length: QUESTIONS_PER_PHASE }, (_, questionIndex) => ({
       id: `fallback-${levelNumber}-normal-${questionIndex}`,
       prompt: `Practice question ${questionIndex + 1} for level ${levelNumber}`,
@@ -502,8 +519,26 @@ export default function QuizAdventure({
   const [dbSets, setDbSets] = useState<Record<number, { normal: QuizQuestion[]; boss: QuizQuestion[] }>>({})
   // Wrong answers this run — drives the avatar fade (req #16)
   const [wrongCount, setWrongCount] = useState(0)
+  // Overall story shows once — the first time this character starts Level 1
+  const [introSeen, setIntroSeen] = useState(() => {
+    try {
+      return window.localStorage.getItem(`mindspark-forest-intro-${characterId ?? 'guest'}`) === '1'
+    } catch {
+      return true
+    }
+  })
+
+  function dismissIntro() {
+    playClickSound()
+    try {
+      window.localStorage.setItem(`mindspark-forest-intro-${characterId ?? 'guest'}`, '1')
+    } catch { /* private mode — show it again next time */ }
+    setIntroSeen(true)
+  }
 
   const level = levels[levelIndex] ?? levels[0]
+  const heroTune = HERO_SPRITE_TUNING[playerClass] ?? HERO_SPRITE_TUNING.warrior
+  const bossTune = BOSS_SPRITE_TUNING[level.number - 1] ?? BOSS_SPRITE_TUNING[0]
   const dbSet = dbSets[level.number]
   const questions = phase === 'boss'
     ? (dbSet?.boss ?? level.bossQuestions)
@@ -514,11 +549,12 @@ export default function QuizAdventure({
   const progressLabel = // eslint-disable-line @typescript-eslint/no-unused-vars
     phase === 'boss' ? `Boss ${questionIndex + 1}/${QUESTIONS_PER_PHASE}` : `Correct ${normalCorrectCount}/${QUESTIONS_PER_PHASE}`
   // Accessible if: already completed (replay), teacher unlocked the starting gate,
-  // or the previous level is completed — teacher unlocks once, then it auto-progresses (req #5).
+  // or Level 1 is passed — the teacher only ever opens Level 1; passing it
+  // automatically opens Levels 2–5 for the student (panel revision).
   function isLevelAccessible(lvlNum: number): boolean {
     if (completedLevels.includes(lvlNum)) return true
     if (teacherUnlockedLevels.includes(lvlNum)) return true
-    if (lvlNum > 1 && completedLevels.includes(lvlNum - 1)) return true
+    if (completedLevels.includes(1)) return true
     return false
   }
   const shouldShowBoss = phase === 'boss' || phase === 'levelComplete' || phase === 'gameComplete'
@@ -720,6 +756,10 @@ export default function QuizAdventure({
     setPhase('boss')
     setQuestionIndex(0)
     setBossHp(MAX_BOSS_HP)
+    // Boss battle starts with FULL life — quiz-phase mistakes must not carry
+    // over into the boss fight (panel revision). Avatar fade resets with it.
+    setHearts(MAX_HEARTS)
+    setWrongCount(0)
     setSelectedAnswer(null)
     setFeedback(null)
   }
@@ -923,164 +963,207 @@ export default function QuizAdventure({
       return 'locked'
     }
 
+    // Single source of truth: the road path AND the node positions both derive
+    // from these waypoints (viewBox 1000×400), so the road always passes
+    // exactly through the center of every level node.
+    const waypoints = [
+      { x: 70, y: 262 },
+      { x: 285, y: 128 },
+      { x: 500, y: 235 },
+      { x: 715, y: 128 },
+      { x: 930, y: 262 },
+    ]
+    const roadPath = waypoints
+      .map((point, pointIdx) => {
+        if (pointIdx === 0) return `M ${point.x} ${point.y}`
+        const prev = waypoints[pointIdx - 1]
+        const midX = (prev.x + point.x) / 2
+        return `C ${midX} ${prev.y}, ${midX} ${point.y}, ${point.x} ${point.y}`
+      })
+      .join(' ')
+    const openIdx = levels.findIndex(lvl => getLevelStatus(lvl.number) === 'open')
+    // ponytail: treats nodes as evenly spaced along the path — close enough visually
+    const clearedFraction =
+      openIdx > 0 ? openIdx / (MAX_LEVELS - 1) : completedLevels.length >= MAX_LEVELS ? 1 : 0
+
     return (
       <section className="game-screen map-stage text-white">
-        {/* Magical purple/pink sky background - kid-friendly */}
-        <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#3b2a73] via-[#6b21a8] to-[#a855f7]" />
-        <div className="background-layer z-0 opacity-[0.06]" style={{ backgroundImage: 'url(/BACKGROUND FOREST 1/FOREST 1/2304x1296.png)', filter: 'blur(4px)' }} />
+        {/* Forest adventure background — kept vivid, readability via vignette */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: "url('/vecteezy_deep-forest-scene-with-trail-in-the-woods-illustration_6079540.jpg')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-black/45 via-black/10 to-black/50" />
 
         <div className="ui-layer flex flex-col">
-          {/* Keys collected banner (req #17) */}
+          {/* Forest Trophies collected banner (req #17) */}
           <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2">
-            <div className="flex items-center gap-1.5 rounded-full border border-yellow-300/40 bg-black/40 px-3 py-1 backdrop-blur-sm">
-              <span className="text-sm">🗝️</span>
-              <span className="text-xs font-black text-yellow-200">Keys: {completedLevels.length}/{MAX_LEVELS}</span>
+            <div className="flex items-center gap-1.5 rounded-full border-2 border-amber-400/60 bg-[#2a1a0a]/85 px-4 py-1.5 shadow-lg backdrop-blur-sm">
+              <span className="text-sm">🏆</span>
+              <span className="text-xs font-black text-amber-200">Trophies: {completedLevels.length}/{MAX_LEVELS}</span>
             </div>
           </div>
           {/* Horizontal S-curve map - fits viewport on all screens */}
-          <div
-            className="absolute inset-0 z-[5] flex items-start justify-center px-2 sm:px-4 pt-4 sm:pt-8"
-            style={{
-              backgroundImage: "url('/vecteezy_deep-forest-scene-with-trail-in-the-woods-illustration_6079540.jpg')",
-              backgroundSize: 'cover',
-              backgroundPosition: 'center center',
-              backgroundRepeat: 'no-repeat',
-            }}
-          >
-            {/* Soft overlay so the road and nodes remain readable */}
-            <div className="absolute inset-0 bg-white/35 backdrop-blur-[1px] pointer-events-none" />
-
-            <div className="relative w-full h-full max-w-5xl scale-[0.78] sm:scale-[0.85] lg:scale-100 origin-center">
-              {/* SVG Winding Road - path passes exactly through each node */}
+          <div className="absolute inset-0 z-[5] flex items-center justify-center px-2 sm:px-6">
+            <div className="relative h-full w-full max-w-5xl">
+              {/* SVG Winding Road — same waypoints as the nodes, so it always lines up */}
               <svg
-                className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
+                className="pointer-events-none absolute inset-0 z-0 h-full w-full"
                 viewBox="0 0 1000 400"
                 preserveAspectRatio="none"
                 fill="none"
               >
-                {/* Road shadow */}
-                <path
-                  d="M 80 148 C 185 148, 185 -20, 290 -20 C 395 -20, 395 100, 500 100 C 605 100, 605 -20, 710 -20 C 815 -20, 815 148, 920 148"
-                  stroke="rgba(0,0,0,0.18)"
-                  strokeWidth="50"
-                  strokeLinecap="round"
-                  fill="none"
-                />
-                {/* Road body */}
-                <path
-                  d="M 80 148 C 185 148, 185 -20, 290 -20 C 395 -20, 395 100, 500 100 C 605 100, 605 -20, 710 -20 C 815 -20, 815 148, 920 148"
-                  stroke="#3d5245"
-                  strokeWidth="42"
-                  strokeLinecap="round"
-                  fill="none"
-                />
+                {/* Road edge */}
+                <path d={roadPath} stroke="#452c15" strokeWidth="50" strokeLinecap="round" fill="none" />
+                {/* Road body — warm dirt trail */}
+                <path d={roadPath} stroke="#8a5a33" strokeWidth="40" strokeLinecap="round" fill="none" />
+                {/* Golden glow over the cleared part of the trail */}
+                {clearedFraction > 0 && (
+                  <path
+                    d={roadPath}
+                    stroke="rgba(251,191,36,0.5)"
+                    strokeWidth="40"
+                    strokeLinecap="round"
+                    fill="none"
+                    pathLength={100}
+                    strokeDasharray={`${clearedFraction * 100} 100`}
+                  />
+                )}
                 {/* Dashed center line */}
                 <path
-                  d="M 80 148 C 185 148, 185 -20, 290 -20 C 395 -20, 395 100, 500 100 C 605 100, 605 -20, 710 -20 C 815 -20, 815 148, 920 148"
-                  stroke="#9ab89a"
+                  d={roadPath}
+                  stroke="#f5e6c8"
                   strokeWidth="3"
                   strokeLinecap="round"
-                  strokeDasharray="14 10"
+                  strokeDasharray="14 12"
                   fill="none"
                 />
               </svg>
 
-              {/* Level Nodes positioned along the S-curve */}
+              {/* Level Nodes — centered on the same waypoints the road is drawn through.
+                  Outer div owns the -50%,-50% centering; the inner motion.div only
+                  animates, so framer-motion can't overwrite the centering transform. */}
               {levels.map((lvl, idx) => {
                 const status = getLevelStatus(lvl.number)
                 const meta = levelMeta[idx]
                 const isUnlocked = status !== 'locked'
-
-                // Positions exactly aligned to SVG road waypoints
-                // Road: M 80 148 ... 290 -20 ... 500 100 ... 710 -20 ... 920 148 (viewBox 1000x400)
-                // Node X% = svgX/1000, Node Y% = svgY/400
-                const positions = [
-                  { left: '8%', top: '37%' },   // 148/400 = 37%
-                  { left: '29%', top: '0%' },   // peak (at -5% but clamped to 0)
-                  { left: '50%', top: '25%' },  // 100/400 = 25%
-                  { left: '71%', top: '0%' },   // peak
-                  { left: '92%', top: '37%' },  // 148/400 = 37%
-                ]
-                const pos = positions[idx]
+                const isOpen = status === 'open'
+                // The hero stands only on the CURRENT stop: the first open level
+                const isCurrent = isOpen && levels.findIndex(l => getLevelStatus(l.number) === 'open') === idx
+                const pos = waypoints[idx]
 
                 return (
-                  <motion.div
+                  <div
                     key={lvl.id}
-                    className="absolute z-10 flex flex-col items-center"
-                    style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, -50%)' }}
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: idx * 0.1, type: 'spring', stiffness: 260, damping: 20 }}
+                    className="absolute z-10"
+                    style={{ left: `${pos.x / 10}%`, top: `${pos.y / 4}%`, transform: 'translate(-50%, -50%)' }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => isUnlocked && enterLevel(idx)}
-                      disabled={!isUnlocked}
-                      className={[
-                        'relative flex items-center justify-center rounded-full shadow-xl transition-transform overflow-hidden',
-                        'w-[64px] h-[64px] sm:w-[88px] sm:h-[88px] lg:w-[112px] lg:h-[112px]',
-                        'border-2 sm:border-[3px]',
-                        isUnlocked
-                          ? status === 'cleared'
-                            ? 'border-yellow-400 cursor-pointer hover:scale-110 active:scale-95 shadow-yellow-500/60 ring-2 ring-yellow-300/50'
-                            : 'border-cyan-400 cursor-pointer hover:scale-110 active:scale-95 shadow-cyan-500/50'
-                          : 'border-[#4a5e52] bg-[#2a3830] cursor-not-allowed',
-                      ].join(' ')}
+                    <motion.div
+                      className="relative flex flex-col items-center"
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: idx * 0.1, type: 'spring', stiffness: 260, damping: 20 }}
                     >
-                      {isUnlocked && (
-                        <Image
-                          src={lvl.backgroundImage}
-                          alt={meta.env}
-                          fill
-                          sizes="112px"
-                          className="rounded-full object-cover"
-                          draggable={false}
+                      {/* Hero avatar standing on the current level */}
+                      {isCurrent && (
+                        <motion.div
+                          className="pointer-events-none absolute -top-9 z-20 mx-auto h-10 w-10 drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)] sm:-top-12 sm:h-14 sm:w-14"
+                          style={{
+                            backgroundImage: `url("${encodeURI(lvl.characterImage)}")`,
+                            backgroundSize: 'contain',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'center bottom',
+                          }}
+                          animate={{ y: [0, -6, 0] }}
+                          transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
                         />
                       )}
-                      {!isUnlocked && (
-                        <Lock className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-[#78909c]" />
-                      )}
-                      <span className={[
-                        'absolute -bottom-1 right-0 sm:bottom-0.5 sm:right-0.5 lg:bottom-1 lg:right-1 rounded px-1 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-black leading-none shadow-md',
-                        isUnlocked
-                          ? status === 'cleared'
-                            ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                            : 'bg-gradient-to-br from-[#9333ea]lue-500 to-purple-500 text-white'
-                          : 'bg-[#37474f]/90 text-[#90a4ae]',
-                      ].join(' ')}>
-                        L{lvl.number}
-                      </span>
-                    </button>
 
-                    {/* Text labels */}
-                    <div className="mt-1 sm:mt-1.5 lg:mt-2 text-center w-[64px] sm:w-[100px] lg:w-[130px]">
-                      <p className="text-[8px] sm:text-[10px] lg:text-xs font-black text-white drop-shadow-md leading-tight">{meta.env}</p>
-                      <p className="hidden sm:block text-[7px] sm:text-[8px] lg:text-[9px] text-purple-100 leading-tight mt-0.5 line-clamp-2">{meta.subtitle}</p>
-                      <span className={[
-                        'inline-block mt-0.5 sm:mt-1 rounded px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7px] lg:text-[8px] font-black uppercase tracking-wider shadow-sm',
-                        status === 'cleared' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' : '',
-                        status === 'open' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : '',
-                        status === 'locked' ? 'bg-[#37474f] text-[#b0bec5]' : '',
-                      ].join(' ')}>
-                        {status === 'cleared' && '✨ Cleared'}
-                        {status === 'open' && '▶ Open'}
-                        {status === 'locked' && '🔒 Locked'}
-                      </span>
-                      {status === 'cleared' && levelStars[lvl.number] && (
-                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                          {[1, 2, 3].map(s => (
-                            <Star
-                              key={s}
-                              className={[
-                                'h-2 w-2 sm:h-2.5 sm:w-2.5 lg:h-3 lg:w-3',
-                                s <= (levelStars[lvl.number] ?? 0) ? 'fill-[#fbc02d] text-[#fbc02d]' : 'text-[#bdbdbd]',
-                              ].join(' ')}
+                      <span className="relative">
+                        {/* Pulsing ring calls attention to the playable level */}
+                        {isOpen && (
+                          <motion.span
+                            className="pointer-events-none absolute -inset-1.5 rounded-full border-4 border-cyan-300/80"
+                            animate={{ scale: [1, 1.18, 1], opacity: [0.9, 0.25, 0.9] }}
+                            transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => isUnlocked && enterLevel(idx)}
+                          disabled={!isUnlocked}
+                          className={[
+                            'relative flex items-center justify-center rounded-full shadow-xl transition-transform overflow-hidden',
+                            'w-[64px] h-[64px] sm:w-[88px] sm:h-[88px] lg:w-[104px] lg:h-[104px]',
+                            'border-2 sm:border-[3px]',
+                            isUnlocked
+                              ? status === 'cleared'
+                                ? 'border-yellow-400 cursor-pointer hover:scale-110 active:scale-95 shadow-yellow-500/60 ring-2 ring-yellow-300/50'
+                                : 'border-cyan-300 cursor-pointer hover:scale-110 active:scale-95 shadow-cyan-500/50'
+                              : 'border-[#3a4a40] bg-[#22302a]/95 cursor-not-allowed',
+                          ].join(' ')}
+                        >
+                          {isUnlocked && (
+                            <Image
+                              src={lvl.backgroundImage}
+                              alt={meta.env}
+                              fill
+                              sizes="104px"
+                              className="rounded-full object-cover"
+                              draggable={false}
                             />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
+                          )}
+                          {!isUnlocked && (
+                            <Lock className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-[#78909c]" />
+                          )}
+                          <span className={[
+                            'absolute -bottom-1 right-0 sm:bottom-0.5 sm:right-0.5 lg:bottom-1 lg:right-1 rounded px-1 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-black leading-none shadow-md',
+                            isUnlocked
+                              ? status === 'cleared'
+                                ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                                : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white'
+                              : 'bg-[#37474f]/90 text-[#90a4ae]',
+                          ].join(' ')}>
+                            L{lvl.number}
+                          </span>
+                        </button>
+                      </span>
+
+                      {/* Text labels */}
+                      <div className="mt-1 sm:mt-1.5 flex flex-col items-center text-center w-[80px] sm:w-[110px] lg:w-[136px]">
+                        <p className="rounded-md bg-black/60 px-1.5 py-0.5 text-[8px] sm:text-[10px] lg:text-xs font-black text-white leading-tight backdrop-blur-[2px]">{meta.env}</p>
+                        <p className="hidden sm:block text-[7px] sm:text-[8px] lg:text-[9px] font-semibold text-amber-100 leading-tight mt-0.5 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{meta.subtitle}</p>
+                        <span className={[
+                          'inline-block mt-0.5 sm:mt-1 rounded px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7px] lg:text-[8px] font-black uppercase tracking-wider shadow-sm',
+                          status === 'cleared' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' : '',
+                          status === 'open' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : '',
+                          status === 'locked' ? 'bg-[#37474f] text-[#b0bec5]' : '',
+                        ].join(' ')}>
+                          {status === 'cleared' && '✨ Cleared'}
+                          {status === 'open' && '▶ Open'}
+                          {status === 'locked' && '🔒 Locked'}
+                        </span>
+                        {status === 'cleared' && levelStars[lvl.number] && (
+                          <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                            {[1, 2, 3].map(s => (
+                              <Star
+                                key={s}
+                                className={[
+                                  'h-2 w-2 sm:h-2.5 sm:w-2.5 lg:h-3 lg:w-3',
+                                  s <= (levelStars[lvl.number] ?? 0) ? 'fill-[#fbc02d] text-[#fbc02d]' : 'text-[#bdbdbd]',
+                                ].join(' ')}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </div>
                 )
               })}
             </div>
@@ -1106,12 +1189,40 @@ export default function QuizAdventure({
         />
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-[#1a1233]/80 via-[#1a1233]/70 to-[#1a1233]/90" />
 
-        <div className="ui-layer flex items-center justify-center p-4">
+        {/* Overall story — shown once, the first time Level 1 is started */}
+        {level.number === 1 && !introSeen ? (
+          <div className="ui-layer flex overflow-y-auto p-3">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="relative m-auto w-full max-w-2xl rounded-2xl border-2 border-emerald-500/50 bg-gradient-to-b from-[#052e16] via-[#14432d] to-[#1e1b4b] p-4 sm:p-5 text-center shadow-[0_0_30px_rgba(52,211,153,0.35)]"
+            >
+              <span className="inline-block rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-200">
+                🌲 {overallStory.speaker}
+              </span>
+              <h2 className="mt-1.5 text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-yellow-200 to-emerald-300">
+                The Enchanted Forest
+              </h2>
+              <p className="mt-2 text-[13px] sm:text-sm leading-relaxed text-emerald-50/90">
+                &ldquo;{overallStory.text}&rdquo;
+              </p>
+              <button
+                type="button"
+                onClick={dismissIntro}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-base font-black text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition"
+              >
+                <Sparkles className="h-5 w-5" /> Start the Adventure
+              </button>
+            </motion.div>
+          </div>
+        ) : (
+        <div className="ui-layer flex overflow-y-auto p-3">
           <motion.div
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-            className="relative w-full max-w-md rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-[#2e1065] via-[#3b0764] to-[#1e1b4b] p-5 sm:p-6 text-center shadow-[0_0_30px_rgba(168,85,247,0.4)]"
+            className="relative m-auto w-full max-w-3xl rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-[#2e1065] via-[#3b0764] to-[#1e1b4b] p-4 sm:p-5 shadow-[0_0_30px_rgba(168,85,247,0.4)]"
           >
             <button
               type="button"
@@ -1122,51 +1233,60 @@ export default function QuizAdventure({
               <MapIcon className="h-4 w-4" />
             </button>
 
-            <span className="inline-block rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-200">
-              Level {level.number} • {story.place}
-            </span>
+            <div className="flex items-center gap-4 sm:gap-6">
+              {/* Boss portrait */}
+              <div className="relative hidden min-[480px]:block shrink-0 h-[clamp(90px,32vh,170px)] w-[clamp(90px,32vh,170px)]">
+                <AnimatedSprite
+                  frames={level.bossFrames}
+                  action="idle"
+                  fallbackSrc={level.bossImage}
+                  alt={story.enemy}
+                  fill
+                  sizes="170px"
+                  className="object-contain object-bottom -scale-x-100 scale-[1.25] drop-shadow-[0_8px_12px_rgba(0,0,0,0.5)]"
+                  fps={10}
+                />
+              </div>
 
-            <h2 className="mt-3 text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
-              {level.title}
-            </h2>
+              {/* Story text */}
+              <div className="min-w-0 flex-1 text-left">
+                <div className="flex flex-wrap items-center gap-2 pr-9">
+                  <span className="inline-block rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-200">
+                    {story.emoji} Level {level.number} • {story.place}
+                  </span>
+                  <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-bold text-purple-200/80">
+                    🏆 Trophies: {completedLevels.length}/{MAX_LEVELS}
+                  </span>
+                </div>
 
-            <div className="relative mx-auto mt-4 h-32 w-32">
-              <AnimatedSprite
-                frames={level.bossFrames}
-                action="idle"
-                fallbackSrc={level.bossImage}
-                alt={story.enemy}
-                fill
-                sizes="128px"
-                className="object-contain object-bottom -scale-x-100 scale-[1.6] drop-shadow-[0_8px_12px_rgba(0,0,0,0.5)]"
-                fps={10}
-              />
-            </div>
+                <h2 className="mt-1.5 text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
+                  {level.title}
+                </h2>
 
-            <p className="mt-3 text-sm leading-relaxed text-purple-100/90">{story.intro}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">🌲 Forest Guardian</p>
+                <p className="mt-0.5 text-[13px] sm:text-sm leading-relaxed text-purple-100/90">&ldquo;{story.intro}&rdquo;</p>
 
-            <div className="mt-4 flex items-center justify-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5 rounded-lg bg-red-500/15 border border-red-400/30 px-2.5 py-1 font-bold text-red-200">
-                <Swords className="h-3.5 w-3.5" /> Enemy: {story.enemy}
-              </span>
-              <span className="flex items-center gap-1.5 rounded-lg bg-yellow-500/15 border border-yellow-400/30 px-2.5 py-1 font-bold text-yellow-200">
-                {story.keyEmoji} Save {story.rescue}
-              </span>
-            </div>
-
-            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-purple-200/70">
-              <span className="rounded-full bg-purple-500/20 px-2 py-0.5">🗝️ Keys collected: {completedLevels.length}/{MAX_LEVELS}</span>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="flex items-center gap-1.5 rounded-lg bg-red-500/15 border border-red-400/30 px-2.5 py-1 font-bold text-red-200">
+                    <Swords className="h-3.5 w-3.5" /> Enemy: {story.enemy}
+                  </span>
+                  <span className="flex items-center gap-1.5 rounded-lg bg-yellow-500/15 border border-yellow-400/30 px-2.5 py-1 font-bold text-yellow-200">
+                    🏆 Earn the {story.trophyName}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <button
               type="button"
               onClick={beginBattleFromStory}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 text-base font-black text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-base font-black text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition"
             >
               <Flame className="h-5 w-5" /> Begin Quest — Answer 5 Questions
             </button>
           </motion.div>
         </div>
+        )}
       </section>
     )
   }
@@ -1269,10 +1389,10 @@ export default function QuizAdventure({
             type="button"
             onClick={() => setScreen('map')}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-amber-700/60 bg-gradient-to-b from-[#4a3118] via-[#2f1d0f] to-[#1c1208] text-amber-200 shadow-[0_3px_0_#1a0f05,inset_0_1px_0_rgba(255,255,255,0.12)] hover:brightness-110"
-            aria-label="Open map"
-            title="Map"
+            aria-label="Back to map"
+            title="Home"
           >
-            <Menu className="h-5 w-5" />
+            <Home className="h-5 w-5" />
           </button>
           <StatPill
             icon={<Crown className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -1304,7 +1424,8 @@ export default function QuizAdventure({
           {/* Characters at bottom of screen - expand when answering */}
           <div className={`pointer-events-none absolute bottom-0 left-0 right-0 z-[8] flex items-end justify-between px-2 sm:px-8 transition-all duration-300 ${isResolving ? 'h-[30%]' : 'h-[30%]'}`}>
             {/* Hero - left side */}
-            <div className="relative h-[clamp(200px,46vh,260px)] w-[38%] sm:w-[34%]" style={{ transform: 'translate(-40%, 62px)' }}>
+            {/* Height tracks the viewport so sprites stay proportional on short landscape phones */}
+            <div className="relative h-[clamp(100px,26vh,220px)] w-[34%] sm:w-[30%]" style={{ transform: 'translate(-6%, 0)' }}>
               <motion.div
                 key={`hero-${level.id}`}
                 className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.45)]"
@@ -1312,17 +1433,22 @@ export default function QuizAdventure({
                 animate={{ x: 0, opacity: 1 }}
               >
                 <div className="relative h-full w-full" style={heroFadeStyle}>
-                  <AnimatedSprite
-                    frames={level.characterFrames}
-                    action={heroAction}
-                    fallbackSrc={level.characterImage}
-                    alt="Player character"
-                    fill
-                    sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
-                    className="origin-bottom object-contain object-bottom scale-[2.75]"
-                    fps={12}
-                    loop={heroAction === 'idle'}
-                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{ transform: `translateY(${heroTune.ty}) scale(${heroTune.scale})`, transformOrigin: 'bottom center' }}
+                  >
+                    <AnimatedSprite
+                      frames={level.characterFrames}
+                      action={heroAction}
+                      fallbackSrc={level.characterImage}
+                      alt="Player character"
+                      fill
+                      sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
+                      className="object-contain object-bottom"
+                      fps={12}
+                      loop={heroAction === 'idle'}
+                    />
+                  </div>
                 </div>
                 {wrongCount >= MAX_HEARTS && (
                   <span className="absolute left-1/2 top-0 -translate-x-1/2 rounded-full bg-gray-700/90 px-2 py-0.5 text-[10px] font-black text-gray-200 shadow">
@@ -1334,7 +1460,10 @@ export default function QuizAdventure({
 
             {/* Boss - right side */}
             {shouldShowBoss && (
-              <div className="relative h-[clamp(200px,46vh,260px)] w-[38%] sm:w-[34%]" style={{ transform: 'translate(40%, 82px)' }}>
+              <div
+                className="relative h-[clamp(100px,26vh,220px)] w-[34%] sm:w-[30%]"
+                style={{ transform: 'translate(6%, 0)' }}
+              >
                 <motion.div
                   key={`boss-${level.id}`}
                   className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.55)]"
@@ -1358,17 +1487,22 @@ export default function QuizAdventure({
                       transition: 'filter 0.5s ease, opacity 0.5s ease',
                     }}
                   >
-                    <AnimatedSprite
-                      frames={level.bossFrames}
-                      action={bossAction}
-                      fallbackSrc={level.bossImage}
-                      alt={level.bossName}
-                      fill
-                      sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
-                      className="origin-bottom object-contain object-bottom -scale-x-100 scale-[2.24]"
-                      fps={bossAction === 'idle' ? 10 : 14}
-                      loop={bossAction === 'idle'}
-                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{ transform: `translateY(${bossTune.ty}) scale(${bossTune.scale})`, transformOrigin: 'bottom center' }}
+                    >
+                      <AnimatedSprite
+                        frames={level.bossFrames}
+                        action={bossAction}
+                        fallbackSrc={level.bossImage}
+                        alt={level.bossName}
+                        fill
+                        sizes="(min-width: 1024px) 600px, (min-width: 640px) 400px, 35vw"
+                        className="object-contain object-bottom -scale-x-100"
+                        fps={bossAction === 'idle' ? 10 : 14}
+                        loop={bossAction === 'idle'}
+                      />
+                    </div>
                   </div>
                   {bossDefeated && (
                     <motion.span
@@ -1388,8 +1522,8 @@ export default function QuizAdventure({
           {/* HP bars - compact floating above each character */}
           {phase === 'boss' && (
             <>
-              {/* Hero HP - above hero (left) */}
-              <div className="absolute bottom-[calc(38%+100px)] left-1 z-10 w-[14%] min-w-[56px]">
+              {/* Hero HP - top left corner, clear of the sprites and question card */}
+              <div className="absolute left-1 top-1 z-10 w-[16%] min-w-[92px]">
                 <div className="rounded-lg border border-white/20 bg-black/50 px-1.5 py-1 backdrop-blur-sm">
                   <div className="mb-0.5 flex items-center justify-between">
                     <span className="text-[9px] font-bold text-cyan-300">❤️ HP</span>
@@ -1404,8 +1538,8 @@ export default function QuizAdventure({
                   </div>
                 </div>
               </div>
-              {/* Boss HP - above boss (right) */}
-              <div className="absolute bottom-[calc(38%+100px)] right-1 z-10 w-[14%] min-w-[56px]">
+              {/* Boss HP - top right corner, clear of the sprites and question card */}
+              <div className="absolute right-1 top-1 z-10 w-[16%] min-w-[92px]">
                 <div className="rounded-lg border border-white/20 bg-black/50 px-1.5 py-1 backdrop-blur-sm">
                   <div className="mb-0.5 flex items-center justify-between">
                     <span className="text-[9px] font-bold text-red-300">💀 Boss</span>
@@ -1545,15 +1679,14 @@ export default function QuizAdventure({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-              className="relative rounded-xl border border-purple-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(168,85,247,0.35)]"
-              style={{ width: '90vw', maxWidth: '340px' }}
+              className="relative m-auto w-[90vw] max-w-[340px] [@media(max-height:480px)]:max-w-[560px] rounded-xl border border-purple-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(168,85,247,0.35)]"
             >
               <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
 
@@ -1569,7 +1702,7 @@ export default function QuizAdventure({
                 Level {level.number} Result
               </h2>
 
-              <div className="mt-2 grid grid-cols-2 gap-1.5 text-left">
+              <div className="mt-2 grid grid-cols-2 [@media(max-height:480px)]:grid-cols-4 gap-1.5 text-left">
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
                   <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
                   <p className="text-lg font-black text-white">{QUESTIONS_PER_PHASE}/{QUESTIONS_PER_PHASE}</p>
@@ -1628,15 +1761,25 @@ export default function QuizAdventure({
                 )}
               </div>
 
-              {/* Key reward + rescue beat (req #17) */}
+              {/* Forest Guardian's "After the Boss" beat + trophy (req #17) */}
               <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/10 px-3 py-2">
                 <p className="text-sm font-black text-yellow-200">
-                  {getLevelStory(level.number).keyEmoji} You earned the {getLevelStory(level.number).keyName}!
+                  🏆 You earned the {getLevelStory(level.number).trophyName}!
                 </p>
-                <p className="text-[11px] text-purple-100/80">🗝️ You freed {getLevelStory(level.number).rescue}.</p>
+                <p className="text-[11px] text-purple-100/80">&ldquo;{getLevelStory(level.number).afterBoss}&rdquo; — Forest Guardian</p>
               </div>
 
-              <p className="mt-2 text-sm font-semibold text-purple-200/80">🎉 Amazing job!</p>
+              {/* Passing Level 1 opens every remaining level (panel revision) */}
+              {level.number === 1 && (
+                <motion.div
+                  animate={{ scale: [1, 1.04, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.4 }}
+                  className="mt-2 rounded-md border border-emerald-400/50 bg-emerald-500/15 px-3 py-2"
+                >
+                  <p className="text-sm font-black text-emerald-300">🎊 Levels 2, 3, 4 &amp; 5 are now OPEN!</p>
+                  <p className="text-[11px] text-emerald-100/80">Go to the map and pick your next adventure.</p>
+                </motion.div>
+              )}
 
               <div className="mt-3 flex gap-2 justify-center">
                 <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
@@ -1659,14 +1802,14 @@ export default function QuizAdventure({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-              className="relative rounded-xl border border-yellow-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(250,204,21,0.3)]"
+              className="relative m-auto rounded-xl border border-yellow-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(250,204,21,0.3)]"
               style={{ width: '90vw', maxWidth: '340px' }}
             >
               <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
@@ -1674,10 +1817,11 @@ export default function QuizAdventure({
               <Trophy className="mx-auto h-9 w-9 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.7)]" />
 
               <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
-                🎊 All Levels Cleared!
+                🎊 You are the Forest Hero!
               </h2>
 
-              <p className="mt-1 text-sm font-semibold text-purple-200/80">You are a MindSpark champion!</p>
+              <p className="mt-1 text-sm font-semibold text-purple-200/80">&ldquo;{getLevelStory(5).afterBoss}&rdquo; — Forest Guardian</p>
+              <p className="mt-1 text-sm font-black text-yellow-300">🏆 You earned the {getLevelStory(5).trophyName}!</p>
 
               <div className="mt-3 flex gap-2 justify-center">
                 <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
@@ -1697,14 +1841,14 @@ export default function QuizAdventure({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-              className="relative rounded-xl border border-red-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(239,68,68,0.25)]"
+              className="relative m-auto rounded-xl border border-red-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(239,68,68,0.25)]"
               style={{ width: '90vw', maxWidth: '340px' }}
             >
               <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-red-400 to-transparent" />
@@ -1717,7 +1861,7 @@ export default function QuizAdventure({
                 Level {level.number} Result
               </h2>
 
-              <div className="mt-2 grid grid-cols-2 gap-1.5 text-left">
+              <div className="mt-2 grid grid-cols-2 [@media(max-height:480px)]:grid-cols-4 gap-1.5 text-left">
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
                   <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
                   <p className="text-lg font-black text-white">{normalCorrectCount}/{QUESTIONS_PER_PHASE}</p>
