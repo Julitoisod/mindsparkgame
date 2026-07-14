@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, BarChart3, CheckCircle2, TrendingUp, Users } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, Star, TrendingUp, Users } from 'lucide-react'
 import { buildRecommendation, proficiencyFromAccuracy } from '@/lib/proficiency'
 
 const bandTone: Record<string, string> = {
-  gray: 'text-gray-400', red: 'text-red-400', yellow: 'text-yellow-400', blue: 'text-blue-400', green: 'text-emerald-400',
+  gray: 'text-gray-400', red: 'text-red-400', orange: 'text-orange-400', yellow: 'text-yellow-400', blue: 'text-blue-400', green: 'text-emerald-400',
 }
 
 type QuizScore = {
@@ -213,7 +213,7 @@ export default function TeacherReportsPage() {
                     <td className="py-3 pr-4">{student.progress.levelsCompleted}/{student.progress.totalLevels}</td>
                     <td className="py-3 pr-4">
                       <span className="flex items-center gap-1 text-yellow-300">
-                        <span className="text-xs">⭐</span> {student.progress.starBalance}
+                        <Star className="h-3 w-3 fill-current" /> {student.progress.starBalance}
                       </span>
                     </td>
                     <td className="py-3 pr-4">
@@ -239,7 +239,7 @@ export default function TeacherReportsPage() {
 
       {/* Quiz Attempts & Scores Detail — per session */}
       <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5">
-        <h3 className="font-bold text-white mb-1">📊 Quiz Attempts & Scores</h3>
+        <h3 className="font-bold text-white mb-1">Quiz Attempts & Scores</h3>
         <p className="text-xs text-purple-400 mb-4">Every quiz attempt by each student — track their progress over time</p>
 
         {sessions.length === 0 ? (
@@ -306,7 +306,7 @@ export default function TeacherReportsPage() {
                               </div>
                             </div>
                             {/* Score */}
-                            <span className="shrink-0 text-xs font-bold text-yellow-300">⭐ {session.total_score}</span>
+                            <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-bold text-yellow-300"><Star className="h-3 w-3 fill-current" /> {session.total_score}</span>
                             {/* Date */}
                             <span className="shrink-0 text-[10px] text-purple-400 hidden sm:block">
                               {new Date(session.session_date).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -326,14 +326,14 @@ export default function TeacherReportsPage() {
       {/* Key Insights */}
       {total > 0 && (
         <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5">
-          <h3 className="font-bold text-white mb-3">💡 Key Insights</h3>
+          <h3 className="font-bold text-white mb-3">Key Insights</h3>
           <div className="grid gap-2 sm:grid-cols-2 text-sm text-purple-200">
-            {green > 0 && <p>✅ Quiz performance is strong with {total > 0 ? Math.round((green / total) * 100) : 0}% of students in the green zone.</p>}
-            {red > 0 && <p>⚠️ Focus on targeted interventions for the {red} student{red > 1 ? 's' : ''} in red.</p>}
-            {none > 0 && <p>📋 {none} student{none > 1 ? 's' : ''} haven&apos;t started — consider unlocking Level 1.</p>}
-            {yellow > 0 && <p>📊 Consistent practice can help improve outcomes for {yellow} average student{yellow > 1 ? 's' : ''}.</p>}
-            {completionRate >= 50 && <p>🎉 Over half your students have completed all levels!</p>}
-            {activeRate < 50 && total > 2 && <p>� Encourage inactive students to start playing.</p>}
+            {green > 0 && <p>Quiz performance is strong with {total > 0 ? Math.round((green / total) * 100) : 0}% of students in the green zone.</p>}
+            {red > 0 && <p>Focus on targeted interventions for the {red} student{red > 1 ? 's' : ''} in red.</p>}
+            {none > 0 && <p>{none} student{none > 1 ? 's' : ''} haven&apos;t started — consider unlocking Level 1.</p>}
+            {yellow > 0 && <p>Consistent practice can help improve outcomes for {yellow} average student{yellow > 1 ? 's' : ''}.</p>}
+            {completionRate >= 50 && <p>Over half your students have completed all levels!</p>}
+            {activeRate < 50 && total > 2 && <p>Encourage inactive students to start playing.</p>}
           </div>
         </div>
       )}

@@ -11,9 +11,15 @@ import {
   playBossWarningSound,
   playGameOverSound,
   playClickSound,
+  startMusic,
+  stopMusic,
+  speak,
+  stopSpeaking,
+  setSoundMuted,
+  loadMutedPreference,
 } from '@/lib/sounds'
 import {
-  Award, // eslint-disable-line @typescript-eslint/no-unused-vars
+  CalendarClock,
   CheckCircle2,
   Crown,
   Flame,
@@ -21,11 +27,14 @@ import {
   Lock,
   Map as MapIcon,
   RotateCcw,
-  Shield, // eslint-disable-line @typescript-eslint/no-unused-vars
+  Skull,
   Sparkles,
   Star,
   Swords,
+  TreePine,
   Trophy,
+  Volume2,
+  VolumeX,
   XCircle,
 } from 'lucide-react'
 
@@ -88,6 +97,10 @@ const QUESTIONS_PER_PHASE = 5
 const MAX_HEARTS = 5
 const MAX_BOSS_HP = 100
 const NORMAL_POINTS = 10
+// The result popup waits for the death animation to play on screen first
+// (panel revision: "the enemy must clearly be seen dying before the result").
+const BOSS_DEFEAT_ANIM_MS = 2800
+const HERO_DEFEAT_ANIM_MS = 1800
 const NORMAL_EXP = 12 // eslint-disable-line @typescript-eslint/no-unused-vars
 const BOSS_DAMAGE = 20
 const FALLBACK_CHARACTER_STATS: CharacterStats = {
@@ -335,6 +348,23 @@ function nextPlayableLevelIndex(completedLevels: number[]): number {
   return Math.min(Math.max(...completedLevels), MAX_LEVELS - 1)
 }
 
+/** Accepts MySQL DATETIME ('2026-07-20 08:00:00') or ISO strings. */
+function parseDeadline(raw: string): Date | null {
+  const date = new Date(raw.includes('T') || raw.includes('Z') ? raw : raw.replace(' ', 'T'))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatDeadline(raw: string): string {
+  const date = parseDeadline(raw)
+  if (!date) return raw
+  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+}
+
+function isDeadlineOverdue(raw: string): boolean {
+  const date = parseDeadline(raw)
+  return date !== null && date.getTime() < Date.now()
+}
+
 function StatPill({
   icon,
   label,
@@ -519,6 +549,13 @@ export default function QuizAdventure({
   const [dbSets, setDbSets] = useState<Record<number, { normal: QuizQuestion[]; boss: QuizQuestion[] }>>({})
   // Wrong answers this run — drives the avatar fade (req #16)
   const [wrongCount, setWrongCount] = useState(0)
+  // Result modals wait for the death animation to finish (panel revision).
+  // Starts true so a "game already complete" load still shows its modal.
+  const [resultShown, setResultShown] = useState(true)
+  // Teacher-set deadlines per level (panel revision: visible on student side)
+  const [deadlines, setDeadlines] = useState<Record<number, string>>({})
+  // Music + voice mute toggle, persisted per device
+  const [soundMuted, setSoundMutedState] = useState(() => loadMutedPreference())
   // Overall story shows once — the first time this character starts Level 1
   const [introSeen, setIntroSeen] = useState(() => {
     try {
@@ -535,6 +572,16 @@ export default function QuizAdventure({
     } catch { /* private mode — show it again next time */ }
     setIntroSeen(true)
   }
+
+  function toggleSound() {
+    playClickSound()
+    setSoundMutedState(current => !current)
+  }
+
+  // Keep the audio engine in sync with the mute toggle
+  useEffect(() => {
+    setSoundMuted(soundMuted)
+  }, [soundMuted])
 
   const level = levels[levelIndex] ?? levels[0]
   const heroTune = HERO_SPRITE_TUNING[playerClass] ?? HERO_SPRITE_TUNING.warrior
@@ -578,6 +625,54 @@ export default function QuizAdventure({
           ? 'attack'
           : 'idle'
 
+  // ── Background music (panel revision: music + voice) ─────────────────────
+  useEffect(() => {
+    if (soundMuted) {
+      stopMusic()
+      return
+    }
+    if (screen === 'battle' && phase === 'boss') startMusic('boss')
+    else if (screen === 'battle' && phase === 'normal') startMusic('battle')
+    else if (screen === 'map' || screen === 'story') startMusic('map')
+    else stopMusic() // result phases — the fanfare/game-over jingle takes over
+    return () => stopMusic()
+  }, [screen, phase, soundMuted])
+
+  // Stop all audio when the game unmounts (navigating away)
+  useEffect(() => () => { stopMusic(); stopSpeaking() }, [])
+
+  // Voice-over: read each question aloud
+  useEffect(() => {
+    if (soundMuted || screen !== 'battle') return
+    if (phase !== 'normal' && phase !== 'boss') return
+    if (!question?.prompt) return
+    speak(question.prompt.replace(/_{2,}/g, ' blank '))
+    return () => stopSpeaking()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question?.id, screen, phase, soundMuted])
+
+  // Voice-over: Forest Guardian narrates the story screen
+  useEffect(() => {
+    if (soundMuted || screen !== 'story') return
+    const story = getLevelStory(level.number)
+    speak(level.number === 1 && !introSeen ? overallStory.text : story.intro)
+    return () => stopSpeaking()
+  }, [screen, level.number, introSeen, soundMuted])
+
+  // Voice-over: announce the level result once the popup appears
+  useEffect(() => {
+    if (soundMuted || !resultShown) return
+    if (phase === 'levelComplete') {
+      const story = getLevelStory(level.number)
+      speak(`Level ${level.number} complete! You earned the ${story.trophyName}!`)
+    } else if (phase === 'gameComplete') {
+      speak('Congratulations, hero! You defeated the Dark Oracle and restored peace to the Enchanted Forest!')
+    } else if (phase === 'gameOver') {
+      speak('Oh no, your hearts ran out. Try again, hero!')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultShown, phase, soundMuted])
+
   useEffect(() => {
     if (!characterId) {
       setProgressLoaded(true)
@@ -607,6 +702,15 @@ export default function QuizAdventure({
           }
         }
         const loadedBadges: string[] = Array.isArray(json.meta?.earnedBadges) ? json.meta.earnedBadges : []
+        const loadedDeadlines: Record<number, string> = {}
+        if (Array.isArray(json.meta?.deadlines)) {
+          for (const item of json.meta.deadlines) {
+            const lvl = Number(item?.levelNumber)
+            const dueAt = String(item?.dueAt ?? '')
+            if (Number.isInteger(lvl) && lvl >= 1 && lvl <= MAX_LEVELS && dueAt) loadedDeadlines[lvl] = dueAt
+          }
+        }
+        setDeadlines(loadedDeadlines)
         setCompletedLevels(loadedCompleted)
         setTeacherUnlockedLevels(loadedTeacherUnlocks)
         setStars(Number.isFinite(loadedStars) ? loadedStars : 0)
@@ -635,7 +739,7 @@ export default function QuizAdventure({
     }
   }, [characterId])
 
-  async function saveLevelProgress(nextCompletedLevels: number[], starRating?: number) {
+  async function saveLevelProgress(nextCompletedLevels: number[], starRating?: number, perfectRun?: boolean) {
     if (!characterId) return
 
     const stats = characterStats ?? FALLBACK_CHARACTER_STATS
@@ -675,6 +779,7 @@ export default function QuizAdventure({
           playtimeSeconds: 0,
           starsEarned: QUESTIONS_PER_PHASE,
           levelStars: updatedLevelStars,
+          perfectRun: perfectRun === true,
         }),
       })
       const json = await response.json()
@@ -776,7 +881,11 @@ export default function QuizAdventure({
       return { ...prev, [level.number]: Math.max(existing, starRating) }
     })
 
-    void saveLevelProgress(nextCompleted, starRating)
+    // 10/10 run: every quiz answer correct AND the boss brought to 0 HP
+    // (0 HP is only reachable when all 5 boss answers were correct)
+    const perfectRun = normalCorrectCount >= QUESTIONS_PER_PHASE && Math.max(0, nextBossHp) <= 0
+
+    void saveLevelProgress(nextCompleted, starRating, perfectRun)
     setSavedStarBalance(current => current + QUESTIONS_PER_PHASE)
     setBossHp(Math.max(0, nextBossHp))
     setScreen('battle')
@@ -784,7 +893,12 @@ export default function QuizAdventure({
     setSelectedAnswer(null)
     setFeedback(null)
 
-    // Show Level Up celebration
+    // Let the boss death animation play on screen BEFORE the result popup
+    // (panel revision: the enemy must clearly be seen dying first).
+    setResultShown(false)
+    window.setTimeout(() => setResultShown(true), BOSS_DEFEAT_ANIM_MS)
+
+    // Show Level Up celebration while the boss falls
     setShowLevelUp(true)
     window.setTimeout(() => setShowLevelUp(false), 3000)
   }
@@ -839,10 +953,10 @@ export default function QuizAdventure({
     setSelectedAnswer(option)
     setFeedback(correct ? 'correct' : 'wrong')
     if (correct) {
-      const messages = ['✅ Amazing!', '🌟 Great job!', '🎉 Correct!', '⭐ Excellent!', '🏆 Brilliant!']
+      const messages = ['Amazing!', 'Great job!', 'Correct!', 'Excellent!', 'Brilliant!']
       setFeedbackMessage(messages[Math.floor(Math.random() * messages.length)])
     } else {
-      setFeedbackMessage('❌ Try again!')
+      setFeedbackMessage('Try again!')
       setWrongCount(c => c + 1) // fades the avatar (req #16)
     }
 
@@ -875,15 +989,26 @@ export default function QuizAdventure({
           heartsRemaining: correct ? hearts : Math.max(0, hearts - 1),
           scoreEarned: correct ? (phase === 'boss' ? NORMAL_POINTS * 2 : NORMAL_POINTS) : 0,
         }),
-      }).catch(() => { /* silent fail — don't block gameplay */ })
+      })
+        .then(response => response.json())
+        .then(json => {
+          // math_streak is awarded per-answer by the server
+          if (Array.isArray(json?.newBadges) && json.newBadges.length > 0) {
+            setEarnedBadges(prev => Array.from(new Set([...prev, ...json.newBadges])))
+            setNewBadgeNotification(json.newBadges[0])
+            window.setTimeout(() => setNewBadgeNotification(null), 4000)
+          }
+        })
+        .catch(() => { /* silent fail — don't block gameplay */ })
     }
 
     window.setTimeout(() => {
       if (phase === 'normal') {
         if (correct) {
+          setNormalCorrectCount(current => current + 1)
           setScore(current => current + NORMAL_POINTS)
           setStars(current => current + 1)
-          setScorePopup(`+${NORMAL_POINTS} ⭐+1`)
+          setScorePopup(`+${NORMAL_POINTS} points, +1 star`)
           window.setTimeout(() => setScorePopup(null), 1500)
         } else {
           const nextHearts = Math.max(0, hearts - 1)
@@ -892,6 +1017,9 @@ export default function QuizAdventure({
             playGameOverSound()
             setPhase('gameOver')
             setSelectedAnswer(null)
+            // Brief pause so the hero's defeat is visible before the popup
+            setResultShown(false)
+            window.setTimeout(() => setResultShown(true), HERO_DEFEAT_ANIM_MS)
             return
           }
         }
@@ -913,7 +1041,7 @@ export default function QuizAdventure({
           const nextBossHp = Math.max(0, bossHp - BOSS_DAMAGE)
           setBossHp(nextBossHp)
           setScore(current => current + NORMAL_POINTS * 2)
-          setScorePopup(`+${NORMAL_POINTS * 2} 💥${BOSS_DAMAGE}dmg`)
+          setScorePopup(`+${NORMAL_POINTS * 2} points, ${BOSS_DAMAGE} damage`)
           window.setTimeout(() => setScorePopup(null), 1500)
         } else {
           const nextHearts = Math.max(0, hearts - 1)
@@ -922,6 +1050,9 @@ export default function QuizAdventure({
             playGameOverSound()
             setPhase('gameOver')
             setSelectedAnswer(null)
+            // Brief pause so the hero's defeat is visible before the popup
+            setResultShown(false)
+            window.setTimeout(() => setResultShown(true), HERO_DEFEAT_ANIM_MS)
             return
           }
         }
@@ -1004,10 +1135,20 @@ export default function QuizAdventure({
           {/* Forest Trophies collected banner (req #17) */}
           <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2">
             <div className="flex items-center gap-1.5 rounded-full border-2 border-amber-400/60 bg-[#2a1a0a]/85 px-4 py-1.5 shadow-lg backdrop-blur-sm">
-              <span className="text-sm">🏆</span>
+              <Trophy className="h-4 w-4 text-amber-300" />
               <span className="text-xs font-black text-amber-200">Trophies: {completedLevels.length}/{MAX_LEVELS}</span>
             </div>
           </div>
+          {/* Sound toggle — music + voice-over on/off (left side: the nav rail owns top-right) */}
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-amber-400/60 bg-[#2a1a0a]/85 text-amber-200 shadow-lg backdrop-blur-sm hover:brightness-110"
+            aria-label={soundMuted ? 'Turn sound on' : 'Turn sound off'}
+            title={soundMuted ? 'Sound off' : 'Sound on'}
+          >
+            {soundMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
           {/* Horizontal S-curve map - fits viewport on all screens */}
           <div className="absolute inset-0 z-[5] flex items-center justify-center px-2 sm:px-6">
             <div className="relative h-full w-full max-w-5xl">
@@ -1144,10 +1285,24 @@ export default function QuizAdventure({
                           status === 'open' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : '',
                           status === 'locked' ? 'bg-[#37474f] text-[#b0bec5]' : '',
                         ].join(' ')}>
-                          {status === 'cleared' && '✨ Cleared'}
-                          {status === 'open' && '▶ Open'}
-                          {status === 'locked' && '🔒 Locked'}
+                          {status === 'cleared' && 'Cleared'}
+                          {status === 'open' && 'Open'}
+                          {status === 'locked' && 'Locked'}
                         </span>
+                        {/* Teacher-set deadline (panel revision: student must see it) */}
+                        {deadlines[lvl.number] && status !== 'cleared' && (
+                          <span
+                            className={[
+                              'mt-0.5 inline-flex items-center gap-0.5 rounded px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7px] lg:text-[8px] font-black shadow-sm',
+                              isDeadlineOverdue(deadlines[lvl.number])
+                                ? 'bg-red-600/90 text-white'
+                                : 'bg-black/65 text-amber-200',
+                            ].join(' ')}
+                          >
+                            <CalendarClock className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
+                            {isDeadlineOverdue(deadlines[lvl.number]) ? 'Overdue' : 'Due'} {formatDeadline(deadlines[lvl.number])}
+                          </span>
+                        )}
                         {status === 'cleared' && levelStars[lvl.number] && (
                           <div className="flex items-center justify-center gap-0.5 mt-0.5">
                             {[1, 2, 3].map(s => (
@@ -1198,8 +1353,8 @@ export default function QuizAdventure({
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
               className="relative m-auto w-full max-w-2xl rounded-2xl border-2 border-emerald-500/50 bg-gradient-to-b from-[#052e16] via-[#14432d] to-[#1e1b4b] p-4 sm:p-5 text-center shadow-[0_0_30px_rgba(52,211,153,0.35)]"
             >
-              <span className="inline-block rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-200">
-                🌲 {overallStory.speaker}
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-200">
+                <TreePine className="h-3 w-3" /> {overallStory.speaker}
               </span>
               <h2 className="mt-1.5 text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-yellow-200 to-emerald-300">
                 The Enchanted Forest
@@ -1252,18 +1407,31 @@ export default function QuizAdventure({
               <div className="min-w-0 flex-1 text-left">
                 <div className="flex flex-wrap items-center gap-2 pr-9">
                   <span className="inline-block rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-200">
-                    {story.emoji} Level {level.number} • {story.place}
+                    Level {level.number} • {story.place}
                   </span>
-                  <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-bold text-purple-200/80">
-                    🏆 Trophies: {completedLevels.length}/{MAX_LEVELS}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-bold text-purple-200/80">
+                    <Trophy className="h-3 w-3" /> Trophies: {completedLevels.length}/{MAX_LEVELS}
                   </span>
+                  {deadlines[level.number] && (
+                    <span
+                      className={[
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold',
+                        isDeadlineOverdue(deadlines[level.number])
+                          ? 'bg-red-500/25 border border-red-400/50 text-red-200'
+                          : 'bg-cyan-500/15 border border-cyan-400/40 text-cyan-200',
+                      ].join(' ')}
+                    >
+                      <CalendarClock className="h-3 w-3" />
+                      {isDeadlineOverdue(deadlines[level.number]) ? 'Overdue:' : 'Deadline:'} {formatDeadline(deadlines[level.number])}
+                    </span>
+                  )}
                 </div>
 
                 <h2 className="mt-1.5 text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
                   {level.title}
                 </h2>
 
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">🌲 Forest Guardian</p>
+                <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300"><TreePine className="h-3 w-3" /> Forest Guardian</p>
                 <p className="mt-0.5 text-[13px] sm:text-sm leading-relaxed text-purple-100/90">&ldquo;{story.intro}&rdquo;</p>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -1271,7 +1439,7 @@ export default function QuizAdventure({
                     <Swords className="h-3.5 w-3.5" /> Enemy: {story.enemy}
                   </span>
                   <span className="flex items-center gap-1.5 rounded-lg bg-yellow-500/15 border border-yellow-400/30 px-2.5 py-1 font-bold text-yellow-200">
-                    🏆 Earn the {story.trophyName}
+                    <Trophy className="h-3.5 w-3.5" /> Earn the {story.trophyName}
                   </span>
                 </div>
               </div>
@@ -1344,9 +1512,11 @@ export default function QuizAdventure({
                     rotate: [0, Math.random() * 720],
                   }}
                   transition={{ duration: 1.2, ease: 'easeOut', delay: i * 0.03 }}
-                  className="absolute text-xl sm:text-3xl"
+                  className="absolute"
                 >
-                  {['⭐', '✨', '🌟', '💫', '🎉', '🎊', '💰', '🪙'][i % 8]}
+                  {i % 2 === 0
+                    ? <Star className="h-5 w-5 sm:h-8 sm:w-8 fill-yellow-300 text-yellow-300 drop-shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
+                    : <Sparkles className="h-5 w-5 sm:h-8 sm:w-8 text-amber-200 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]" />}
                 </motion.div>
               ))}
               {/* Golden ring burst */}
@@ -1393,6 +1563,15 @@ export default function QuizAdventure({
             title="Home"
           >
             <Home className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-amber-700/60 bg-gradient-to-b from-[#4a3118] via-[#2f1d0f] to-[#1c1208] text-amber-200 shadow-[0_3px_0_#1a0f05,inset_0_1px_0_rgba(255,255,255,0.12)] hover:brightness-110"
+            aria-label={soundMuted ? 'Turn sound on' : 'Turn sound off'}
+            title={soundMuted ? 'Sound off' : 'Sound on'}
+          >
+            {soundMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </button>
           <StatPill
             icon={<Crown className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -1509,9 +1688,9 @@ export default function QuizAdventure({
                       initial={{ scale: 0, rotate: -8, opacity: 0 }}
                       animate={{ scale: 1, rotate: -8, opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 14 }}
-                      className="absolute left-1/2 top-2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-red-300 bg-gradient-to-b from-red-500 to-rose-700 px-3 py-1 text-xs font-black text-white shadow-[0_3px_0_#7f1d1d] sm:text-sm"
+                      className="absolute left-1/2 top-2 z-10 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border-2 border-red-300 bg-gradient-to-b from-red-500 to-rose-700 px-3 py-1 text-xs font-black text-white shadow-[0_3px_0_#7f1d1d] sm:text-sm"
                     >
-                      💀 {level.bossName} Defeated!
+                      <Skull className="h-3.5 w-3.5" /> {level.bossName} Defeated!
                     </motion.span>
                   )}
                 </motion.div>
@@ -1526,7 +1705,7 @@ export default function QuizAdventure({
               <div className="absolute left-1 top-1 z-10 w-[16%] min-w-[92px]">
                 <div className="rounded-lg border border-white/20 bg-black/50 px-1.5 py-1 backdrop-blur-sm">
                   <div className="mb-0.5 flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-cyan-300">❤️ HP</span>
+                    <span className="text-[9px] font-bold text-cyan-300">Hero HP</span>
                     <span className="text-[9px] font-bold tabular-nums text-white">{hearts * 20} / {MAX_HEARTS * 20}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-black/40">
@@ -1542,7 +1721,7 @@ export default function QuizAdventure({
               <div className="absolute right-1 top-1 z-10 w-[16%] min-w-[92px]">
                 <div className="rounded-lg border border-white/20 bg-black/50 px-1.5 py-1 backdrop-blur-sm">
                   <div className="mb-0.5 flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-red-300">💀 Boss</span>
+                    <span className="text-[9px] font-bold text-red-300">Boss HP</span>
                     <span className="text-[9px] font-bold tabular-nums text-white">{bossHp} / {MAX_BOSS_HP}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-black/40">
@@ -1603,7 +1782,7 @@ export default function QuizAdventure({
                     {/* Inner highlight */}
                     <div className="absolute inset-[3px] rounded-xl border border-amber-200/50 pointer-events-none" />
                     <p className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-amber-700/80">
-                      {phase === 'boss' ? `⚔️ ${level.bossName} challenges you!` : `✨ Question ${questionIndex + 1}:`}
+                      {phase === 'boss' ? `${level.bossName} challenges you!` : `Question ${questionIndex + 1}:`}
                     </p>
                     <h2 className="mt-1 text-sm font-black leading-snug text-gray-800 sm:text-base lg:text-lg">
                       {question.prompt.replace(/\bblank\b/gi, '____')}
@@ -1671,9 +1850,9 @@ export default function QuizAdventure({
 
       </div>
 
-      {/* Score Popup Modal — compact centered card */}
+      {/* Score Popup Modal — appears only after the defeat animation played */}
       <AnimatePresence>
-        {phase === 'levelComplete' && (
+        {phase === 'levelComplete' && resultShown && (
           <motion.div
             key="level-complete-modal"
             initial={{ opacity: 0 }}
@@ -1696,7 +1875,7 @@ export default function QuizAdventure({
                 ))}
               </div>
 
-              <span className="inline-block rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-sm font-bold text-emerald-300">✅ Passed</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-sm font-bold text-emerald-300"><CheckCircle2 className="h-4 w-4" /> Passed</span>
 
               <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
                 Level {level.number} Result
@@ -1708,22 +1887,22 @@ export default function QuizAdventure({
                   <p className="text-lg font-black text-white">{QUESTIONS_PER_PHASE}/{QUESTIONS_PER_PHASE}</p>
                 </div>
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">⭐ Stars</p>
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Stars</p>
                   <p className="text-lg font-black text-yellow-300">{stars}</p>
                 </div>
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">🏆 Points</p>
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Points</p>
                   <p className="text-lg font-black text-white">{score}</p>
                 </div>
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">❤️ Hearts</p>
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Hearts</p>
                   <p className="text-lg font-black text-cyan-300">{hearts}/{MAX_HEARTS}</p>
                 </div>
               </div>
 
               {/* Badges Section */}
               <div className="mt-2 rounded-md border border-yellow-400/20 bg-yellow-400/5 px-2.5 py-2">
-                <p className="mb-2 text-[10px] uppercase font-bold text-yellow-300/70 leading-none">🏅 Badges</p>
+                <p className="mb-2 text-[10px] uppercase font-bold text-yellow-300/70 leading-none">Badges</p>
                 {earnedBadges.length === 0 ? (
                   <p className="text-[11px] text-white/40 italic">No badges yet — keep playing!</p>
                 ) : (
@@ -1748,7 +1927,7 @@ export default function QuizAdventure({
                               <div className={`absolute inset-[3px] rounded-full ${isNew ? 'bg-gradient-to-br from-yellow-300 to-orange-400' : 'bg-gradient-to-br from-green-300 to-green-500'}`} />
                               {/* Inner circle */}
                               <div className="relative z-10 flex items-center justify-center rounded-full bg-white shadow-inner" style={{ width: 28, height: 28 }}>
-                                <span className="text-base leading-none">{badge.icon}</span>
+                                <badge.icon className={`h-4 w-4 ${isNew ? 'text-orange-500' : 'text-green-700'}`} />
                               </div>
                             </div>
                           </div>
@@ -1763,8 +1942,8 @@ export default function QuizAdventure({
 
               {/* Forest Guardian's "After the Boss" beat + trophy (req #17) */}
               <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/10 px-3 py-2">
-                <p className="text-sm font-black text-yellow-200">
-                  🏆 You earned the {getLevelStory(level.number).trophyName}!
+                <p className="flex items-center justify-center gap-1 text-sm font-black text-yellow-200">
+                  <Trophy className="h-4 w-4 shrink-0" /> You earned the {getLevelStory(level.number).trophyName}!
                 </p>
                 <p className="text-[11px] text-purple-100/80">&ldquo;{getLevelStory(level.number).afterBoss}&rdquo; — Forest Guardian</p>
               </div>
@@ -1776,7 +1955,7 @@ export default function QuizAdventure({
                   transition={{ repeat: Infinity, duration: 1.4 }}
                   className="mt-2 rounded-md border border-emerald-400/50 bg-emerald-500/15 px-3 py-2"
                 >
-                  <p className="text-sm font-black text-emerald-300">🎊 Levels 2, 3, 4 &amp; 5 are now OPEN!</p>
+                  <p className="text-sm font-black text-emerald-300">Levels 2, 3, 4 &amp; 5 are now OPEN!</p>
                   <p className="text-[11px] text-emerald-100/80">Go to the map and pick your next adventure.</p>
                 </motion.div>
               )}
@@ -1796,7 +1975,7 @@ export default function QuizAdventure({
           </motion.div>
         )}
 
-        {phase === 'gameComplete' && (
+        {phase === 'gameComplete' && resultShown && (
           <motion.div
             key="game-complete-modal"
             initial={{ opacity: 0 }}
@@ -1817,11 +1996,11 @@ export default function QuizAdventure({
               <Trophy className="mx-auto h-9 w-9 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.7)]" />
 
               <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
-                🎊 You are the Forest Hero!
+                You are the Forest Hero!
               </h2>
 
               <p className="mt-1 text-sm font-semibold text-purple-200/80">&ldquo;{getLevelStory(5).afterBoss}&rdquo; — Forest Guardian</p>
-              <p className="mt-1 text-sm font-black text-yellow-300">🏆 You earned the {getLevelStory(5).trophyName}!</p>
+              <p className="mt-1 flex items-center justify-center gap-1 text-sm font-black text-yellow-300"><Trophy className="h-4 w-4 shrink-0" /> You earned the {getLevelStory(5).trophyName}!</p>
 
               <div className="mt-3 flex gap-2 justify-center">
                 <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
@@ -1835,7 +2014,7 @@ export default function QuizAdventure({
           </motion.div>
         )}
 
-        {phase === 'gameOver' && (
+        {phase === 'gameOver' && resultShown && (
           <motion.div
             key="game-over-modal"
             initial={{ opacity: 0 }}
@@ -1855,7 +2034,7 @@ export default function QuizAdventure({
 
               <XCircle className="mx-auto h-8 w-8 text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
 
-              <span className="mt-1 inline-block rounded-full bg-red-500/20 border border-red-400/40 px-3 py-0.5 text-sm font-bold text-red-300">❌ Failed</span>
+              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-400/40 px-3 py-0.5 text-sm font-bold text-red-300"><XCircle className="h-4 w-4" /> Failed</span>
 
               <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-300 via-pink-300 to-purple-300">
                 Level {level.number} Result
@@ -1867,20 +2046,20 @@ export default function QuizAdventure({
                   <p className="text-lg font-black text-white">{normalCorrectCount}/{QUESTIONS_PER_PHASE}</p>
                 </div>
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">⭐ Stars</p>
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Stars</p>
                   <p className="text-lg font-black text-yellow-300">{stars}</p>
                 </div>
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">🏆 Points</p>
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Points</p>
                   <p className="text-lg font-black text-white">{score}</p>
                 </div>
                 <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">❤️ Hearts</p>
+                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Hearts</p>
                   <p className="text-lg font-black text-red-300">0/{MAX_HEARTS}</p>
                 </div>
               </div>
 
-              <p className="mt-2 text-sm font-semibold text-purple-200/80">💪 Try again, hero!</p>
+              <p className="mt-2 text-sm font-semibold text-purple-200/80">Try again, hero!</p>
 
               <div className="mt-3 flex gap-2 justify-center">
                 <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-purple-500/30 hover:from-purple-400 hover:to-pink-400">
@@ -1965,7 +2144,7 @@ export default function QuizAdventure({
             className="absolute top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-yellow-400/40 bg-[#2e215b]/95 px-5 py-3 shadow-2xl backdrop-blur-md"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.icon ?? '🏅' })()}</span>
+              {(() => { const BadgeIcon = BADGES.find(b => b.id === newBadgeNotification)?.icon ?? Trophy; return <BadgeIcon className="h-7 w-7 text-yellow-300" /> })()}
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-yellow-300">Badge Earned!</p>
                 <p className="text-sm font-black text-white">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.name ?? 'New Badge' })()}</p>

@@ -56,6 +56,8 @@ export interface SavePayload {
   playtimeSeconds: number
   starsEarned?: number
   levelStars?: Record<string, number>
+  /** True when the run was 10/10 — all quiz and boss answers correct. */
+  perfectRun?: boolean
 }
 
 export interface ApiResponse<T = unknown> {

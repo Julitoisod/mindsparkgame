@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Gamepad2, Lock, LogOut, Sparkles, Star } from 'lucide-react'
+import { CheckCircle2, Gamepad2, Heart, Lock, LogOut, Sparkles, Star, Swords, Wind } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { characterOptions } from '@/lib/characterOptions'
@@ -247,9 +247,9 @@ export default function CharacterSelectPage() {
 
                   {/* Stats */}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}>❤️ HP {option.stats.maxHp}</span>
-                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}>⚔️ ATK {option.stats.attack}</span>
-                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}>💨 SPD {option.stats.speed}</span>
+                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}><Heart className="h-2.5 w-2.5 fill-current" /> HP {option.stats.maxHp}</span>
+                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}><Swords className="h-2.5 w-2.5" /> ATK {option.stats.attack}</span>
+                    <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}><Wind className="h-2.5 w-2.5" /> SPD {option.stats.speed}</span>
                   </div>
 
                   {/* Owned / status */}

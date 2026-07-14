@@ -235,7 +235,7 @@ export default function TeacherDashboardPage() {
       {/* Welcome + Feature Card */}
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-2xl font-black">Welcome back, {user?.username}! 👋</h2>
+          <h2 className="text-2xl font-black">Welcome back, {user?.username}!</h2>
           <p className="mt-1 text-sm text-[#6B7280]">Here&apos;s your sections overview</p>
         </motion.div>
 
@@ -245,7 +245,7 @@ export default function TeacherDashboardPage() {
           transition={{ delay: 0.1 }}
           className="rounded-xl border border-purple-400/20 bg-gradient-to-br from-purple-900/60 to-pink-900/30 backdrop-blur-md p-4"
         >
-          <p className="mb-2 text-xs font-bold text-[#374151]">✨ Welcome to Teacher Management</p>
+          <p className="mb-2 text-xs font-bold text-[#374151]">Welcome to Teacher Management</p>
           <div className="space-y-1.5">
             {[
               'Create and manage sections',
@@ -467,7 +467,7 @@ export default function TeacherDashboardPage() {
 
             {/* CSV format info */}
             <div className="space-y-1 rounded-lg border border-purple-400/15 bg-purple-900/30 p-3 text-xs text-[#4B5563]">
-              <p className="font-bold text-[#374151]">📋 Required CSV columns:</p>
+              <p className="font-bold text-[#374151]">Required CSV columns:</p>
               <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Full Name, Username</p>
               <p className="text-[10px] text-[#6B7280]">Password is auto-generated as username + &quot;123&quot;. Max 100 students per file.</p>
             </div>
@@ -514,7 +514,7 @@ export default function TeacherDashboardPage() {
                 className="mt-4 pt-4 border-t border-purple-400/15"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-[#111827]">📊 Upload Results</p>
+                  <p className="text-xs font-bold text-[#111827]">Upload Results</p>
                   <span className="text-[10px] text-[#6B7280]">{csvSummary}</span>
                 </div>
                 <div className="max-h-[160px] overflow-y-auto space-y-1">

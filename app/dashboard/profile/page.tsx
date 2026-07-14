@@ -215,7 +215,7 @@ export default function DashboardProfilePage() {
               const earned = earnedBadges.includes(b.id)
               return (
                 <div key={b.id} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-[#c084fc]/30 bg-[#241a47]' : 'border-[#c084fc]/10 bg-[#241a47]/50 opacity-50 grayscale'}`}>
-                  <div className="text-xl leading-none mb-0.5">{b.icon}</div>
+                  <b.icon className={`mx-auto mb-0.5 h-5 w-5 ${earned ? 'text-yellow-300' : 'text-[#f3e8ff]/50'}`} />
                   <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#f3e8ff]' : 'text-[#f3e8ff]/50'}`}>{b.name}</p>
                 </div>
               )

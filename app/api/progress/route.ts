@@ -66,8 +66,15 @@ export async function GET(request: Request) {
   )
   const totalScore = Number(scoreRows[0]?.total_score ?? 0)
 
+  // Teacher-set level deadlines — surfaced on the student's map (panel revision)
+  const deadlineRows = await query<{ level_number: number; due_at: string }>(
+    'SELECT level_number, due_at FROM level_deadlines WHERE student_id = ? ORDER BY level_number ASC',
+    [session.userId],
+  )
+  const deadlines = deadlineRows.map(row => ({ levelNumber: row.level_number, dueAt: row.due_at }))
+
   if (!rows.length) {
-    return NextResponse.json({ success: true, message: 'No progress', data: null, meta: { starBalance, totalScore, teacherUnlockedLevels, earnedBadges } })
+    return NextResponse.json({ success: true, message: 'No progress', data: null, meta: { starBalance, totalScore, teacherUnlockedLevels, earnedBadges, deadlines } })
   }
 
   // Parse JSON columns stored as TEXT
@@ -79,7 +86,7 @@ export async function GET(request: Request) {
     levelStars:      safeParseJSON(row.levelStars as string, {}),
   }
 
-  return NextResponse.json({ success: true, message: 'OK', data: parsed, meta: { starBalance, totalScore, teacherUnlockedLevels, earnedBadges } })
+  return NextResponse.json({ success: true, message: 'OK', data: parsed, meta: { starBalance, totalScore, teacherUnlockedLevels, earnedBadges, deadlines } })
 }
 
 /**
@@ -166,44 +173,52 @@ export async function POST(request: Request) {
   // Stars are now added in real-time via /api/attempts on each correct answer
   // No need to add them again here to avoid double-counting
 
-  // ── Badge evaluation ──────────────────────────────────────────────────────
+  // ── Badge evaluation (panel-approved badge table) ─────────────────────────
+  // math_streak is awarded per-answer in /api/attempts.
   const newBadges: string[] = []
   const completedArray = Array.isArray(completedLevels) ? completedLevels : []
 
-  // first_steps: Complete Level 1
-  if (completedArray.includes(1)) {
-    newBadges.push('first_steps')
+  // first_victory: cleared a level for the first time
+  if (completedArray.length >= 1) {
+    newBadges.push('first_victory')
   }
 
-  // math_explorer: Complete Level 3
-  if (completedArray.includes(3)) {
-    newBadges.push('math_explorer')
+  // boss_slayer: a true boss kill — 3 stars means every boss answer was
+  // correct, which is the only way the boss reaches 0 HP
+  if (Object.values(mergedLevelStars).some(s => s >= 3)) {
+    newBadges.push('boss_slayer')
   }
 
-  // champion: Complete all 5 levels
+  // forest_champion + forest_explorer: all 5 levels cleared at least once
   if ([1, 2, 3, 4, 5].every(n => completedArray.includes(n))) {
-    newBadges.push('champion')
+    newBadges.push('forest_champion', 'forest_explorer')
   }
 
-  // perfect_score: Get 3 stars on any level
-  const hasThreeStars = Object.values(mergedLevelStars).some(s => s >= 3)
-  if (hasThreeStars) {
+  // perfect_score: 10/10 in one run (client-tracked; quiz + boss both flawless)
+  if (body.perfectRun === true) {
     newBadges.push('perfect_score')
   }
 
-  // star_collector: Earn 20+ total stars (from wallet)
-  const walletRows = await query<{ stars: number }>(
-    'SELECT stars FROM student_wallets WHERE user_id = ? LIMIT 1',
+  // star_collector: 100 stars collected lifetime — each correct answer earns
+  // exactly one star, so count attempts rather than the spendable wallet
+  const collectedRows = await query<{ collected: number }>(
+    'SELECT COUNT(*) AS collected FROM quiz_attempts WHERE user_id = ? AND is_correct = 1',
     [session.userId],
   )
-  const totalStars = Number(walletRows[0]?.stars ?? 0)
-  if (totalStars >= 20) {
+  if (Number(collectedRows[0]?.collected ?? 0) >= 100) {
     newBadges.push('star_collector')
   }
 
-  // boss_slayer: Defeat 3 bosses (3+ completed levels)
-  if (completedArray.length >= 3) {
-    newBadges.push('boss_slayer')
+  // dedicated_learner: replayed a level 3+ times (each run answers 5 quiz questions)
+  const replayRows = await query<{ level_number: number }>(
+    `SELECT level_number FROM quiz_attempts
+     WHERE user_id = ? AND phase = 'normal'
+     GROUP BY level_number HAVING COUNT(*) >= 15
+     LIMIT 1`,
+    [session.userId],
+  )
+  if (replayRows.length > 0) {
+    newBadges.push('dedicated_learner')
   }
 
   // Insert new badges (INSERT IGNORE to skip duplicates)

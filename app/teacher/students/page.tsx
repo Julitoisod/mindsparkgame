@@ -54,6 +54,7 @@ type Deadline = { levelNumber: number; dueAt: string }
 const toneStyles: Record<string, string> = {
   gray: 'bg-gray-100 text-gray-700 border-gray-300',
   red: 'bg-red-100 text-red-700 border-red-300',
+  orange: 'bg-orange-100 text-orange-700 border-orange-300',
   yellow: 'bg-yellow-100 text-yellow-700 border-yellow-300',
   blue: 'bg-blue-100 text-blue-700 border-blue-300',
   green: 'bg-emerald-100 text-emerald-700 border-emerald-300',
@@ -419,10 +420,10 @@ export default function TeacherStudentsPage() {
           </select>
           <select value={filterPerformance} onChange={e => setFilterPerformance(e.target.value)} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
             <option value="">All Performance</option>
-            <option value="green">🟢 Good</option>
-            <option value="yellow">🟡 Average</option>
-            <option value="red">🔴 Needs Help</option>
-            <option value="none">⚪ Not Started</option>
+            <option value="green">Good</option>
+            <option value="yellow">Average</option>
+            <option value="red">Needs Help</option>
+            <option value="none">Not Started</option>
           </select>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
             <option value="">All Status</option>
@@ -675,7 +676,7 @@ export default function TeacherStudentsPage() {
                                   <span className="text-xs text-gray-500">Overall accuracy: <span className="font-bold text-gray-800">{ins.overall.accuracy}%</span></span>
                                 </div>
                                 <p className="rounded-lg bg-purple-50 border border-purple-200 px-3 py-2 text-xs text-purple-900">
-                                  💡 {ins.recommendation}
+                                  {ins.recommendation}
                                 </p>
                                 {ins.weakLessons.length > 0 && (
                                   <p className="text-xs text-gray-600">

@@ -58,7 +58,23 @@ export async function POST(request: Request) {
     )
   }
 
-  return NextResponse.json({ success: true, message: 'Attempt recorded' })
+  // math_streak badge: 5 correct answers in a row (quiz + boss combined)
+  const newBadges: string[] = []
+  if (isCorrect) {
+    const recent = await query<{ is_correct: number }>(
+      'SELECT is_correct FROM quiz_attempts WHERE user_id = ? ORDER BY id DESC LIMIT 5',
+      [session.userId],
+    )
+    if (recent.length === 5 && recent.every(row => Number(row.is_correct) === 1)) {
+      const awarded = await execute(
+        'INSERT IGNORE INTO student_badges (user_id, badge_id) VALUES (?, ?)',
+        [session.userId, 'math_streak'],
+      )
+      if (awarded.affectedRows > 0) newBadges.push('math_streak')
+    }
+  }
+
+  return NextResponse.json({ success: true, message: 'Attempt recorded', newBadges })
 }
 
 /**

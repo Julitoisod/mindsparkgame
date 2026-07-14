@@ -23,7 +23,7 @@ export default function HomePage() {
       {/* ── Nav ── */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-purple-400/15">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">⚡</span>
+          <Zap className="h-6 w-6 text-yellow-300 fill-yellow-300" />
           <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
             MindSpark
           </span>
