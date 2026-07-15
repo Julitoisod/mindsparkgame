@@ -1,6 +1,7 @@
 import { NextResponse }  from 'next/server'
 import { query, execute } from '@/lib/db'
 import { getSession }     from '@/lib/auth'
+import { CAPSTONE_BADGE_ID, REQUIRED_FOR_CHAMPION } from '@/lib/badges'
 import type { SavePayload } from '@/types/game'
 
 /**
@@ -189,9 +190,10 @@ export async function POST(request: Request) {
     newBadges.push('boss_slayer')
   }
 
-  // forest_champion + forest_explorer: all 5 levels cleared at least once
+  // forest_explorer: all 5 levels cleared at least once
+  // (forest_champion is the capstone — handled after the other badges are saved)
   if ([1, 2, 3, 4, 5].every(n => completedArray.includes(n))) {
-    newBadges.push('forest_champion', 'forest_explorer')
+    newBadges.push('forest_explorer')
   }
 
   // perfect_score: 10/10 in one run (client-tracked; quiz + boss both flawless)
@@ -209,18 +211,6 @@ export async function POST(request: Request) {
     newBadges.push('star_collector')
   }
 
-  // dedicated_learner: replayed a level 3+ times (each run answers 5 quiz questions)
-  const replayRows = await query<{ level_number: number }>(
-    `SELECT level_number FROM quiz_attempts
-     WHERE user_id = ? AND phase = 'normal'
-     GROUP BY level_number HAVING COUNT(*) >= 15
-     LIMIT 1`,
-    [session.userId],
-  )
-  if (replayRows.length > 0) {
-    newBadges.push('dedicated_learner')
-  }
-
   // Insert new badges (INSERT IGNORE to skip duplicates)
   const awardedBadges: string[] = []
   for (const badgeId of newBadges) {
@@ -231,6 +221,27 @@ export async function POST(request: Request) {
       )
       if (result.affectedRows > 0) {
         awardedBadges.push(badgeId)
+      }
+    } catch {
+      // Skip if duplicate or error
+    }
+  }
+
+  // forest_champion: the capstone — unlocks only once every OTHER badge is
+  // earned. Re-read the full set (includes math_streak, awarded in /api/attempts).
+  const earnedRows = await query<{ badge_id: string }>(
+    'SELECT badge_id FROM student_badges WHERE user_id = ?',
+    [session.userId],
+  )
+  const earnedSet = new Set(earnedRows.map(r => r.badge_id))
+  if (!earnedSet.has(CAPSTONE_BADGE_ID) && REQUIRED_FOR_CHAMPION.every(id => earnedSet.has(id))) {
+    try {
+      const result = await execute(
+        'INSERT IGNORE INTO student_badges (user_id, badge_id) VALUES (?, ?)',
+        [session.userId, CAPSTONE_BADGE_ID],
+      )
+      if (result.affectedRows > 0) {
+        awardedBadges.push(CAPSTONE_BADGE_ID)
       }
     } catch {
       // Skip if duplicate or error

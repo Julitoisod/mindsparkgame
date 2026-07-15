@@ -13,6 +13,8 @@ export interface LevelStory {
   afterBoss: string
   /** The Forest Trophy earned for clearing the level. */
   trophyName: string
+  /** Public path to the trophy artwork. */
+  trophyImage: string
 }
 
 /** Shown once — the first time the student starts Level 1. */
@@ -31,6 +33,7 @@ export const levelStories: readonly LevelStory[] = [
       "The Golem is blocking the entrance to the Enchanted Forest. To challenge the Golem, you must first complete five math questions. Each correct answer strengthens your hero for the battle ahead. Once you're ready, defeat the Golem and earn your first Forest Trophy.",
     afterBoss: 'Congratulations! You defeated the Golem and cleared the forest entrance.',
     trophyName: 'Forest Explorer Trophy',
+    trophyImage: '/rewards/trophies/forest_explorer.png',
   },
   {
     level: 2,
@@ -40,6 +43,7 @@ export const levelStories: readonly LevelStory[] = [
       'The Minotaur is guarding the next path through the forest. Complete the five math questions to prepare your hero for battle. Defeat the Minotaur to continue your journey and earn another Forest Trophy.',
     afterBoss: 'Excellent! The Minotaur has been defeated, and the forest path is safe once again.',
     trophyName: 'Pathfinder Trophy',
+    trophyImage: '/rewards/trophies/pathfinder.png',
   },
   {
     level: 3,
@@ -49,6 +53,7 @@ export const levelStories: readonly LevelStory[] = [
       'A powerful Wraith has covered this part of the forest with darkness. Answer the five math questions to gather the strength needed for the battle. Defeat the Wraith to restore light to the forest.',
     afterBoss: 'Well done! The darkness has disappeared.',
     trophyName: 'Lightkeeper Trophy',
+    trophyImage: '/rewards/trophies/lightkeeper.png',
   },
   {
     level: 4,
@@ -58,6 +63,7 @@ export const levelStories: readonly LevelStory[] = [
       'The Necromancer has spread dark magic across the forest. Complete the five math questions to prepare for the battle. Defeat the Necromancer to protect the forest and earn another Forest Trophy.',
     afterBoss: 'Amazing! The dark magic has been lifted from the forest.',
     trophyName: 'Nature Guardian Trophy',
+    trophyImage: '/rewards/trophies/nature_guardian.png',
   },
   {
     level: 5,
@@ -67,6 +73,7 @@ export const levelStories: readonly LevelStory[] = [
       'The Dark Oracle is the source of the darkness in the Enchanted Forest. Complete the final five math questions to prepare for your greatest challenge. Defeat the Dark Oracle and restore peace to the forest.',
     afterBoss: 'Congratulations, Hero! You defeated the Dark Oracle and restored peace to the Enchanted Forest.',
     trophyName: 'Forest Hero Trophy',
+    trophyImage: '/rewards/trophies/forest_hero.png',
   },
 ] as const
 

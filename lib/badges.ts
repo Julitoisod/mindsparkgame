@@ -1,25 +1,28 @@
-import type { LucideIcon } from 'lucide-react'
-import { BookOpen, Flame, Medal, Star, Swords, Target, TreePine, Trophy } from 'lucide-react'
-
 export type Badge = {
   id: string
   name: string
   description: string
-  icon: LucideIcon
+  /** Public path to the badge artwork. */
+  image: string
 }
 
-// Badge set from the panel-approved revision table (June 2026).
-// Icons are lucide components — the panel asked for no emojis anywhere.
+// Final badge set (panel-approved, July 2026). Custom artwork lives in
+// /public/rewards/badges — the panel asked for no emojis / no placeholder icons.
 export const BADGES: Badge[] = [
-  { id: 'first_victory', name: 'First Victory', description: 'Complete your first level', icon: Star },
-  { id: 'perfect_score', name: 'Perfect Score', description: 'Score 10/10 in any level', icon: Target },
-  { id: 'boss_slayer', name: 'Boss Slayer', description: 'Defeat your first boss', icon: Swords },
-  { id: 'math_streak', name: 'Math Streak', description: 'Answer 5 questions correctly in a row', icon: Flame },
-  { id: 'forest_champion', name: 'Forest Champion', description: 'Complete all 5 levels', icon: Trophy },
-  { id: 'star_collector', name: 'Star Collector', description: 'Collect 100 stars', icon: Medal },
-  { id: 'dedicated_learner', name: 'Dedicated Learner', description: 'Replay any level 3 times', icon: BookOpen },
-  { id: 'forest_explorer', name: 'Forest Explorer', description: 'Complete every level at least once', icon: TreePine },
+  { id: 'first_victory',   name: 'First Victory',   description: 'Complete your first level',              image: '/rewards/badges/first_victory.png' },
+  { id: 'perfect_score',   name: 'Perfect Score',   description: 'Get 10/10 in any level',                 image: '/rewards/badges/perfect_score.png' },
+  { id: 'boss_slayer',     name: 'Boss Slayer',     description: 'Defeat your first boss',                 image: '/rewards/badges/boss_slayer.png' },
+  { id: 'math_streak',     name: 'Math Streak',     description: 'Answer 5 questions correctly in a row',  image: '/rewards/badges/math_streak.png' },
+  { id: 'star_collector',  name: 'Star Collector',  description: 'Earn 100 stars',                         image: '/rewards/badges/star_collector.png' },
+  { id: 'forest_explorer', name: 'Forest Explorer', description: 'Complete all 5 levels',                  image: '/rewards/badges/forest_explorer.png' },
+  { id: 'forest_champion', name: 'Forest Champion', description: 'Earn all other badges in the game',      image: '/rewards/badges/forest_champion.png' },
 ]
+
+/** The capstone badge — awarded only once every other badge is earned. */
+export const CAPSTONE_BADGE_ID = 'forest_champion'
+
+/** Every badge that must be earned before the capstone unlocks. */
+export const REQUIRED_FOR_CHAMPION = BADGES.filter(b => b.id !== CAPSTONE_BADGE_ID).map(b => b.id)
 
 export function getBadgeById(id: string): Badge | undefined {
   return BADGES.find(b => b.id === id)

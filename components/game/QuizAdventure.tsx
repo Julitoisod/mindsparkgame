@@ -1916,21 +1916,15 @@ export default function QuizAdventure({
                           transition={{ repeat: Infinity, duration: 1.2 }}
                           className="flex flex-col items-center gap-0.5"
                         >
-                          {/* Rosette ribbon badge */}
-                          <div className="relative flex items-center justify-center">
-                            {/* Ribbon tails */}
-                            <div className="absolute bottom-[-10px] left-[50%] -translate-x-[9px] w-0 h-0 border-l-[9px] border-r-[0px] border-t-[12px] border-l-transparent border-r-transparent border-t-green-600" />
-                            <div className="absolute bottom-[-10px] left-[50%] translate-x-[0px] w-0 h-0 border-l-[0px] border-r-[9px] border-t-[12px] border-l-transparent border-r-transparent border-t-green-600" />
-                            {/* Rosette outer ring */}
-                            <div className={`relative flex items-center justify-center rounded-full ${isNew ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-green-400 to-green-600'} shadow-md`} style={{ width: 44, height: 44 }}>
-                              {/* Scalloped edge effect */}
-                              <div className={`absolute inset-[3px] rounded-full ${isNew ? 'bg-gradient-to-br from-yellow-300 to-orange-400' : 'bg-gradient-to-br from-green-300 to-green-500'}`} />
-                              {/* Inner circle */}
-                              <div className="relative z-10 flex items-center justify-center rounded-full bg-white shadow-inner" style={{ width: 28, height: 28 }}>
-                                <badge.icon className={`h-4 w-4 ${isNew ? 'text-orange-500' : 'text-green-700'}`} />
-                              </div>
-                            </div>
-                          </div>
+                          {/* Badge artwork */}
+                          <Image
+                            src={badge.image}
+                            alt={badge.name}
+                            width={52}
+                            height={52}
+                            unoptimized
+                            className="h-12 w-12 object-contain drop-shadow-[0_2px_5px_rgba(0,0,0,0.45)]"
+                          />
                           <span className="mt-2 text-[9px] font-bold text-center leading-tight text-white/80 max-w-[48px]">{badge.name}</span>
                           {isNew && <span className="rounded-full bg-yellow-400 px-1.5 text-[7px] font-black text-black">NEW!</span>}
                         </motion.div>
@@ -1942,6 +1936,14 @@ export default function QuizAdventure({
 
               {/* Forest Guardian's "After the Boss" beat + trophy (req #17) */}
               <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/10 px-3 py-2">
+                <Image
+                  src={getLevelStory(level.number).trophyImage}
+                  alt={getLevelStory(level.number).trophyName}
+                  width={140}
+                  height={112}
+                  unoptimized
+                  className="mx-auto mb-1 h-16 w-auto object-contain drop-shadow-[0_3px_8px_rgba(0,0,0,0.45)]"
+                />
                 <p className="flex items-center justify-center gap-1 text-sm font-black text-yellow-200">
                   <Trophy className="h-4 w-4 shrink-0" /> You earned the {getLevelStory(level.number).trophyName}!
                 </p>
@@ -1993,7 +1995,15 @@ export default function QuizAdventure({
             >
               <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
 
-              <Trophy className="mx-auto h-9 w-9 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.7)]" />
+              <Image
+                src={getLevelStory(5).trophyImage}
+                alt={getLevelStory(5).trophyName}
+                width={220}
+                height={176}
+                unoptimized
+                priority
+                className="mx-auto h-24 w-auto object-contain drop-shadow-[0_0_14px_rgba(250,204,21,0.55)]"
+              />
 
               <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
                 You are the Forest Hero!
@@ -2144,7 +2154,7 @@ export default function QuizAdventure({
             className="absolute top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-yellow-400/40 bg-[#2e215b]/95 px-5 py-3 shadow-2xl backdrop-blur-md"
           >
             <div className="flex items-center gap-3">
-              {(() => { const BadgeIcon = BADGES.find(b => b.id === newBadgeNotification)?.icon ?? Trophy; return <BadgeIcon className="h-7 w-7 text-yellow-300" /> })()}
+              {(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b ? <Image src={b.image} alt={b.name} width={44} height={44} unoptimized className="h-11 w-11 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]" /> : <Trophy className="h-7 w-7 text-yellow-300" /> })()}
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-yellow-300">Badge Earned!</p>
                 <p className="text-sm font-black text-white">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.name ?? 'New Badge' })()}</p>
