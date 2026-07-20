@@ -552,6 +552,8 @@ export default function QuizAdventure({
   // Result modals wait for the death animation to finish (panel revision).
   // Starts true so a "game already complete" load still shows its modal.
   const [resultShown, setResultShown] = useState(true)
+  // Level-complete result plays as a sequence of popups: trophy → summary → badges
+  const [resultStep, setResultStep] = useState<'trophy' | 'summary' | 'badges'>('trophy')
   // Teacher-set deadlines per level (panel revision: visible on student side)
   const [deadlines, setDeadlines] = useState<Record<number, string>>({})
   // Music + voice mute toggle, persisted per device
@@ -895,6 +897,7 @@ export default function QuizAdventure({
 
     // Let the boss death animation play on screen BEFORE the result popup
     // (panel revision: the enemy must clearly be seen dying first).
+    setResultStep('trophy') // result sequence always opens on the trophy popup
     setResultShown(false)
     window.setTimeout(() => setResultShown(true), BOSS_DEFEAT_ANIM_MS)
 
@@ -1601,10 +1604,10 @@ export default function QuizAdventure({
 
         <main className="relative flex min-h-0 flex-1 flex-col pt-0.5 sm:pt-1">
           {/* Characters at bottom of screen - expand when answering */}
-          <div className={`pointer-events-none absolute bottom-0 left-0 right-0 z-[8] flex items-end justify-between px-2 sm:px-8 transition-all duration-300 ${isResolving ? 'h-[30%]' : 'h-[30%]'}`}>
+          <div className={`pointer-events-none absolute bottom-0 left-0 right-0 z-[8] flex items-end justify-between px-1 sm:px-2 transition-all duration-300 ${isResolving ? 'h-[30%]' : 'h-[30%]'}`}>
             {/* Hero - left side */}
             {/* Height tracks the viewport so sprites stay proportional on short landscape phones */}
-            <div className="relative h-[clamp(100px,26vh,220px)] w-[34%] sm:w-[30%]" style={{ transform: 'translate(-6%, 0)' }}>
+            <div className="relative h-[clamp(100px,26vh,220px)] w-[26%] sm:w-[24%]" style={{ transform: 'translate(-10%, 0)' }}>
               <motion.div
                 key={`hero-${level.id}`}
                 className="relative h-full w-full drop-shadow-[0_10px_15px_rgba(0,0,0,0.45)]"
@@ -1640,8 +1643,8 @@ export default function QuizAdventure({
             {/* Boss - right side */}
             {shouldShowBoss && (
               <div
-                className="relative h-[clamp(100px,26vh,220px)] w-[34%] sm:w-[30%]"
-                style={{ transform: 'translate(6%, 0)' }}
+                className="relative h-[clamp(100px,26vh,220px)] w-[26%] sm:w-[24%]"
+                style={{ transform: 'translate(10%, 0)' }}
               >
                 <motion.div
                   key={`boss-${level.id}`}
@@ -1761,8 +1764,10 @@ export default function QuizAdventure({
             )}
           </AnimatePresence>
 
-          {/* Question + Answers - overlaid on top, hidden during feedback so characters are visible */}
-          <div className={`relative z-[20] mx-auto flex w-[62%] max-w-[780px] min-w-[270px] translate-y-11 flex-col items-center px-2 transition-all duration-300 sm:translate-y-9 sm:px-3 ${isResolving ? 'pointer-events-none scale-95 opacity-0' : 'scale-[1.1] opacity-100'}`}>
+          {/* Question + Answers — centre lane only, so the hero (left) and boss (right)
+              are never covered. Width is tuned to leave a gutter either side of the
+              sprite lanes above; keep them in sync if either changes. */}
+          <div className={`relative z-[20] mx-auto flex w-[47%] max-w-[640px] min-w-[240px] translate-y-2 flex-col items-center px-2 transition-all duration-300 sm:translate-y-1 sm:px-3 ${isResolving ? 'pointer-events-none scale-95 opacity-0' : 'scale-100 opacity-100'}`}>
             <AnimatePresence mode="wait">
               {(phase === 'normal' || phase === 'boss') && (
                 <motion.div
@@ -1860,120 +1865,176 @@ export default function QuizAdventure({
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
           >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-              className="relative m-auto w-[90vw] max-w-[340px] [@media(max-height:480px)]:max-w-[560px] rounded-xl border border-purple-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(168,85,247,0.35)]"
-            >
-              <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
-
-              <div className="flex justify-center gap-0.5 mb-1">
-                {[1, 2, 3].map(s => (
-                  <Star key={s} className={`h-6 w-6 ${s <= (hearts >= 5 ? 3 : hearts >= 3 ? 2 : 1) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'}`} />
-                ))}
-              </div>
-
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-sm font-bold text-emerald-300"><CheckCircle2 className="h-4 w-4" /> Passed</span>
-
-              <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
-                Level {level.number} Result
-              </h2>
-
-              <div className="mt-2 grid grid-cols-2 [@media(max-height:480px)]:grid-cols-4 gap-1.5 text-left">
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
-                  <p className="text-lg font-black text-white">{QUESTIONS_PER_PHASE}/{QUESTIONS_PER_PHASE}</p>
-                </div>
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Stars</p>
-                  <p className="text-lg font-black text-yellow-300">{stars}</p>
-                </div>
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Points</p>
-                  <p className="text-lg font-black text-white">{score}</p>
-                </div>
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Hearts</p>
-                  <p className="text-lg font-black text-cyan-300">{hearts}/{MAX_HEARTS}</p>
-                </div>
-              </div>
-
-              {/* Badges Section */}
-              <div className="mt-2 rounded-md border border-yellow-400/20 bg-yellow-400/5 px-2.5 py-2">
-                <p className="mb-2 text-[10px] uppercase font-bold text-yellow-300/70 leading-none">Badges</p>
-                {earnedBadges.length === 0 ? (
-                  <p className="text-[11px] text-white/40 italic">No badges yet — keep playing!</p>
-                ) : (
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {BADGES.filter(b => earnedBadges.includes(b.id)).map(badge => {
-                      const isNew = badge.id === newBadgeNotification
-                      return (
-                        <motion.div
-                          key={badge.id}
-                          animate={isNew ? { scale: [1, 1.15, 1] } : {}}
-                          transition={{ repeat: Infinity, duration: 1.2 }}
-                          className="flex flex-col items-center gap-0.5"
-                        >
-                          {/* Badge artwork */}
-                          <Image
-                            src={badge.image}
-                            alt={badge.name}
-                            width={52}
-                            height={52}
-                            unoptimized
-                            className="h-12 w-12 object-contain drop-shadow-[0_2px_5px_rgba(0,0,0,0.45)]"
-                          />
-                          <span className="mt-2 text-[9px] font-bold text-center leading-tight text-white/80 max-w-[48px]">{badge.name}</span>
-                          {isNew && <span className="rounded-full bg-yellow-400 px-1.5 text-[7px] font-black text-black">NEW!</span>}
-                        </motion.div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Forest Guardian's "After the Boss" beat + trophy (req #17) */}
-              <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/10 px-3 py-2">
-                <Image
-                  src={getLevelStory(level.number).trophyImage}
-                  alt={getLevelStory(level.number).trophyName}
-                  width={140}
-                  height={112}
-                  unoptimized
-                  className="mx-auto mb-1 h-16 w-auto object-contain drop-shadow-[0_3px_8px_rgba(0,0,0,0.45)]"
-                />
-                <p className="flex items-center justify-center gap-1 text-sm font-black text-yellow-200">
-                  <Trophy className="h-4 w-4 shrink-0" /> You earned the {getLevelStory(level.number).trophyName}!
-                </p>
-                <p className="text-[11px] text-purple-100/80">&ldquo;{getLevelStory(level.number).afterBoss}&rdquo; — Forest Guardian</p>
-              </div>
-
-              {/* Passing Level 1 opens every remaining level (panel revision) */}
-              {level.number === 1 && (
+            <AnimatePresence mode="wait">
+              {/* Step 1 — the trophy pops up first */}
+              {resultStep === 'trophy' && (
                 <motion.div
-                  animate={{ scale: [1, 1.04, 1] }}
-                  transition={{ repeat: Infinity, duration: 1.4 }}
-                  className="mt-2 rounded-md border border-emerald-400/50 bg-emerald-500/15 px-3 py-2"
+                  key="rc-trophy"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.85, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+                  className="relative m-auto w-[90vw] max-w-[340px] rounded-xl border border-yellow-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-5 py-5 text-center shadow-[0_0_28px_rgba(250,204,21,0.4)]"
                 >
-                  <p className="text-sm font-black text-emerald-300">Levels 2, 3, 4 &amp; 5 are now OPEN!</p>
-                  <p className="text-[11px] text-emerald-100/80">Go to the map and pick your next adventure.</p>
+                  <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
+
+                  <motion.div
+                    initial={{ scale: 0, rotate: -18 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 13, delay: 0.1 }}
+                  >
+                    <Image
+                      src={getLevelStory(level.number).trophyImage}
+                      alt={getLevelStory(level.number).trophyName}
+                      width={220}
+                      height={176}
+                      unoptimized
+                      priority
+                      className="mx-auto h-32 w-auto object-contain drop-shadow-[0_0_16px_rgba(250,204,21,0.55)]"
+                    />
+                  </motion.div>
+
+                  <h2 className="mt-2 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300">
+                    Level {level.number} Complete!
+                  </h2>
+                  <p className="mt-1 flex items-center justify-center gap-1 text-sm font-black text-yellow-200">
+                    <Trophy className="h-4 w-4 shrink-0" /> You earned the {getLevelStory(level.number).trophyName}!
+                  </p>
+                  <p className="mt-1 text-[11px] text-purple-100/80">&ldquo;{getLevelStory(level.number).afterBoss}&rdquo; — Forest Guardian</p>
+
+                  <button
+                    type="button"
+                    onClick={() => { playClickSound(); setResultStep('summary') }}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-yellow-500 to-amber-500 px-5 py-2 text-sm font-black text-white shadow-md shadow-yellow-500/30 hover:from-yellow-400 hover:to-amber-400"
+                  >
+                    <Sparkles className="h-4 w-4" /> Continue
+                  </button>
                 </motion.div>
               )}
 
-              <div className="mt-3 flex gap-2 justify-center">
-                <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
-                  <RotateCcw className="h-4 w-4" /> Retry
-                </button>
-                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
-                  <MapIcon className="h-4 w-4" /> Map
-                </button>
-                <button type="button" onClick={continueToNextLevel} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400">
-                  <Flame className="h-4 w-4" /> Next
-                </button>
-              </div>
-            </motion.div>
+              {/* Step 2 — the level summary */}
+              {resultStep === 'summary' && (
+                <motion.div
+                  key="rc-summary"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.85, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+                  className="relative m-auto w-[90vw] max-w-[340px] [@media(max-height:480px)]:max-w-[560px] rounded-xl border border-purple-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(168,85,247,0.35)]"
+                >
+                  <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
+
+                  <div className="flex justify-center gap-0.5 mb-1">
+                    {[1, 2, 3].map(s => (
+                      <Star key={s} className={`h-6 w-6 ${s <= (hearts >= 5 ? 3 : hearts >= 3 ? 2 : 1) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'}`} />
+                    ))}
+                  </div>
+
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-sm font-bold text-emerald-300"><CheckCircle2 className="h-4 w-4" /> Passed</span>
+
+                  <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
+                    Level {level.number} Result
+                  </h2>
+
+                  <div className="mt-2 grid grid-cols-2 [@media(max-height:480px)]:grid-cols-4 gap-1.5 text-left">
+                    <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                      <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
+                      <p className="text-lg font-black text-white">{QUESTIONS_PER_PHASE}/{QUESTIONS_PER_PHASE}</p>
+                    </div>
+                    <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                      <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Stars</p>
+                      <p className="text-lg font-black text-yellow-300">{stars}</p>
+                    </div>
+                    <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                      <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Points</p>
+                      <p className="text-lg font-black text-white">{score}</p>
+                    </div>
+                    <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
+                      <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Hearts</p>
+                      <p className="text-lg font-black text-cyan-300">{hearts}/{MAX_HEARTS}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { playClickSound(); setResultStep('badges') }}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 px-5 py-2 text-sm font-black text-white shadow-md shadow-purple-500/30 hover:from-purple-400 hover:to-fuchsia-400"
+                  >
+                    <Sparkles className="h-4 w-4" /> Continue
+                  </button>
+                </motion.div>
+              )}
+
+              {/* Step 3 — the badges pop up */}
+              {resultStep === 'badges' && (
+                <motion.div
+                  key="rc-badges"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.85, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+                  className="relative m-auto w-[90vw] max-w-[340px] [@media(max-height:480px)]:max-w-[560px] rounded-xl border border-yellow-400/40 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(250,204,21,0.3)]"
+                >
+                  <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
+
+                  <p className="mb-2 text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300">Badges</p>
+                  {earnedBadges.length === 0 ? (
+                    <p className="text-[11px] text-white/40 italic">No badges yet — keep playing!</p>
+                  ) : (
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {BADGES.filter(b => earnedBadges.includes(b.id)).map((badge, i) => {
+                        const isNew = badge.id === newBadgeNotification
+                        return (
+                          <motion.div
+                            key={badge.id}
+                            initial={{ scale: 0, y: 8 }}
+                            animate={isNew ? { scale: [1, 1.15, 1], y: 0 } : { scale: 1, y: 0 }}
+                            transition={isNew ? { repeat: Infinity, duration: 1.2 } : { type: 'spring', stiffness: 300, damping: 16, delay: i * 0.08 }}
+                            className="flex flex-col items-center gap-0.5"
+                          >
+                            {/* Badge artwork */}
+                            <Image
+                              src={badge.image}
+                              alt={badge.name}
+                              width={52}
+                              height={52}
+                              unoptimized
+                              className="h-12 w-12 object-contain drop-shadow-[0_2px_5px_rgba(0,0,0,0.45)]"
+                            />
+                            <span className="mt-2 text-[9px] font-bold text-center leading-tight text-white/80 max-w-[48px]">{badge.name}</span>
+                            {isNew && <span className="rounded-full bg-yellow-400 px-1.5 text-[7px] font-black text-black">NEW!</span>}
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Passing Level 1 opens every remaining level (panel revision) */}
+                  {level.number === 1 && (
+                    <motion.div
+                      animate={{ scale: [1, 1.04, 1] }}
+                      transition={{ repeat: Infinity, duration: 1.4 }}
+                      className="mt-3 rounded-md border border-emerald-400/50 bg-emerald-500/15 px-3 py-2"
+                    >
+                      <p className="text-sm font-black text-emerald-300">Levels 2, 3, 4 &amp; 5 are now OPEN!</p>
+                      <p className="text-[11px] text-emerald-100/80">Go to the map and pick your next adventure.</p>
+                    </motion.div>
+                  )}
+
+                  <div className="mt-3 flex gap-2 justify-center">
+                    <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+                      <RotateCcw className="h-4 w-4" /> Retry
+                    </button>
+                    <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+                      <MapIcon className="h-4 w-4" /> Map
+                    </button>
+                    <button type="button" onClick={continueToNextLevel} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400">
+                      <Flame className="h-4 w-4" /> Next
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 

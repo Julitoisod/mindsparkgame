@@ -1,4 +1,4 @@
-<system>
+    <system>
 
 # System Prompt - Spec Workflow
 
