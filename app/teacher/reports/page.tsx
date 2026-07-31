@@ -237,6 +237,52 @@ export default function TeacherReportsPage() {
         )}
       </div>
 
+      {/* Scores Per Level — matrix (panel req: each student's scores per level) */}
+      <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5">
+        <h3 className="font-bold text-white mb-1">Scores Per Level</h3>
+        <p className="text-xs text-purple-400 mb-4">Each student&apos;s quiz accuracy and points for every level — a basis for awarding additional points</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-purple-400/20 text-left text-xs font-bold uppercase text-purple-400">
+                <th className="pb-3 pr-4">Student</th>
+                <th className="pb-3 pr-4">Section</th>
+                {[1, 2, 3, 4, 5].map(lvl => <th key={lvl} className="pb-3 pr-4 text-center">Level {lvl}</th>)}
+                <th className="pb-3 pr-4 text-center">Total Points</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-purple-400/10">
+              {students.map(student => {
+                const byLevel = new Map((student.quizScores ?? []).map(qs => [qs.levelNumber, qs]))
+                const totalPoints = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.totalScore, 0)
+                return (
+                  <tr key={student.id} className="text-purple-100">
+                    <td className="py-3 pr-4 font-bold text-white">{student.username}</td>
+                    <td className="py-3 pr-4 text-purple-200">{student.classroomName ?? '—'}</td>
+                    {[1, 2, 3, 4, 5].map(lvl => {
+                      const qs = byLevel.get(lvl)
+                      if (!qs || qs.totalAttempts === 0) {
+                        return <td key={lvl} className="py-3 pr-4 text-center text-purple-500">—</td>
+                      }
+                      const acc = Math.round((qs.correctAttempts / qs.totalAttempts) * 100)
+                      const accColor = acc >= 70 ? 'text-emerald-400' : acc >= 40 ? 'text-yellow-400' : 'text-red-400'
+                      return (
+                        <td key={lvl} className="py-3 pr-4 text-center">
+                          <span className={`font-bold ${accColor}`}>{qs.correctAttempts}/{qs.totalAttempts}</span>
+                          <span className="block text-[10px] text-purple-400">{acc}% · {qs.totalScore}pt</span>
+                        </td>
+                      )
+                    })}
+                    <td className="py-3 pr-4 text-center font-black text-yellow-300">{totalPoints > 0 ? totalPoints : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        {students.length === 0 && <p className="text-center text-purple-400 py-8">No students enrolled yet</p>}
+      </div>
+
       {/* Quiz Attempts & Scores Detail — per session */}
       <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5">
         <h3 className="font-bold text-white mb-1">Quiz Attempts & Scores</h3>

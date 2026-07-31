@@ -80,11 +80,11 @@ export default function DashboardLayout({
         <button
           type="button"
           onClick={logout}
-          aria-label="Sign out"
+          aria-label="Log out"
           className="flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl border border-pink-300/30 bg-[#1a1233]/80 shadow-lg backdrop-blur-sm transition hover:bg-pink-500/30"
         >
           <LogOut className="h-5 w-5 text-pink-200" />
-          <span className="text-[8px] font-black uppercase leading-none tracking-wide text-pink-200">Exit</span>
+          <span className="text-[8px] font-black uppercase leading-none tracking-wide text-pink-200">Logout</span>
         </button>
       </nav>
 

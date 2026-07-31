@@ -16,11 +16,14 @@ async function requireTeacher() {
 
 /**
  * POST /api/teacher/students/bulk
- * Body: { classroomId: number, students: { fullName?, username }[] }
- * Bulk enroll students from CSV upload (Full Name + Username).
- * Password is auto-generated as: username + "123".
+ * Body: { classroomId, students: { lastName, firstName, middleName?, username, password? }[] }
+ * Bulk enroll students from the Registrar's official class-list CSV.
+ * `full_name` is composed ("First Middle Last") so existing readers keep working.
+ * Password uses the CSV value when given; otherwise falls back to username + "123".
  * No parent email is collected or notified.
  */
+const composeFullName = (first: string, middle: string, last: string) =>
+  [first, middle, last].map(p => p.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ') || null
 export async function POST(request: Request) {
   try {
     const teacher = await requireTeacher()
@@ -62,7 +65,12 @@ export async function POST(request: Request) {
     for (let i = 0; i < students.length; i++) {
       const raw = students[i] as Record<string, unknown>
       const username = String(raw.username ?? '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
-      const fullName = String(raw.fullName ?? raw.full_name ?? raw.name ?? '').trim().replace(/\s+/g, ' ') || null
+      const lastName = String(raw.lastName ?? raw.last_name ?? '').trim().replace(/\s+/g, ' ')
+      const firstName = String(raw.firstName ?? raw.first_name ?? '').trim().replace(/\s+/g, ' ')
+      const middleName = String(raw.middleName ?? raw.middle_name ?? '').trim().replace(/\s+/g, ' ')
+      // Back-compat: accept a single Full Name column and use it as the display name only.
+      const legacyFullName = String(raw.fullName ?? raw.full_name ?? raw.name ?? '').trim().replace(/\s+/g, ' ')
+      const fullName = composeFullName(firstName, middleName, lastName) ?? (legacyFullName || null)
 
       // Validate username
       if (!username || username.length < 2) {
@@ -82,17 +90,18 @@ export async function POST(request: Request) {
         continue
       }
 
-      // Auto-generate password: username + "123"
-      const password = `${username}123`
-      // Generate a placeholder email to satisfy the NOT NULL / UNIQUE constraint
+      // Password from the Registrar file when provided (>= 4 chars); otherwise auto-generate.
+      const csvPassword = String(raw.password ?? '').trim()
+      const password = csvPassword.length >= 4 ? csvPassword : `${username}123`
+      // Placeholder email to satisfy the NOT NULL / UNIQUE constraint (no email is sent).
       const email = `${username}@student.mindspark`
 
       const passwordHash = await hashPassword(password)
       await execute(
         `INSERT INTO users
-           (username, full_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-         VALUES (?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-        [username, fullName, email, passwordHash, teacher.id, classroomId],
+           (username, full_name, last_name, first_name, middle_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
+        [username, fullName, lastName || null, firstName || null, middleName || null, email, passwordHash, teacher.id, classroomId],
       )
 
       results.push({ row: i + 1, name: fullName || username, status: 'enrolled' })

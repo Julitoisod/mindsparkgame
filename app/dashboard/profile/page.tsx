@@ -224,17 +224,17 @@ export default function DashboardProfilePage() {
           </div>
         </div>
 
-        {/* Badges — compact horizontal scroll */}
+        {/* Badges — centered, no per-badge card, wraps instead of scrolling */}
         <div className="rounded-lg border border-[#c084fc]/15 bg-[#1a0f3a]/60 p-3">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-bold text-white/80">Badges</p>
             <span className="text-[10px] font-bold text-[#c084fc]">{BADGES.filter(b => earnedBadges.includes(b.id)).length}/{BADGES.length}</span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex flex-wrap justify-center gap-3">
             {BADGES.map(b => {
               const earned = earnedBadges.includes(b.id)
               return (
-                <div key={b.id} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-[#c084fc]/30 bg-[#241a47]' : 'border-[#c084fc]/10 bg-[#241a47]/50 opacity-50 grayscale'}`}>
+                <div key={b.id} className={`w-16 text-center ${earned ? '' : 'opacity-50 grayscale'}`}>
                   <Image src={b.image} alt={b.name} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
                   <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#f3e8ff]' : 'text-[#f3e8ff]/50'}`}>{b.name}</p>
                 </div>

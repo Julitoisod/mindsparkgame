@@ -8,7 +8,6 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
-  Copy,
   Download,
   FileQuestion,
   FileSpreadsheet,
@@ -19,7 +18,6 @@ import {
   Star,
   TrendingUp,
   Upload,
-  UserPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -37,12 +35,8 @@ export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [classroomName, setClassroomName] = useState('')
   const [creatingClassroom, setCreatingClassroom] = useState(false)
-  const [enrollForm, setEnrollForm] = useState({ fullName: '', username: '', password: '' })
-  const [selectedClassroomId, setSelectedClassroomId] = useState<number | null>(null)
-  const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [enrolledCredentials, setEnrolledCredentials] = useState<{ fullName: string; username: string; password: string } | null>(null)
 
   // CSV bulk upload state
   const [csvClassroomId, setCsvClassroomId] = useState<number | null>(null)
@@ -62,16 +56,15 @@ export default function TeacherDashboardPage() {
       const studJson = await studRes.json()
       if (classJson.success) setClassrooms(classJson.data)
       if (studJson.success) setStudents(studJson.data)
-      if (classJson.data?.length && !selectedClassroomId) {
-        setSelectedClassroomId(classJson.data[0].id)
-        setCsvClassroomId(classJson.data[0].id)
+      if (classJson.data?.length) {
+        setCsvClassroomId(prev => prev ?? classJson.data[0].id)
       }
     } catch {
       setError('Failed to load data')
     } finally {
       setLoading(false)
     }
-  }, [selectedClassroomId])
+  }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -90,7 +83,6 @@ export default function TeacherDashboardPage() {
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
       setClassrooms(prev => [json.data, ...prev])
-      setSelectedClassroomId(json.data.id)
       setCsvClassroomId(json.data.id)
       setClassroomName('')
       setSuccess('Section created!')
@@ -99,36 +91,6 @@ export default function TeacherDashboardPage() {
       setError(err instanceof Error ? err.message : 'Failed to create section')
     } finally {
       setCreatingClassroom(false)
-    }
-  }
-
-  async function enrollStudent(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedClassroomId) { setError('Select a section first'); return }
-    setEnrolling(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/teacher/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ ...enrollForm, classroomId: selectedClassroomId }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.message)
-      setStudents(prev => [json.data, ...prev])
-      setEnrolledCredentials({
-        fullName: enrollForm.fullName,
-        username: enrollForm.username,
-        password: enrollForm.password,
-      })
-      setEnrollForm({ fullName: '', username: '', password: '' })
-      setSuccess('Student enrolled successfully! Credentials shown below.')
-      setTimeout(() => setSuccess(null), 6000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to enroll student')
-    } finally {
-      setEnrolling(false)
     }
   }
 
@@ -186,12 +148,14 @@ export default function TeacherDashboardPage() {
         return
       }
 
-      // Map CSV columns — full name + username
-      const students = rows.map(row => {
-        const fullName = row.full_name ?? row.fullname ?? row.name ?? row.student_name ?? ''
-        const username = row.username ?? row.user_name ?? ''
-        return { fullName, username }
-      })
+      // Map the Registrar's official columns: Last Name, First Name, Middle Name, Username, Password.
+      const students = rows.map(row => ({
+        lastName: row.last_name ?? row.lastname ?? row.surname ?? '',
+        firstName: row.first_name ?? row.firstname ?? row.given_name ?? '',
+        middleName: row.middle_name ?? row.middlename ?? row.middle_initial ?? '',
+        username: row.username ?? row.user_name ?? '',
+        password: row.password ?? row.pass ?? '',
+      }))
 
       const res = await fetch('/api/teacher/students/bulk', {
         method: 'POST',
@@ -215,7 +179,7 @@ export default function TeacherDashboardPage() {
   }
 
   function downloadTemplate() {
-    const csv = 'Full Name,Username\nJohn Mark Santos,johnmark\nMaria Santos,mariasantos'
+    const csv = 'Last Name,First Name,Middle Name,Username,Password\nSantos,John Mark,Cruz,johnmark,johnmark123\nReyes,Maria,Dela,mariareyes,maria2026'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -249,7 +213,7 @@ export default function TeacherDashboardPage() {
           <div className="space-y-1.5">
             {[
               'Create and manage sections',
-              'Add students one-by-one or via CSV',
+              'Enroll students from the Registrar CSV class list',
               'Track and manage student accounts',
               'Generate reports and insights',
               'Unlock levels for students',
@@ -285,63 +249,8 @@ export default function TeacherDashboardPage() {
         </motion.div>
       )}
 
-      {/* New Student Credentials Card */}
-      <AnimatePresence>
-        {enrolledCredentials && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="rounded-xl border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-white p-5 shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-purple-600" />
-                <h3 className="text-sm font-black text-purple-800">New Student Credentials</h3>
-              </div>
-              <button
-                onClick={() => setEnrolledCredentials(null)}
-                className="rounded-lg p-1 text-gray-400 hover:bg-purple-100 hover:text-purple-600 transition"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {enrolledCredentials.fullName && (
-                <div className="rounded-lg bg-white border border-purple-200 p-3">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase">Full Name</p>
-                  <p className="text-sm font-black text-purple-700">{enrolledCredentials.fullName}</p>
-                </div>
-              )}
-              <div className="rounded-lg bg-white border border-purple-200 p-3">
-                <p className="text-[10px] font-bold text-gray-500 uppercase">Username</p>
-                <p className="text-sm font-black text-purple-700">{enrolledCredentials.username}</p>
-              </div>
-              <div className="rounded-lg bg-white border border-purple-200 p-3 relative">
-                <p className="text-[10px] font-bold text-gray-500 uppercase">Password</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-black text-purple-700">{enrolledCredentials.password}</p>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(enrolledCredentials.password)
-                        .then(() => alert('Password copied to clipboard!'))
-                        .catch(() => alert('Failed to copy'))
-                    }}
-                    className="rounded-md p-1 text-purple-400 hover:bg-purple-100 hover:text-purple-600 transition"
-                    title="Copy password"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <p className="mt-2 text-[10px] text-gray-500">Share these credentials with the student. This card will disappear when you close it.</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Quick Actions — 3 columns */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Quick Actions — Create Section + Registrar CSV enrolment */}
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Create Section */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -385,58 +294,6 @@ export default function TeacherDashboardPage() {
           )}
         </motion.div>
 
-        {/* Enroll Student (single) */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dcfce7] text-[#16A34A]">
-              <UserPlus className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="font-bold text-[#111827]">Enroll Student</h3>
-              <p className="text-[10px] text-[#6B7280]">Add one student manually</p>
-            </div>
-          </div>
-          <form onSubmit={enrollStudent} className="space-y-3">
-            <select
-              value={selectedClassroomId ?? ''}
-              onChange={e => setSelectedClassroomId(Number(e.target.value) || null)}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            >
-              <option value="" className="text-gray-500">Select section...</option>
-              {classrooms.map(c => <option key={c.id} value={c.id} className="text-gray-900">{c.name}</option>)}
-            </select>
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={enrollForm.fullName}
-              onChange={e => setEnrollForm(f => ({ ...f, fullName: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
-            <input
-              type="text"
-              placeholder="Username"
-              value={enrollForm.username}
-              onChange={e => setEnrollForm(f => ({ ...f, username: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
-            <input
-              type="text"
-              placeholder="Assigned Password"
-              value={enrollForm.password}
-              onChange={e => setEnrollForm(f => ({ ...f, password: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
-            <Button type="submit" loading={enrolling} icon={<UserPlus className="h-4 w-4" />} className="w-full">
-              Enroll Student
-            </Button>
-          </form>
-        </motion.div>
-
         {/* CSV Bulk Upload */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -449,8 +306,8 @@ export default function TeacherDashboardPage() {
               <FileSpreadsheet className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="font-bold text-[#111827]">CSV Bulk Enroll</h3>
-              <p className="text-[10px] text-[#6B7280]">Upload multiple students at once</p>
+              <h3 className="font-bold text-[#111827]">Enroll from Registrar CSV</h3>
+              <p className="text-[10px] text-[#6B7280]">Upload the official class list</p>
             </div>
           </div>
 
@@ -468,8 +325,8 @@ export default function TeacherDashboardPage() {
             {/* CSV format info */}
             <div className="space-y-1 rounded-lg border border-purple-400/15 bg-purple-900/30 p-3 text-xs text-[#4B5563]">
               <p className="font-bold text-[#374151]">Required CSV columns:</p>
-              <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Full Name, Username</p>
-              <p className="text-[10px] text-[#6B7280]">Password is auto-generated as username + &quot;123&quot;. Max 100 students per file.</p>
+              <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Last Name, First Name, Middle Name, Username, Password</p>
+              <p className="text-[10px] text-[#6B7280]">Use the Registrar&apos;s official class list. If Password is blank, it defaults to username + &quot;123&quot;. Max 100 students per file.</p>
             </div>
 
             {/* Download template */}
