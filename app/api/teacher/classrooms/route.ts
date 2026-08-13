@@ -6,9 +6,23 @@ import type { User } from '@/types/user'
 interface ClassroomRow {
   id: number
   name: string
+  schoolYear: string | null
   studentCount: number
   createdAt: string
   updatedAt: string
+}
+
+/** School year as printed on the section card, e.g. "2026-2027". */
+const SCHOOL_YEAR_PATTERN = /^\d{4}\s*[-–]\s*\d{4}$/
+
+/** Normalises "2026 – 2027" / "2026-2027" to the stored "2026-2027" form. */
+function normalizeSchoolYear(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!SCHOOL_YEAR_PATTERN.test(trimmed)) return null
+  const [start, end] = trimmed.split(/\s*[-–]\s*/).map(Number)
+  if (end !== start + 1) return null
+  return `${start}-${end}`
 }
 
 async function requireTeacher() {
@@ -28,6 +42,7 @@ function publicClassroom(row: ClassroomRow) {
   return {
     id: row.id,
     name: row.name,
+    schoolYear: row.schoolYear,
     studentCount: Number(row.studentCount ?? 0),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -44,6 +59,7 @@ async function getClassroom(classroomId: number, teacherId: number) {
     `SELECT
        c.id,
        c.name,
+       c.school_year AS schoolYear,
        COUNT(u.id) AS studentCount,
        c.created_at AS createdAt,
        c.updated_at AS updatedAt
@@ -53,7 +69,7 @@ async function getClassroom(classroomId: number, teacherId: number) {
       AND u.role = 'student'
       AND u.enrolled_by = c.teacher_id
      WHERE c.id = ? AND c.teacher_id = ?
-     GROUP BY c.id, c.name, c.created_at, c.updated_at
+     GROUP BY c.id, c.name, c.school_year, c.created_at, c.updated_at
      LIMIT 1`,
     [classroomId, teacherId],
   )
@@ -70,6 +86,7 @@ export async function GET() {
       `SELECT
          c.id,
          c.name,
+         c.school_year AS schoolYear,
          COUNT(u.id) AS studentCount,
          c.created_at AS createdAt,
          c.updated_at AS updatedAt
@@ -79,7 +96,7 @@ export async function GET() {
         AND u.role = 'student'
         AND u.enrolled_by = c.teacher_id
        WHERE c.teacher_id = ?
-       GROUP BY c.id, c.name, c.created_at, c.updated_at
+       GROUP BY c.id, c.name, c.school_year, c.created_at, c.updated_at
        ORDER BY c.created_at DESC`,
       [teacher.id],
     )
@@ -110,17 +127,25 @@ export async function POST(request: Request) {
       )
     }
 
+    const schoolYear = normalizeSchoolYear(body.schoolYear)
+    if (!schoolYear) {
+      return NextResponse.json(
+        { success: false, message: 'School year must look like 2026-2027 (consecutive years).', data: { schoolYear: 'School year must look like 2026-2027.' } },
+        { status: 422 },
+      )
+    }
+
     const existing = await query<Pick<ClassroomRow, 'id'>>(
-      'SELECT id FROM classrooms WHERE teacher_id = ? AND name = ? LIMIT 1',
-      [teacher.id, name],
+      'SELECT id FROM classrooms WHERE teacher_id = ? AND name = ? AND school_year = ? LIMIT 1',
+      [teacher.id, name, schoolYear],
     )
     if (existing.length > 0) {
-      return NextResponse.json({ success: false, message: 'Section already exists' }, { status: 409 })
+      return NextResponse.json({ success: false, message: 'That section already exists for this school year' }, { status: 409 })
     }
 
     const result = await execute(
-      'INSERT INTO classrooms (teacher_id, name) VALUES (?, ?)',
-      [teacher.id, name],
+      'INSERT INTO classrooms (teacher_id, name, school_year) VALUES (?, ?, ?)',
+      [teacher.id, name, schoolYear],
     )
 
     const classroom = await getClassroom(result.insertId, teacher.id)
@@ -155,19 +180,38 @@ export async function PATCH(request: Request) {
       )
     }
 
-    // Check for duplicate name (excluding current classroom)
-    const duplicate = await query<Pick<ClassroomRow, 'id'>>(
-      'SELECT id FROM classrooms WHERE teacher_id = ? AND name = ? AND id != ? LIMIT 1',
-      [teacher.id, name, classroomId],
-    )
+    // School year is optional on rename — omit it to keep the stored value.
+    const schoolYear = body.schoolYear === undefined ? undefined : normalizeSchoolYear(body.schoolYear)
+    if (body.schoolYear !== undefined && !schoolYear) {
+      return NextResponse.json(
+        { success: false, message: 'School year must look like 2026-2027 (consecutive years).', data: { schoolYear: 'School year must look like 2026-2027.' } },
+        { status: 422 },
+      )
+    }
+
+    // Check for duplicate name in the same school year (excluding current classroom)
+    const duplicate = schoolYear
+      ? await query<Pick<ClassroomRow, 'id'>>(
+          'SELECT id FROM classrooms WHERE teacher_id = ? AND name = ? AND school_year = ? AND id != ? LIMIT 1',
+          [teacher.id, name, schoolYear, classroomId],
+        )
+      : await query<Pick<ClassroomRow, 'id'>>(
+          'SELECT id FROM classrooms WHERE teacher_id = ? AND name = ? AND id != ? LIMIT 1',
+          [teacher.id, name, classroomId],
+        )
     if (duplicate.length > 0) {
       return NextResponse.json({ success: false, message: 'A section with that name already exists' }, { status: 409 })
     }
 
-    const result = await execute(
-      'UPDATE classrooms SET name = ?, updated_at = NOW() WHERE id = ? AND teacher_id = ?',
-      [name, classroomId, teacher.id],
-    )
+    const result = schoolYear
+      ? await execute(
+          'UPDATE classrooms SET name = ?, school_year = ?, updated_at = NOW() WHERE id = ? AND teacher_id = ?',
+          [name, schoolYear, classroomId, teacher.id],
+        )
+      : await execute(
+          'UPDATE classrooms SET name = ?, updated_at = NOW() WHERE id = ? AND teacher_id = ?',
+          [name, classroomId, teacher.id],
+        )
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: 'Section not found' }, { status: 404 })

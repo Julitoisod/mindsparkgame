@@ -59,3 +59,20 @@ export async function execute(
   const [result] = await pool.execute(sql, params)
   return result as mysql.ResultSetHeader
 }
+
+/**
+ * Turns a driver error into something the teacher can act on.
+ *
+ * A missing column or table means a file in database/migrations/ was never
+ * applied to THIS database — the most common deploy failure in this project,
+ * and the one that used to surface as a bare "Bulk enrollment failed" 500 with
+ * no clue as to why. Say what is actually wrong instead.
+ */
+export function describeDbError(error: unknown, fallback: string): string {
+  const code = (error as { code?: string } | null)?.code
+  if (code === 'ER_BAD_FIELD_ERROR' || code === 'ER_NO_SUCH_TABLE') {
+    return 'The database is out of date — apply database/migrations/ (latest: 2026-08b-revision.sql) to this server, then try again.'
+  }
+  if (code === 'ER_DUP_ENTRY') return 'That username is already taken.'
+  return fallback
+}

@@ -68,6 +68,9 @@ type Student = PublicUser & {
   classroomId: number | null
   classroomName: string | null
   fullName: string | null
+  lastName: string | null
+  firstName: string | null
+  middleName: string | null
   progress: StudentProgress
   teacherUnlockedLevels: number[]
   quizScores: QuizScore[]
@@ -117,7 +120,7 @@ export default function TeacherStudentsPage() {
   const [savingDeadline, setSavingDeadline] = useState(false)
 
   /** Form state for the currently expanded student's account edit. */
-  const [draft, setDraft] = useState({ username: '', password: '', fullName: '' })
+  const [draft, setDraft] = useState({ username: '', password: '', lastName: '', firstName: '', middleName: '' })
 
   const loadInsight = useCallback(async (studentId: number) => {
     setInsightLoading(studentId)
@@ -140,7 +143,13 @@ export default function TeacherStudentsPage() {
   useEffect(() => {
     if (expandedId !== null) {
       const s = students.find(st => st.id === expandedId)
-      if (s) setDraft({ username: s.username, password: '', fullName: s.fullName ?? '' })
+      if (s) setDraft({
+        username: s.username,
+        password: '',
+        lastName: s.lastName ?? '',
+        firstName: s.firstName ?? '',
+        middleName: s.middleName ?? '',
+      })
       loadInsight(expandedId)
       loadDeadlines(expandedId)
     }
@@ -591,15 +600,23 @@ export default function TeacherStudentsPage() {
                                 />
                                 <p className="text-[10px] text-gray-400 mt-0.5">Min 8 chars, with a letter & a number</p>
                               </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Full Name</label>
-                                <input
-                                  type="text"
-                                  placeholder="Student full name"
-                                  value={draft.fullName}
-                                  onChange={e => setDraft(prev => ({ ...prev, fullName: e.target.value }))}
-                                  className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                                />
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                {([
+                                  ['lastName', 'Last Name', 'Santos'],
+                                  ['firstName', 'First Name', 'John Mark'],
+                                  ['middleName', 'Middle Name', 'Cruz'],
+                                ] as const).map(([field, label, placeholder]) => (
+                                  <div key={field}>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">{label}</label>
+                                    <input
+                                      type="text"
+                                      placeholder={placeholder}
+                                      value={draft[field]}
+                                      onChange={e => setDraft(prev => ({ ...prev, [field]: e.target.value }))}
+                                      className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                    />
+                                  </div>
+                                ))}
                               </div>
                               <button
                                 onClick={(e: React.MouseEvent) => {
@@ -620,7 +637,12 @@ export default function TeacherStudentsPage() {
                                       return setError('Password must be at least 8 characters and include a letter and a number.')
                                     }
                                   }
-                                  const changes: Record<string, string | undefined> = { username: trimmedUsername, fullName: draft.fullName.trim() }
+                                  const changes: Record<string, string | undefined> = {
+                                    username: trimmedUsername,
+                                    lastName: draft.lastName.trim(),
+                                    firstName: draft.firstName.trim(),
+                                    middleName: draft.middleName.trim(),
+                                  }
                                   if (draft.password) changes.password = draft.password
                                   updateStudent(student.id, changes)
                                 }}

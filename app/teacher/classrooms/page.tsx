@@ -2,19 +2,22 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Pencil, PlusCircle, School, Users } from 'lucide-react'
+import { CalendarDays, Pencil, PlusCircle, School, Users } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
+import { currentSchoolYear, formatSchoolYear } from '@/lib/enrollment'
 
-type Classroom = { id: number; name: string; studentCount: number; createdAt: string }
+type Classroom = { id: number; name: string; schoolYear: string | null; studentCount: number; createdAt: string }
 
 export default function TeacherClassroomsPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [loading, setLoading] = useState(true)
   const [classroomName, setClassroomName] = useState('')
+  const [schoolYear, setSchoolYear] = useState(currentSchoolYear())
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
+  const [editSchoolYear, setEditSchoolYear] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,7 +46,7 @@ export default function TeacherClassroomsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: classroomName.trim() }),
+        body: JSON.stringify({ name: classroomName.trim(), schoolYear }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
@@ -65,7 +68,7 @@ export default function TeacherClassroomsPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ id: editingId, name: editName.trim() }),
+        body: JSON.stringify({ id: editingId, name: editName.trim(), schoolYear: editSchoolYear.trim() }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
@@ -90,8 +93,9 @@ export default function TeacherClassroomsPage() {
       {error && <div className="rounded-lg bg-red-500/20 border border-red-400/30 px-4 py-2 text-sm text-red-200">{error}</div>}
 
       {/* Create */}
-      <form onSubmit={createClassroom} className="flex gap-2">
-        <Input placeholder="New section name..." value={classroomName} onChange={e => setClassroomName(e.target.value)} className="flex-1" />
+      <form onSubmit={createClassroom} className="flex flex-wrap gap-2">
+        <Input placeholder="School Year (2026-2027)" value={schoolYear} onChange={e => setSchoolYear(e.target.value)} className="w-[170px]" />
+        <Input placeholder="Section name (Grade 3 - Gals)" value={classroomName} onChange={e => setClassroomName(e.target.value)} className="flex-1 min-w-[180px]" />
         <Button type="submit" loading={creating} icon={<PlusCircle className="h-4 w-4" />}>Create</Button>
       </form>
 
@@ -117,6 +121,7 @@ export default function TeacherClassroomsPage() {
               {editingId === classroom.id ? (
                 <div className="space-y-2">
                   <Input value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
+                  <Input value={editSchoolYear} onChange={e => setEditSchoolYear(e.target.value)} placeholder="School Year (2026-2027)" />
                   <div className="flex gap-2">
                     <Button size="sm" onClick={saveEdit} loading={savingEdit}>Save</Button>
                     <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
@@ -129,17 +134,25 @@ export default function TeacherClassroomsPage() {
                       <h3 className="font-bold text-white text-lg">{classroom.name}</h3>
                       <div className="flex items-center gap-1 mt-1 text-purple-300 text-sm">
                         <Users className="h-3.5 w-3.5" />
-                        <span>{classroom.studentCount} students</span>
+                        <span>{classroom.studentCount} Students</span>
                       </div>
+                      {classroom.schoolYear && (
+                        <div className="flex items-center gap-1 mt-0.5 text-purple-300 text-sm">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          <span>{formatSchoolYear(classroom.schoolYear)}</span>
+                        </div>
+                      )}
                     </div>
                     <button
-                      onClick={() => { setEditingId(classroom.id); setEditName(classroom.name) }}
+                      onClick={() => { setEditingId(classroom.id); setEditName(classroom.name); setEditSchoolYear(classroom.schoolYear ?? currentSchoolYear()) }}
                       className="rounded-lg p-2 text-purple-300 hover:bg-purple-500/20 transition"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                   </div>
-                  <p className="mt-2 text-xs text-purple-400">Created {new Date(classroom.createdAt).toLocaleDateString()}</p>
+                  <p className="mt-2 text-xs text-purple-400">
+                    Created {new Date(classroom.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
                 </>
               )}
             </motion.div>

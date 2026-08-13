@@ -224,6 +224,22 @@ body:has(.student-app-shell) {
   object-position: center center !important;
 }
 
+/* Result-screen artwork opts out of the full-bleed override above so the
+   Level Complete screen can size its trophy and badges. Sizes shrink on a
+   landscape phone so result + trophy + badges fit without scrolling. */
+.game-screen img.result-trophy {
+  width: auto !important;
+  height: 5rem !important;
+}
+.game-screen img.result-badge {
+  width: 3rem !important;
+  height: 3rem !important;
+}
+@media (max-height: 560px) {
+  .game-screen img.result-trophy { height: 25vh !important; }
+  .game-screen img.result-badge  { width: 12vh !important; height: 12vh !important; }
+}
+
 .ui-layer {
   position: absolute;
   inset: 0;

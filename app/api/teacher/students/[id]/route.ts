@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { execute, query } from '@/lib/db'
 import { getSession, hashPassword } from '@/lib/auth'
-import type { EnrollmentStatus, PublicUser, User } from '@/types/user'
+import { composeFullName } from '@/lib/enrollment'
+import type { EnrollmentStatus, User } from '@/types/user'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -11,6 +12,9 @@ interface StudentRow {
   id: number
   username: string
   fullName: string | null
+  lastName: string | null
+  firstName: string | null
+  middleName: string | null
   email: string
   role: 'student'
   enrollmentStatus: EnrollmentStatus
@@ -34,10 +38,13 @@ async function requireTeacher() {
   return rows[0]
 }
 
-function publicStudent(row: StudentRow): PublicUser & { enrolledAt: string | null; fullName: string | null } {
+function publicStudent(row: StudentRow) {
   return {
     id: row.id,
     username: row.username,
+    lastName: row.lastName,
+    firstName: row.firstName,
+    middleName: row.middleName,
     email: row.email,
     role: row.role,
     enrollmentStatus: row.enrollmentStatus,
@@ -68,7 +75,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   }
 
   const updates: string[] = []
-  const params: Array<string | number> = []
+  const params: Array<string | number | null> = []
 
   if (typeof body.username === 'string') {
     const username = body.username.trim()
@@ -102,7 +109,28 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
   }
 
-  if (typeof body.fullName === 'string') {
+  // Names are edited as Last / First / Middle (panel revision, Aug 2026);
+  // `full_name` is recomposed from them. A bare fullName is still accepted so
+  // older callers keep working.
+  const namePartsGiven = ['lastName', 'firstName', 'middleName'].some(key => typeof body[key] === 'string')
+  if (namePartsGiven) {
+    const part = (value: unknown) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '')
+    const lastName = part(body.lastName)
+    const firstName = part(body.firstName)
+    const middleName = part(body.middleName)
+    if ([lastName, firstName, middleName].some(p => p.length > 60)) {
+      return NextResponse.json({ success: false, message: 'Each name part must be 60 characters or fewer.' }, { status: 422 })
+    }
+    const fullName = composeFullName(firstName, middleName, lastName)
+    updates.push('last_name = ?', 'first_name = ?', 'middle_name = ?')
+    params.push(lastName || null, firstName || null, middleName || null)
+    if (fullName) {
+      updates.push('full_name = ?')
+      params.push(fullName)
+    } else {
+      updates.push('full_name = NULL')
+    }
+  } else if (typeof body.fullName === 'string') {
     const fullName = body.fullName.trim().replace(/\s+/g, ' ')
     if (fullName === '') {
       updates.push('full_name = NULL')
@@ -149,6 +177,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
        u.id,
        u.username,
        u.full_name AS fullName,
+       u.last_name AS lastName,
+       u.first_name AS firstName,
+       u.middle_name AS middleName,
        u.email,
        u.role,
        u.enrollment_status AS enrollmentStatus,

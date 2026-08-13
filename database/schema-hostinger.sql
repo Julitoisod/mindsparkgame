@@ -37,11 +37,12 @@ CREATE TABLE IF NOT EXISTS classrooms (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   teacher_id  INT UNSIGNED NOT NULL,
   name        VARCHAR(80)  NOT NULL,
+  school_year VARCHAR(9)   DEFAULT NULL,
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   PRIMARY KEY (id),
-  UNIQUE KEY uq_classrooms_teacher_name (teacher_id, name),
+  UNIQUE KEY uq_classrooms_teacher_name_sy (teacher_id, name, school_year),
   KEY idx_classrooms_teacher (teacher_id),
   CONSTRAINT fk_classrooms_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

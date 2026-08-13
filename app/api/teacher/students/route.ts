@@ -1,12 +1,16 @@
   import { NextResponse } from 'next/server'
-  import { execute, query } from '@/lib/db'
+  import { describeDbError, execute, query } from '@/lib/db'
   import { getSession, hashPassword } from '@/lib/auth'
+  import { composeFullName } from '@/lib/enrollment'
   import type { EnrollmentStatus, User } from '@/types/user'
 
   interface StudentRow {
     id: number
     username: string
     fullName: string | null
+    lastName: string | null
+    firstName: string | null
+    middleName: string | null
     email: string
     role: 'student'
     enrollmentStatus: EnrollmentStatus
@@ -62,6 +66,9 @@
       id: row.id,
       username: row.username,
       fullName: row.fullName,
+      lastName: row.lastName,
+      firstName: row.firstName,
+      middleName: row.middleName,
       email: row.email,
       role: row.role,
       enrollmentStatus: row.enrollmentStatus,
@@ -116,6 +123,9 @@
         u.id,
         u.username,
         u.full_name AS fullName,
+        u.last_name AS lastName,
+        u.first_name AS firstName,
+        u.middle_name AS middleName,
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,
@@ -203,8 +213,15 @@
       return NextResponse.json({ success: false, message: 'Invalid JSON body' }, { status: 400 })
     }
 
+    const text = (value: unknown) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '')
+
     const username = typeof body.username === 'string' ? body.username.trim() : ''
-    const fullName = typeof body.fullName === 'string' ? body.fullName.trim().replace(/\s+/g, ' ') : ''
+    // Manual enrolment collects Last / First / Middle name (panel revision,
+    // Aug 2026). `full_name` stays as the composed display name.
+    const lastName = text(body.lastName)
+    const firstName = text(body.firstName)
+    const middleName = text(body.middleName)
+    const fullName = composeFullName(firstName, middleName, lastName) ?? text(body.fullName)
     const password = typeof body.password === 'string' ? body.password : ''
     const classroomId = typeof body.classroomId === 'number' ? body.classroomId : Number(body.classroomId)
 
@@ -215,6 +232,11 @@
     if (username.length < 3 || username.length > 32 || !/^[a-zA-Z0-9_]+$/.test(username)) {
       errors.username = 'Username must be 3-32 letters, numbers, or underscores.'
     }
+    if (!lastName) errors.lastName = 'Last name is required.'
+    if (!firstName) errors.firstName = 'First name is required.'
+    if (lastName.length > 60) errors.lastName = 'Last name is too long.'
+    if (firstName.length > 60) errors.firstName = 'First name is too long.'
+    if (middleName.length > 60) errors.middleName = 'Middle name is too long.'
     if (fullName.length > 120) {
       errors.fullName = 'Full name is too long.'
     }
@@ -241,18 +263,30 @@
     }
 
     const passwordHash = await hashPassword(password)
-    const result = await execute(
-      `INSERT INTO users
-        (username, full_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-      VALUES (?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-      [username, fullName || null, email, passwordHash, teacher.id, classroomId],
-    )
+    let result
+    try {
+      result = await execute(
+        `INSERT INTO users
+          (username, full_name, last_name, first_name, middle_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
+        [username, fullName || null, lastName || null, firstName || null, middleName || null, email, passwordHash, teacher.id, classroomId],
+      )
+    } catch (error) {
+      console.error('[teacher/students] insert', error)
+      return NextResponse.json(
+        { success: false, message: describeDbError(error, 'Could not enroll that student') },
+        { status: 500 },
+      )
+    }
 
     const rows = await query<StudentRow>(
       `SELECT
         u.id,
         u.username,
         u.full_name AS fullName,
+        u.last_name AS lastName,
+        u.first_name AS firstName,
+        u.middle_name AS middleName,
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,
