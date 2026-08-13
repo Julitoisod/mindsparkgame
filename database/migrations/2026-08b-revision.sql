@@ -20,6 +20,9 @@ UPDATE classrooms
          CASE WHEN MONTH(created_at) >= 6 THEN YEAR(created_at) + 1 ELSE YEAR(created_at) END)
  WHERE school_year IS NULL;
 
-ALTER TABLE classrooms DROP INDEX uq_classrooms_teacher_name;
+-- IF EXISTS / IF NOT EXISTS keep this re-runnable. Without them a second run
+-- aborts on the DROP, and the ADD below never executes — leaving the table with
+-- the OLD unique key, so a section name cannot be reused in a new school year.
+ALTER TABLE classrooms DROP INDEX IF EXISTS uq_classrooms_teacher_name;
 ALTER TABLE classrooms
-  ADD UNIQUE KEY uq_classrooms_teacher_name_sy (teacher_id, name, school_year);
+  ADD UNIQUE KEY IF NOT EXISTS uq_classrooms_teacher_name_sy (teacher_id, name, school_year);
