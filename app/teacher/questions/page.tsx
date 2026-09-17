@@ -317,7 +317,7 @@ export default function TeacherQuestionsPage() {
                     list="category-suggestions"
                     value={form.category}
                     onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                    placeholder="e.g. Division"
+                    placeholder="e.g. Estimating Volume"
                     className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400"
                   />
                   <datalist id="category-suggestions">

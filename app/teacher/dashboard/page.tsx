@@ -365,7 +365,7 @@ export default function TeacherDashboardPage() {
               <input
                 id="dash-section-name"
                 type="text"
-                placeholder="e.g. Grade 3 - Gals"
+                placeholder="e.g. Grade 5 - Gals"
                 value={classroomName}
                 onChange={e => setClassroomName(e.target.value)}
                 className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"

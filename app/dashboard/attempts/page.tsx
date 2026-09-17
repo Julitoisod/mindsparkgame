@@ -8,11 +8,11 @@ import { useGame } from '@/hooks/useGame'
 import type { CharacterData } from '@/types/character'
 
 const levelNodes = [
-  { id: 1, title: 'Forest Gate', topic: 'Treasure Box Multiplication' },
-  { id: 2, title: 'Crystal Bridge', topic: 'Division Heroes Adventure' },
-  { id: 3, title: 'Elven Ruins', topic: 'Fraction and Number Quest' },
-  { id: 4, title: 'Moonlit Keep', topic: 'Shape Slide Explorer' },
-  { id: 5, title: 'Oracle Tower', topic: 'Symmetry Super Challenge' },
+  { id: 1, title: 'Forest Gate', topic: 'Fraction, Decimal & Solid Quest' },
+  { id: 2, title: 'Crystal Bridge', topic: 'Prisms, Pyramids & Nets' },
+  { id: 3, title: 'Elven Ruins', topic: 'Surface Area Builders' },
+  { id: 4, title: 'Moonlit Keep', topic: 'Surface Area Problem Solvers' },
+  { id: 5, title: 'Oracle Tower', topic: 'Volume Estimation Challenge' },
 ]
 
 type Attempt = {

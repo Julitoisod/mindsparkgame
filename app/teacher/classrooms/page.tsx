@@ -95,7 +95,7 @@ export default function TeacherClassroomsPage() {
       {/* Create */}
       <form onSubmit={createClassroom} className="flex flex-wrap gap-2">
         <Input placeholder="School Year (2026-2027)" value={schoolYear} onChange={e => setSchoolYear(e.target.value)} className="w-[170px]" />
-        <Input placeholder="Section name (Grade 3 - Gals)" value={classroomName} onChange={e => setClassroomName(e.target.value)} className="flex-1 min-w-[180px]" />
+        <Input placeholder="Section name (Grade 5 - Gals)" value={classroomName} onChange={e => setClassroomName(e.target.value)} className="flex-1 min-w-[180px]" />
         <Button type="submit" loading={creating} icon={<PlusCircle className="h-4 w-4" />}>Create</Button>
       </form>
 

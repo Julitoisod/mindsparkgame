@@ -1,0 +1,160 @@
+{
+  "levels": [
+    {
+      "level": 1,
+      "title": "Fraction, Decimal & Solid Quest",
+      "lessons": [
+        {
+          "code": "M5 1301",
+          "category": "Fractions & Decimals",
+          "questions": [
+            { "prompt": "What is the value of 1/2 + 1/4?", "options": ["1/4", "2/4", "3/4", "4/4"], "answer": "C" },
+            { "prompt": "What is the value of 2.5 + 1.75?", "options": ["3.25", "4.25", "4.50", "4.75"], "answer": "B" },
+            { "prompt": "What is 3/4 ÷ 1/2?", "options": ["1/2", "1", "1 1/2", "2"], "answer": "C" },
+            { "prompt": "Ana has 2.5 meters of ribbon. She uses 0.75 meter. How much ribbon is left?", "options": ["1.25 m", "1.50 m", "1.75 m", "2.25 m"], "answer": "C" },
+            { "prompt": "A recipe needs 3/4 cup of sugar. If you make 2 batches, how much sugar is needed?", "options": ["3/4 cup", "1 cup", "1 1/4 cups", "1 1/2 cups"], "answer": "D" }
+          ]
+        },
+        {
+          "code": "M5 1302",
+          "category": "Multi-step Fraction & Decimal Problems",
+          "questions": [
+            { "prompt": "Maria has ₱500. She spends ₱125.50 on school supplies and ₱75.25 on food. How much money does she have left?", "options": ["₱289.25", "₱299.25", "₱309.25", "₱319.25"], "answer": "B" },
+            { "prompt": "A baker has 5.5 kg of flour. She uses 1.75 kg in the morning and 1 1/2 kg in the afternoon. How much flour remains?", "options": ["2.00 kg", "2.25 kg", "2.50 kg", "2.75 kg"], "answer": "B" },
+            { "prompt": "A class collected ₱1,200. They spent ₱350.50 for materials and ₱249.50 for food. The remaining money was divided equally among 4 groups. How much did each group receive?", "options": ["₱125", "₱150", "₱175", "₱200"], "answer": "B" }
+          ]
+        },
+        {
+          "code": "M5 1401",
+          "category": "Illustrating Solid Figures",
+          "questions": [
+            { "prompt": "Which of the following is a solid figure?", "options": ["Triangle", "Circle", "Rectangle", "Cube"], "answer": "D" },
+            { "prompt": "Which of the following is a plane figure?", "options": ["Sphere", "Cylinder", "Triangle", "Cube"], "answer": "C" },
+            { "prompt": "How many dimensions does a solid figure have?", "options": ["One", "Two", "Three", "Four"], "answer": "C" },
+            { "prompt": "Which object is an example of a sphere?", "options": ["Basketball", "Cereal box", "Can", "Ice cream cone"], "answer": "A" },
+            { "prompt": "Which object is shaped like a cylinder?", "options": ["Dice", "Can", "Basketball", "Party hat"], "answer": "B" },
+            { "prompt": "Which object is shaped like a cone?", "options": ["Globe", "Can", "Ice cream cone", "Box"], "answer": "C" },
+            { "prompt": "Which object is an example of a rectangular prism?", "options": ["Ball", "Shoebox", "Cone", "Globe"], "answer": "B" },
+            { "prompt": "What is a pictorial model?", "options": ["A physical object", "A drawing representing a solid figure", "A measuring instrument", "A number sentence"], "answer": "B" },
+            { "prompt": "What is a concrete model?", "options": ["A physical model representing a solid figure", "A drawing on paper", "A mathematical equation", "A plane figure"], "answer": "A" },
+            { "prompt": "A water bottle is shaped like a cylinder. What solid figure does it represent?", "options": ["Sphere", "Cone", "Cylinder", "Pyramid"], "answer": "C" }
+          ]
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "title": "Prisms, Pyramids & Nets",
+      "lessons": [
+        {
+          "code": "M5 1402",
+          "category": "Prisms and Pyramids",
+          "questions": [
+            { "prompt": "Which solid figure has two congruent and parallel bases?", "options": ["Pyramid", "Prism", "Cone", "Sphere"], "answer": "B" },
+            { "prompt": "A pyramid has how many bases?", "options": ["None", "One", "Two", "Three"], "answer": "B" },
+            { "prompt": "What is the name of a prism whose bases are triangles?", "options": ["Square prism", "Rectangular prism", "Triangular prism", "Pentagonal pyramid"], "answer": "C" },
+            { "prompt": "How many faces does a rectangular prism have?", "options": ["4", "5", "6", "8"], "answer": "C" },
+            { "prompt": "How many edges does a rectangular prism have?", "options": ["6", "8", "10", "12"], "answer": "D" },
+            { "prompt": "How many vertices does a cube have?", "options": ["4", "6", "8", "12"], "answer": "C" },
+            { "prompt": "Which solid figure has one polygonal base and triangular faces that meet at one point?", "options": ["Prism", "Pyramid", "Cylinder", "Sphere"], "answer": "B" },
+            { "prompt": "A solid figure has 5 faces, 9 edges, and 6 vertices. What is the solid?", "options": ["Cube", "Square pyramid", "Triangular prism", "Rectangular prism"], "answer": "C" }
+          ]
+        },
+        {
+          "code": "M5 1403",
+          "category": "Solid Figures and Their Nets",
+          "questions": [
+            { "prompt": "What is a net?", "options": ["A solid figure", "A flat pattern that can be folded to form a solid figure", "A type of prism", "A type of vertex"], "answer": "B" },
+            { "prompt": "How many square faces are needed to make a cube?", "options": ["4", "5", "6", "8"], "answer": "C" },
+            { "prompt": "Which net can form a cube?", "options": ["Six squares", "One square and four triangles", "Two circles and one rectangle", "One circle and one sector"], "answer": "A" },
+            { "prompt": "What shapes are found in the net of a square pyramid?", "options": ["Six squares", "One square and four triangles", "Two triangles and three rectangles", "Two circles and one rectangle"], "answer": "B" },
+            { "prompt": "Which solid figure can be formed from two circles and one rectangle?", "options": ["Cone", "Cylinder", "Cube", "Pyramid"], "answer": "B" },
+            { "prompt": "Which solid figure can have a net containing two triangles and three rectangles?", "options": ["Cube", "Triangular prism", "Cylinder", "Square pyramid"], "answer": "B" },
+            { "prompt": "Which solid figure can be formed from one circle and one sector?", "options": ["Cone", "Cube", "Prism", "Sphere"], "answer": "A" },
+            { "prompt": "A cube has 6 faces, 12 edges, and 8 vertices. Which net should represent it?", "options": ["Six connected squares arranged so they can fold into a cube", "Four triangles and one square", "Two circles and one rectangle", "One circle and one triangle"], "answer": "A" },
+            { "prompt": "What happens when a correct net is folded along its edges?", "options": ["It becomes a plane figure", "It becomes a solid figure", "It becomes a line", "It disappears"], "answer": "B" },
+            { "prompt": "Why are nets useful in studying solid figures?", "options": ["They show the faces of a solid figure in a flat form.", "They show only the edges.", "They remove the vertices.", "They change a solid into a circle."], "answer": "A" },
+            { "prompt": "A square pyramid has a square base and four triangular lateral faces. How many faces does its net have?", "options": ["4", "5", "6", "8"], "answer": "B" },
+            { "prompt": "Which of the following is NOT a solid figure that can be represented by a net?", "options": ["Cube", "Cylinder", "Triangular prism", "Circle"], "answer": "D" }
+          ]
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "title": "Surface Area Builders",
+      "lessons": [
+        {
+          "code": "M5 1501",
+          "category": "Surface Area of Prisms & Pyramids",
+          "questions": [
+            { "prompt": "What is surface area?", "options": ["The space inside a solid figure", "The total area of all the surfaces of a solid figure", "The distance around a solid", "The number of vertices"], "answer": "B" },
+            { "prompt": "What are the surfaces of a solid figure called?", "options": ["Edges", "Vertices", "Faces", "Bases"], "answer": "C" },
+            { "prompt": "What are lateral faces?", "options": ["Faces that are not the bases", "The bases only", "The vertices", "The edges"], "answer": "A" },
+            { "prompt": "What is the surface area of a cube with an edge of 4 cm?", "options": ["16 cm²", "64 cm²", "96 cm²", "128 cm²"], "answer": "C" },
+            { "prompt": "A rectangular prism measures 5 cm by 4 cm by 3 cm. What is its surface area?", "options": ["84 cm²", "94 cm²", "104 cm²", "114 cm²"], "answer": "B" },
+            { "prompt": "A cube has an edge of 6 cm. What is its surface area?", "options": ["36 cm²", "72 cm²", "144 cm²", "216 cm²"], "answer": "D" },
+            { "prompt": "A rectangular prism has dimensions 7 cm, 5 cm, and 3 cm. What is its surface area?", "options": ["122 cm²", "132 cm²", "142 cm²", "152 cm²"], "answer": "C" },
+            { "prompt": "A square pyramid has a base area of 25 cm². Each of its four triangular faces has an area of 15 cm². What is its total surface area?", "options": ["65 cm²", "75 cm²", "85 cm²", "95 cm²"], "answer": "C" },
+            { "prompt": "If the surface areas of all six faces of a cube are added, what are you finding?", "options": ["Volume", "Perimeter", "Surface area", "Capacity"], "answer": "C" },
+            { "prompt": "Why can a net be useful in finding surface area?", "options": ["It shows all the faces of the solid laid out flat.", "It shows only one face.", "It removes the bases.", "It changes the solid's dimensions."], "answer": "A" },
+            { "prompt": "A rectangular prism has dimensions 10 cm × 5 cm × 2 cm. What is its surface area?", "options": ["120 cm²", "140 cm²", "160 cm²", "180 cm²"], "answer": "C" },
+            { "prompt": "A cube-shaped gift has an edge of 8 cm. How much wrapping paper is needed to cover its entire surface?", "options": ["256 cm²", "384 cm²", "512 cm²", "576 cm²"], "answer": "B" }
+          ]
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "title": "Surface Area Problem Solvers",
+      "lessons": [
+        {
+          "code": "M5 1502",
+          "category": "Surface Area of Other Solids",
+          "questions": [
+            { "prompt": "Which solid figure has two circular bases?", "options": ["Cone", "Cylinder", "Sphere", "Pyramid"], "answer": "B" },
+            { "prompt": "What is the formula for the surface area of a sphere?", "options": ["2πr²", "πr² + πrs", "4πr²", "2πrh"], "answer": "C" },
+            { "prompt": "A sphere has a radius of 5 cm. Using π = 3.14, what is its surface area?", "options": ["78.5 cm²", "157 cm²", "314 cm²", "628 cm²"], "answer": "C" },
+            { "prompt": "What is the formula for the surface area of a cone?", "options": ["4πr²", "πr² + πrs", "2πr² + 2πrh", "πr²h"], "answer": "B" },
+            { "prompt": "A cone has a radius of 6 cm and a slant height of 8 cm. Using π = 3.14, what is its surface area?", "options": ["188.40 cm²", "226.08 cm²", "263.76 cm²", "301.44 cm²"], "answer": "C" }
+          ]
+        },
+        {
+          "code": "M5 1503",
+          "category": "Surface Area Word Problems",
+          "questions": [
+            { "prompt": "What should you identify first when solving a surface-area word problem?", "options": ["The answer", "The given information and what is asked", "The formula", "The final unit"], "answer": "B" },
+            { "prompt": "What should you do after identifying the given information?", "options": ["Sketch the solid figure", "Guess the answer", "Add all the numbers", "Divide the dimensions"], "answer": "A" },
+            { "prompt": "A cube has an edge of 7 cm. What is its surface area?", "options": ["49 cm²", "98 cm²", "196 cm²", "294 cm²"], "answer": "D" },
+            { "prompt": "A gift box is shaped like a cube with an edge of 10 cm. How much wrapping paper is needed to cover the entire box?", "options": ["100 cm²", "400 cm²", "500 cm²", "600 cm²"], "answer": "D" },
+            { "prompt": "A rectangular box measures 10 cm × 5 cm × 4 cm. How much material is needed to cover its entire outside surface?", "options": ["180 cm²", "200 cm²", "220 cm²", "240 cm²"], "answer": "C" }
+          ]
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "title": "Volume Estimation Challenge",
+      "lessons": [
+        {
+          "code": "M5 1504",
+          "category": "Estimating Volume",
+          "questions": [
+            { "prompt": "What does volume measure?", "options": ["The outside surface of an object", "The amount of space occupied by an object", "The number of edges", "The distance around an object"], "answer": "B" },
+            { "prompt": "Which can be used as a nonstandard unit for estimating volume?", "options": ["Meter", "Centimeter", "Eraser", "Kilometer"], "answer": "C" },
+            { "prompt": "Why should the same-sized objects be used when estimating volume?", "options": ["To make the estimate more consistent", "To make the container heavier", "To make the objects bigger", "To change the container's shape"], "answer": "A" },
+            { "prompt": "A cube-shaped container can hold 27 same-sized erasers. What is its estimated volume?", "options": ["17 erasers", "27 erasers", "37 erasers", "47 erasers"], "answer": "B" },
+            { "prompt": "A rectangular-prism box can hold 60 same-sized erasers. What is its estimated volume?", "options": ["40 erasers", "50 erasers", "60 erasers", "70 erasers"], "answer": "C" },
+            { "prompt": "Box A contains 250 same-sized marbles. Box B contains 210 same-sized marbles. Which has the greater estimated volume?", "options": ["Box A", "Box B", "Both have equal volume", "Cannot be determined"], "answer": "A" },
+            { "prompt": "Three boxes contain same-sized pebbles: Box A has 304, Box B has 316, and Box C has 300. Which box has the greatest estimated volume?", "options": ["Box A", "Box B", "Box C", "All are equal"], "answer": "B" },
+            { "prompt": "Which item would be most suitable for estimating the volume of a shoebox?", "options": ["Basketball", "Watermelon", "Small erasers", "Large balloons"], "answer": "C" },
+            { "prompt": "A basket can hold 10 balls. Raul needs to transport 85 balls. How many trips are needed?", "options": ["7", "8", "9", "10"], "answer": "C" },
+            { "prompt": "Which statement is true about estimating volume using nonstandard units?", "options": ["Smaller units usually require more units to fill the same space.", "Larger units always require more units.", "Different-sized objects should be mixed together.", "The objects do not need to fit inside the container."], "answer": "A" },
+            { "prompt": "Box A holds 50 same-sized cubes, while Box B holds 75 same-sized cubes. Which box has the greater estimated volume?", "options": ["Box A", "Box B", "Both are equal", "Cannot be determined"], "answer": "B" },
+            { "prompt": "If a container holds 100 same-sized blocks, what does the number 100 represent in this activity?", "options": ["Its estimated volume in the chosen nonstandard unit", "Its surface area", "Its perimeter", "Its number of vertices"], "answer": "A" }
+          ]
+        }
+      ]
+    }
+  ]
+}

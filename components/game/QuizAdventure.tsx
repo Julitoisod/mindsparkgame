@@ -1090,11 +1090,11 @@ export default function QuizAdventure({
 
   if (screen === 'map') {
     const levelMeta = [
-      { env: 'Forest Gate', subtitle: 'Treasure Box Multiplication Quest' },
-      { env: 'Crystal Bridge', subtitle: 'Division Heroes Adventure' },
-      { env: 'Elven Ruins', subtitle: 'Fraction and Number Fun Quest' },
-      { env: 'Moonlit Keep', subtitle: 'Shape Slide Explorer' },
-      { env: 'Oracle Tower', subtitle: 'Symmetry Super Challenge' },
+      { env: 'Forest Gate', subtitle: 'Fraction, Decimal & Solid Quest' },
+      { env: 'Crystal Bridge', subtitle: 'Prisms, Pyramids & Nets' },
+      { env: 'Elven Ruins', subtitle: 'Surface Area Builders' },
+      { env: 'Moonlit Keep', subtitle: 'Surface Area Problem Solvers' },
+      { env: 'Oracle Tower', subtitle: 'Volume Estimation Challenge' },
     ]
 
     function getLevelStatus(lvlNum: number): 'cleared' | 'open' | 'locked' {
