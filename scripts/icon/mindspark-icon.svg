@@ -1,0 +1,35 @@
+<!-- MindSpark launcher icon — full square (legacy ic_launcher / ic_launcher_round).
+     Colours are the MindSpark Math palette from app/globals.css. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#3459C7"/>
+      <stop offset="55%"  stop-color="#4A54DD"/>
+      <stop offset="100%" stop-color="#6255E8"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="60%"  stop-color="#F4F2FF"/>
+      <stop offset="100%" stop-color="#D9B8FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0%"   stop-color="#9B83F5" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#9B83F5" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="232" r="190" fill="url(#glow)"/>
+
+  <!-- sparkles -->
+  <g fill="#D9B8FF" opacity="0.9">
+    <path d="M108 120 l9 24 24 9 -24 9 -9 24 -9 -24 -24 -9 24 -9z"/>
+    <path d="M404 322 l7 19 19 7 -19 7 -7 19 -7 -19 -19 -7 19 -7z"/>
+    <circle cx="398" cy="140" r="7"/>
+    <circle cx="120" cy="368" r="6"/>
+  </g>
+
+  <!-- spark bolt -->
+  <path d="M291 56 L150 286 h78 l-37 170 160 -246 h-84 z"
+        fill="url(#bolt)" stroke="#22326f" stroke-width="10" stroke-linejoin="round"/>
+</svg>
