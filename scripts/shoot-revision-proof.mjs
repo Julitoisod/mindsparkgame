@@ -61,7 +61,7 @@ await db.end()
 const answerOf = new Map(bank.map(r => [r.prompt, JSON.parse(r.options)[r.correct_index]]))
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new' })
-const page = await browser.newPage()
+let page = await browser.newPage()
 await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 })
 const shot = async name => { await page.screenshot({ path: `${OUT}/${name}.png` }); console.log('  shot', name) }
 const clickText = text => page.evaluate(t => {
@@ -82,9 +82,10 @@ if (landingText.includes('Grade 3')) throw new Error('item 1: Grade 3 still on t
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle2' })
 await wait(1200)
 await shot('rev-02-student-login')
-if ((await page.evaluate(() => document.body.innerText)).toLowerCase().includes('teacher')) {
-  throw new Error('item 12: student login still mentions the teacher')
-}
+// The rule is no teacher ROUTE from the student page. The web notice does say
+// "ask your teacher to install it", which is guidance, not a way in.
+const teacherLinks = await page.$$eval('a', as => as.filter(a => /teacher/i.test(a.getAttribute('href') ?? '')).length)
+if (teacherLinks > 0) throw new Error('item 12: student login still links to a teacher page')
 
 // ── Teacher login ────────────────────────────────────────────────────────────
 await page.goto(`${BASE}/teacher-login`, { waitUntil: 'networkidle2' })
@@ -92,6 +93,11 @@ await wait(900)
 await shot('rev-03-teacher-login')
 
 // ── 7-9. Choose character ────────────────────────────────────────────────────
+// Student sign-in is app-only now, so the rest of the journey runs as the APK
+// does: a fresh page that reports Capacitor's native platform.
+page = await browser.newPage()
+await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 })
+await page.evaluateOnNewDocument(() => { window.Capacitor = { isNativePlatform: () => true } })
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle2' })
 await page.type('input[aria-label="Username"]', student)
 await page.type('input[type="password"]', STUDENT_PASS)

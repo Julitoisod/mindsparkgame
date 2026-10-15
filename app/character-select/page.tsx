@@ -149,23 +149,23 @@ export default function CharacterSelectPage() {
             The star counter that used to sit here is gone — stars live in the
             dashboard only (item 7). The character name is assigned
             automatically so the student just picks a face and goes. */}
-        <div className="mb-3 text-center">
+        <div className="mb-3 text-center [@media(max-height:460px)]:mb-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D9B8FF]">
             {existingCharacter ? 'Current avatar' : 'First login setup'}
           </p>
-          <h2 className="mt-1 flex items-center justify-center gap-3 text-xl font-black leading-tight">
+          <h2 className="mt-1 flex items-center justify-center gap-3 text-xl font-black leading-tight [@media(max-height:460px)]:mt-0 [@media(max-height:460px)]:text-base">
             <Sparkles className="h-4 w-4 text-[#D9B8FF]" />
             Pick your avatar to start
             <Sparkles className="h-4 w-4 text-[#D9B8FF]" />
           </h2>
-          <p className="mt-1 text-[11px] font-semibold text-[#F4F2FF]/75">
+          <p className="mt-1 text-[11px] font-semibold text-[#F4F2FF]/75 [@media(max-height:460px)]:hidden">
             {existingCharacter
               ? 'First avatar is locked in. Unlock more with stars from boss clears.'
               : 'Your first avatar is free! Unlock more later with earned stars.'}
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 [@media(max-height:460px)]:gap-2">
           {characterOptions.map(option => {
             const selected = selectedClass === option.class
             const firstPick = !existingCharacter
@@ -188,7 +188,7 @@ export default function CharacterSelectPage() {
                 onClick={() => { if (locked && !canAfford) return; setSelectedClass(option.class) }}
                 disabled={locked && !canAfford}
                 className={[
-                  'relative flex flex-col rounded-xl border-2 p-2.5 text-left transition',
+                  'relative flex flex-col rounded-xl border-2 p-2.5 text-left transition [@media(max-height:460px)]:p-1.5',
                   theme.border, theme.bg,
                   locked && !canAfford ? 'cursor-not-allowed opacity-50' : 'hover:brightness-110',
                   selected ? `ring-2 ${theme.ring}` : '',
@@ -208,7 +208,7 @@ export default function CharacterSelectPage() {
                 )}
 
                 {/* Character image */}
-                <div className="relative h-20 w-full overflow-hidden rounded-lg [@media(max-height:400px)]:h-14">
+                <div className="relative h-20 w-full overflow-hidden rounded-lg [@media(max-height:460px)]:h-12">
                   <Image
                     src={option.imagePath}
                     alt={option.label}
@@ -230,17 +230,17 @@ export default function CharacterSelectPage() {
                   <p className={`text-[10px] font-black uppercase tracking-widest ${theme.labelColor}`}>
                     {theme.label} · <span className="normal-case tracking-normal text-white">{option.label}</span>
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold leading-snug text-white/65 flex-1">{option.description}</p>
+                  <p className="mt-1 text-[11px] font-semibold leading-snug text-white/65 flex-1 [@media(max-height:460px)]:hidden">{option.description}</p>
 
                   {/* Stats */}
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex flex-wrap gap-1.5 [@media(max-height:460px)]:mt-1">
                     <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}><Heart className="h-2.5 w-2.5 fill-current" /> HP {option.stats.maxHp}</span>
                     <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}><Swords className="h-2.5 w-2.5" /> ATK {option.stats.attack}</span>
                     <span className={`flex items-center gap-1 rounded-full ${theme.statBg} px-2 py-0.5 text-[10px] font-black text-white`}><Wind className="h-2.5 w-2.5" /> SPD {option.stats.speed}</span>
                   </div>
 
                   {/* Owned / status */}
-                  <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1">
+                  <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 [@media(max-height:460px)]:mt-1 [@media(max-height:460px)]:py-0.5">
                     {owned
                       ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-400" /><span className="text-xs font-black text-green-300">Owned</span></>
                       : canAfford
@@ -254,7 +254,7 @@ export default function CharacterSelectPage() {
           })}
         </div>
 
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex justify-center [@media(max-height:460px)]:mt-2">
           <Button
             size="lg"
             loading={saving}
