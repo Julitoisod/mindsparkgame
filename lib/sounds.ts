@@ -1,3 +1,4 @@
+import { chunkForSpeech } from './speechChunks'
 /**
  * lib/sounds.ts
  * Sound effects, looping background music, and voice-over.
@@ -352,24 +353,77 @@ export function stopMusic() {
 // Speech Synthesis reads story beats, questions, and results aloud so young
 // students can follow along even before they read fluently.
 
+// Android's WebView needs more care than a desktop browser:
+//  - voices arrive asynchronously; speaking before they load says nothing,
+//  - a long utterance is dropped partway (the storyline had no voice at all),
+//  - speak() straight after cancel() is sometimes ignored,
+//  - the engine pauses itself during long speech unless nudged.
+let speechToken = 0
+let resumeTimer: number | null = null
+
+function stopResumeTicks() {
+  if (resumeTimer !== null) {
+    window.clearInterval(resumeTimer)
+    resumeTimer = null
+  }
+}
+
+/** Resolves once the engine has voices (or immediately if it already does). */
+function whenVoicesReady(synth: SpeechSynthesis): Promise<void> {
+  if (synth.getVoices().length > 0) return Promise.resolve()
+  return new Promise(resolve => {
+    let settled = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      synth.removeEventListener('voiceschanged', done)
+      resolve()
+    }
+    synth.addEventListener('voiceschanged', done)
+    // Some engines never fire the event; don't wait on them forever.
+    window.setTimeout(done, 1200)
+  })
+}
+
 /** Speaks text aloud, cancelling anything already being spoken. */
 export function speak(text: string) {
   if (muted || !text) return
+  const token = ++speechToken
   try {
     const synth = window.speechSynthesis
     if (!synth) return
     synth.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'en-US'
-    utterance.rate = 0.95
-    utterance.pitch = 1.05
-    synth.speak(utterance)
+    stopResumeTicks()
+
+    void whenVoicesReady(synth).then(() => {
+      if (token !== speechToken || muted) return // superseded or muted meanwhile
+
+      const voice = synth.getVoices().find(v => v.lang?.startsWith('en')) ?? null
+      const pieces = chunkForSpeech(text)
+
+      pieces.forEach(piece => {
+        const utterance = new SpeechSynthesisUtterance(piece)
+        utterance.lang = 'en-US'
+        utterance.rate = 0.95
+        utterance.pitch = 1.05
+        if (voice) utterance.voice = voice
+        synth.speak(utterance)
+      })
+
+      // Keep the engine awake; stop ticking once the queue drains.
+      resumeTimer = window.setInterval(() => {
+        if (token !== speechToken || !synth.speaking) { stopResumeTicks(); return }
+        synth.resume()
+      }, 5000)
+    })
   } catch {
     // Speech not available — game stays playable
   }
 }
 
 export function stopSpeaking() {
+  speechToken++
+  stopResumeTicks()
   try {
     window.speechSynthesis?.cancel()
   } catch {

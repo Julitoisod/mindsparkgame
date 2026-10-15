@@ -43,9 +43,25 @@ export const viewport: Viewport = {
   themeColor: '#00441b',
 }
 
+/**
+ * Runs before anything paints: inside the student APK the teacher landing page
+ * must never be seen, not even for a frame. The React-side redirect in
+ * StudentAppRedirect only fires after hydration, which is why the panel kept
+ * seeing the teacher page flash before the login.
+ */
+const APP_REDIRECT = `try{
+  var c = window.Capacitor;
+  if (c && c.isNativePlatform && c.isNativePlatform() && location.pathname === '/') {
+    location.replace('/login');
+  }
+}catch(e){}`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`dark ${inter.variable} ${orbitron.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: APP_REDIRECT }} />
+      </head>
       <body className="bg-dark-900 text-primary-100 font-body antialiased min-h-screen">
         {children}
         <Toaster
