@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { describeDbError, execute, query } from '@/lib/db'
+import { describeDbError, execute, hasColumn, query } from '@/lib/db'
 import { getSession, hashPassword } from '@/lib/auth'
 import { composeFullName, defaultPasswordFor, generateUsername } from '@/lib/enrollment'
 import type { User } from '@/types/user'
@@ -77,6 +77,8 @@ export async function POST(request: Request) {
 
     // Every username already in use, so generated ones stay unique across the
     // whole system and within this batch.
+    // NULL when 2026-10-revision.sql has not reached this database yet
+    const keepsPassword = await hasColumn('users', 'initial_password')
     const takenRows = await query<{ username: string }>('SELECT username FROM users')
     const taken = new Set(takenRows.map(r => r.username.toLowerCase()))
 
@@ -121,9 +123,9 @@ export async function POST(request: Request) {
       try {
         await execute(
           `INSERT INTO users
-             (username, full_name, last_name, first_name, middle_name, email, password_hash, initial_password, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-          [username, fullName, lastName || null, firstName || null, middleName || null, email, passwordHash, password, teacher.id, classroomId],
+             (username, full_name, last_name, first_name, middle_name, email, password_hash, ${keepsPassword ? 'initial_password, ' : ''}role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ${keepsPassword ? '?, ' : ''}'student', 'enrolled', ?, ?, NOW())`,
+          [username, fullName, lastName || null, firstName || null, middleName || null, email, passwordHash, ...(keepsPassword ? [password] : []), teacher.id, classroomId],
         )
       } catch (error) {
         console.error('[teacher/students/bulk] insert', error)

@@ -1,5 +1,5 @@
   import { NextResponse } from 'next/server'
-  import { describeDbError, execute, query } from '@/lib/db'
+  import { describeDbError, execute, hasColumn, query } from '@/lib/db'
   import { getSession, hashPassword } from '@/lib/auth'
   import { composeFullName } from '@/lib/enrollment'
   import type { EnrollmentStatus, User } from '@/types/user'
@@ -122,6 +122,11 @@
       params.push(classroomId)
     }
 
+    // Falls back to NULL when 2026-10-revision.sql has not been applied here yet
+    const passwordColumn = (await hasColumn('users', 'initial_password'))
+      ? 'u.initial_password AS initialPassword'
+      : 'NULL AS initialPassword'
+
     const rows = await query<StudentRow>(
       `SELECT
         u.id,
@@ -130,7 +135,7 @@
         u.last_name AS lastName,
         u.first_name AS firstName,
         u.middle_name AS middleName,
-        u.initial_password AS initialPassword,
+        ${passwordColumn},
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,
@@ -268,13 +273,14 @@
     }
 
     const passwordHash = await hashPassword(password)
+    const keepsPassword = await hasColumn('users', 'initial_password')
     let result
     try {
       result = await execute(
         `INSERT INTO users
-          (username, full_name, last_name, first_name, middle_name, email, password_hash, initial_password, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-        [username, fullName || null, lastName || null, firstName || null, middleName || null, email, passwordHash, password, teacher.id, classroomId],
+          (username, full_name, last_name, first_name, middle_name, email, password_hash, ${keepsPassword ? 'initial_password, ' : ''}role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ${keepsPassword ? '?, ' : ''}'student', 'enrolled', ?, ?, NOW())`,
+        [username, fullName || null, lastName || null, firstName || null, middleName || null, email, passwordHash, ...(keepsPassword ? [password] : []), teacher.id, classroomId],
       )
     } catch (error) {
       console.error('[teacher/students] insert', error)
@@ -292,7 +298,7 @@
         u.last_name AS lastName,
         u.first_name AS firstName,
         u.middle_name AS middleName,
-        u.initial_password AS initialPassword,
+        ${keepsPassword ? 'u.initial_password AS initialPassword' : 'NULL AS initialPassword'},
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,

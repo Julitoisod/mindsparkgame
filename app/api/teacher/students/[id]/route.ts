@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { execute, query } from '@/lib/db'
+import { execute, hasColumn, query } from '@/lib/db'
 import { getSession, hashPassword } from '@/lib/auth'
 import { composeFullName } from '@/lib/enrollment'
 import type { EnrollmentStatus, User } from '@/types/user'
@@ -155,8 +155,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     updates.push('password_hash = ?')
     params.push(await hashPassword(body.password))
     // Keep the teacher's readable copy in step with the real password (item 6)
-    updates.push('initial_password = ?')
-    params.push(body.password)
+    if (await hasColumn('users', 'initial_password')) {
+      updates.push('initial_password = ?')
+      params.push(body.password)
+    }
   }
 
   if (updates.length === 0) {

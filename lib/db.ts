@@ -61,6 +61,29 @@ export async function execute(
 }
 
 /**
+ * Does this database have that column yet?
+ *
+ * Migrations are applied by hand on the live server, so a deploy can land
+ * before its migration does. Features that can degrade (rather than 500) ask
+ * this first. Cached per process — the answer only changes with a migration.
+ */
+const columnCache = new Map<string, boolean>()
+export async function hasColumn(table: string, column: string): Promise<boolean> {
+  const key = `${table}.${column}`
+  const cached = columnCache.get(key)
+  if (cached !== undefined) return cached
+
+  const rows = await query<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM information_schema.columns
+      WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+    [table, column],
+  )
+  const present = Number(rows[0]?.n ?? 0) > 0
+  columnCache.set(key, present)
+  return present
+}
+
+/**
  * Turns a driver error into something the teacher can act on.
  *
  * A missing column or table means a file in database/migrations/ was never
@@ -71,7 +94,7 @@ export async function execute(
 export function describeDbError(error: unknown, fallback: string): string {
   const code = (error as { code?: string } | null)?.code
   if (code === 'ER_BAD_FIELD_ERROR' || code === 'ER_NO_SUCH_TABLE') {
-    return 'The database is out of date — apply database/migrations/ (latest: 2026-08b-revision.sql) to this server, then try again.'
+    return 'The database is out of date — apply database/migrations/ (latest: 2026-10-revision.sql) to this server, then try again.'
   }
   if (code === 'ER_DUP_ENTRY') return 'That username is already taken.'
   return fallback
