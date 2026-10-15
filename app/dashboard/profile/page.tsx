@@ -177,22 +177,9 @@ export default function DashboardProfilePage() {
           )}
         </div>
 
-        {/* Account info */}
-        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3 space-y-2">
-          <p className="text-xs font-bold text-white/80 mb-1">Account</p>
-          <div className="flex justify-between text-xs">
-            <span className="text-white/50">Username</span>
-            <span className="text-white font-bold">{user.username}</span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-white/50">Email</span>
-            <span className="text-white font-bold truncate max-w-[180px]">{user.email}</span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-white/50">Role</span>
-            <span className="text-white font-bold capitalize">{user.role}</span>
-          </div>
-        </div>
+        {/* Account card removed (2026-10 panel feedback): students sign in with a
+            username and password only, and the email here is a generated
+            placeholder (name@student.mindspark) that only confused them. */}
 
         {/* Trophies — earned by clearing each level; shown before badges */}
         <div className="rounded-lg border border-amber-400/20 bg-[#22326f]/55 p-3">
