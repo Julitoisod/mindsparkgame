@@ -1,37 +1,48 @@
 /**
- * app/login/page.tsx — Login page
+ * app/login/page.tsx — STUDENT sign-in
+ *
+ * 2026-10 revision (items 12-13): the student login is fully separated from
+ * the teacher's. It has its own artwork and carries no teacher links; teachers
+ * sign in at /teacher-login, which is reachable from the landing page only.
  */
-import Link from 'next/link'
-import { Gamepad2 } from 'lucide-react'
+import Image from 'next/image'
 import LoginForm from '@/components/auth/LoginForm'
-import TeacherAccessLink from '@/components/auth/TeacherAccessLink'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Sign In' }
+export const metadata: Metadata = { title: 'Student Sign In' }
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen bg-game-gradient flex items-center justify-center p-4">
-      <div className="relative z-10 w-full max-w-md space-y-8">
+    <main className="relative min-h-screen overflow-hidden flex items-center justify-center p-4">
+      <Image
+        src="/revision/student-login-bg.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
+      />
+      <div className="absolute inset-0 bg-[#22326f]/35" />
+
+      <div className="relative z-10 w-full max-w-md space-y-6">
         {/* Logo */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <Gamepad2 className="w-8 h-8 text-primary-300" />
-            <span className="text-2xl font-black font-game text-white">MindSpark</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white">Welcome Back</h1>
-          <p className="text-primary-100/55 text-sm">Students sign in with credentials assigned by a teacher</p>
+        <div className="text-center">
+          <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-[0_3px_6px_rgba(34,50,111,0.85)] font-game">
+            MINDSPARK
+          </h1>
+          <span className="mt-1 inline-block rounded-full bg-[#6255E8] px-4 py-0.5 text-sm font-bold tracking-widest text-[#F4F2FF] shadow-lg">
+            MATH
+          </span>
         </div>
 
         {/* Form card */}
-        <div className="glass rounded-2xl p-8 space-y-6">
-          <LoginForm />
-          <TeacherAccessLink />
+        <div className="rounded-3xl border-2 border-[#9B83F5]/60 bg-[#F4F2FF]/95 p-7 shadow-2xl backdrop-blur-sm">
+          <div className="mb-5 text-center">
+            <h2 className="text-2xl font-black text-[#3459C7]">✦ Welcome Back! ✦</h2>
+            <p className="mt-1 text-sm text-[#22326f]/70">Log in to continue your learning journey.</p>
+          </div>
+          <LoginForm theme="student" />
         </div>
-
-        <p className="text-center text-xs text-primary-100/45">
-          <Link href="/" className="hover:text-primary-100 transition-colors">← Back to home</Link>
-        </p>
       </div>
     </main>
   )

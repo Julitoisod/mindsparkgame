@@ -1132,13 +1132,13 @@ export default function QuizAdventure({
         <div
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: "url('/vecteezy_deep-forest-scene-with-trail-in-the-woods-illustration_6079540.jpg')",
+            backgroundImage: "url('/revision/map-bg.jpg')",
             backgroundSize: 'cover',
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-black/45 via-black/10 to-black/50" />
+        <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-black/25 via-transparent to-black/30" />
 
         <div className="ui-layer flex flex-col">
           {/* Forest Trophies collected banner (req #17) */}
@@ -2205,17 +2205,17 @@ export default function QuizAdventure({
         {newBadgeNotification && (
           <motion.div
             key="badge-notification"
-            initial={{ opacity: 0, y: -40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -40 }}
-            transition={{ duration: 0.4 }}
-            className="absolute top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-yellow-400/40 bg-[#2e215b]/95 px-5 py-3 shadow-2xl backdrop-blur-md"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ duration: 0.35 }}
+            className="pointer-events-none absolute bottom-5 left-1/2 z-50 -translate-x-1/2 px-4"
           >
-            <div className="flex items-center gap-3">
-              {(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b ? <Image src={b.image} alt={b.name} width={44} height={44} unoptimized className="h-11 w-11 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]" /> : <Trophy className="h-7 w-7 text-yellow-300" /> })()}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-yellow-300">Badge Earned!</p>
-                <p className="text-sm font-black text-white">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.name ?? 'New Badge' })()}</p>
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-[#9B83F5] bg-[#22326f]/95 px-5 py-3 text-center shadow-2xl backdrop-blur-md">
+              {(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b ? <Image src={b.image} alt={b.name} width={64} height={64} unoptimized className="badge-pop-art h-16 w-16 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" /> : <Trophy className="h-10 w-10 text-[#D9B8FF]" /> })()}
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-wide text-[#D9B8FF]">Badge Earned!</p>
+                <p className="text-base font-black text-[#F4F2FF]">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.name ?? 'New Badge' })()}</p>
               </div>
             </div>
           </motion.div>

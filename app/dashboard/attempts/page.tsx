@@ -115,7 +115,7 @@ export default function DashboardAttemptsPage() {
             <button onClick={() => setFilterLevel(null)} className="rounded-md bg-purple-700/40 p-1.5 transition hover:bg-purple-700/60">
               <Filter className="h-3.5 w-3.5 text-fuchsia-400" />
             </button>
-            <div className="flex items-center gap-1.5 rounded-md bg-[#2d1f5e] px-2.5 py-1">
+            <div className="flex items-center gap-1.5 rounded-md bg-[#3459C7]/45 px-2.5 py-1">
               <Search className="h-3.5 w-3.5 text-purple-400" />
               <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="w-20 bg-transparent text-xs text-white placeholder-purple-400/60 focus:outline-none" />
             </div>
@@ -136,7 +136,7 @@ export default function DashboardAttemptsPage() {
                   <p className="text-xs font-black truncate">Lvl {level.id}: {level.title}</p>
                   <p className="text-[10px] text-purple-200 truncate">{level.topic}</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${complete ? 'bg-[#9333ea] text-[#faf5ff]' : open ? 'bg-purple-800/40 text-purple-100' : 'bg-purple-900/40 text-purple-300'}`}>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${complete ? 'bg-[#6255E8] text-[#faf5ff]' : open ? 'bg-purple-800/40 text-purple-100' : 'bg-purple-900/40 text-purple-300'}`}>
                   {complete ? 'Done' : open ? 'Ready' : 'Lock'}
                 </span>
               </div>

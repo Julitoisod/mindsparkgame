@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── MindSpark Math palette (2026-10 revision, item 5) ─────────────────────
+   60% royal blue · 25% vibrant purple · 10% lavender · 5% pink-lavender,
+   with soft white for text. Use these tokens instead of new hex literals. */
+:root {
+  --ms-blue:     #3459C7; /* main background, cards, interface */
+  --ms-purple:   #6255E8; /* buttons, highlights, selected cards */
+  --ms-lavender: #9B83F5; /* glowing borders, secondary buttons, accents */
+  --ms-pink:     #D9B8FF; /* magic effects, stars, soft glow */
+  --ms-white:    #F4F2FF; /* text, icons, readable interface details */
+  --ms-blue-deep: #22326f; /* darkened royal blue for large backdrops */
+}
+
 /* ── Base resets ───────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -10,7 +22,7 @@
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #1a1233;
+  background: var(--ms-blue-deep);
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
@@ -118,6 +130,8 @@ body:has(.student-app-shell) {
   overscroll-behavior: none;
 }
 
+/* One background for every student shell screen — Profile, Store, Attempts and
+   the logout state all share it (2026-10 revision, item 16). */
 .student-app-shell {
   position: fixed;
   inset: 0;
@@ -126,7 +140,7 @@ body:has(.student-app-shell) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(to bottom right, #1a1233, #3b2a73, #6b21a8);
+  background: linear-gradient(to bottom right, var(--ms-blue-deep), var(--ms-blue), var(--ms-purple));
 }
 
 .student-header {
@@ -238,6 +252,14 @@ body:has(.student-app-shell) {
 @media (max-height: 560px) {
   .game-screen img.result-trophy { height: 25vh !important; }
   .game-screen img.result-badge  { width: 12vh !important; height: 12vh !important; }
+}
+
+/* The badge-earned popup opts out too. Without this the full-bleed rule above
+   stretches the badge art to 100%/100%, which is what pushed the popup over the
+   question instead of leaving it a small centered card (2026-10 item 15). */
+.game-screen img.badge-pop-art {
+  width: 4rem !important;
+  height: 4rem !important;
 }
 
 .ui-layer {

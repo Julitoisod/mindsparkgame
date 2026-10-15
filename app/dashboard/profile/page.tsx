@@ -84,10 +84,8 @@ export default function DashboardProfilePage() {
 
   const stats = character.stats as CharacterStats
   const completedCount = progress?.completedLevels?.length ?? 0
-  const playtime = progress?.playtimeSeconds ?? 0
-  const hours = Math.floor(playtime / 3600)
-  const minutes = Math.floor((playtime % 3600) / 60)
-  const playtimeLabel = hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
+  // Playtime readouts removed (2026-10 item 16): answering is untimed, so the
+  // "0m" never moved and only confused the panel.
   const completionPercent = Math.min(100, Math.round((completedCount / 5) * 100))
   const remainingLevels = Math.max(0, 5 - completedCount)
 
@@ -114,49 +112,44 @@ export default function DashboardProfilePage() {
             <div className="flex gap-3 mt-0.5">
               <span className="text-[10px] text-white/50">{access.starBalance} stars</span>
               <span className="text-[10px] text-white/50">{completedCount}/5 done</span>
-              <span className="text-[10px] text-white/50">{playtimeLabel}</span>
             </div>
           </div>
         </div>
 
         {/* Compact Stats Grid */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-lg border border-[#c084fc]/15 bg-[#241a47] px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#c084fc]/70">Class</p>
-            <p className="text-xs font-bold text-[#f3e8ff] capitalize mt-0.5">{character.class}</p>
+          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Class</p>
+            <p className="text-xs font-bold text-[#F4F2FF] capitalize mt-0.5">{character.class}</p>
           </div>
-          <div className="rounded-lg border border-[#c084fc]/15 bg-[#241a47] px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#c084fc]/70">Level</p>
-            <p className="text-xs font-bold text-[#f3e8ff] mt-0.5">{stats.level}</p>
+          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Level</p>
+            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{stats.level}</p>
           </div>
-          <div className="rounded-lg border border-[#c084fc]/15 bg-[#241a47] px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#c084fc]/70">Zone</p>
-            <p className="text-xs font-bold text-[#f3e8ff] mt-0.5">{progress?.currentZone ?? 1}</p>
+          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Zone</p>
+            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{progress?.currentZone ?? 1}</p>
           </div>
-          <div className="rounded-lg border border-[#c084fc]/15 bg-[#241a47] px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#c084fc]/70">Playtime</p>
-            <p className="text-xs font-bold text-[#f3e8ff] mt-0.5">{playtimeLabel}</p>
+          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Member</p>
+            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{new Date(user.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           </div>
-          <div className="rounded-lg border border-[#c084fc]/15 bg-[#241a47] px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#c084fc]/70">Member</p>
-            <p className="text-xs font-bold text-[#f3e8ff] mt-0.5">{new Date(user.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-          </div>
-          <div className="rounded-lg border border-[#c084fc]/15 bg-[#241a47] px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#c084fc]/70">Left</p>
-            <p className="text-xs font-bold text-[#f3e8ff] mt-0.5">{remainingLevels} lvls</p>
+          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Left</p>
+            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{remainingLevels} lvls</p>
           </div>
         </div>
 
         {/* Progress */}
-        <div className="rounded-lg border border-[#c084fc]/15 bg-[#1a0f3a]/60 p-3">
+        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-white font-game">Progress</span>
-            <span className="text-xs font-bold text-[#c084fc]">{completedCount}/5</span>
+            <span className="text-xs font-bold text-[#9B83F5]">{completedCount}/5</span>
           </div>
-          <div className="h-2 rounded-full bg-[#241a47] overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#9333ea] to-[#c084fc] transition-all" style={{ width: `${completionPercent}%` }} />
+          <div className="h-2 rounded-full bg-[#3459C7]/35 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-[#6255E8] to-[#9B83F5] transition-all" style={{ width: `${completionPercent}%` }} />
           </div>
-          <div className="flex justify-between mt-2">
+          <div className="mt-3 grid grid-cols-2 divide-x divide-white/10">
             <div className="text-center">
               <p className="text-lg font-black text-white">{access.starBalance}</p>
               <p className="text-[10px] text-white/50 uppercase">Stars</p>
@@ -165,20 +158,16 @@ export default function DashboardProfilePage() {
               <p className="text-lg font-black text-white">{completionPercent}%</p>
               <p className="text-[10px] text-white/50 uppercase">Complete</p>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-black text-white">{hours > 0 ? `${hours}h` : `${minutes}m`}</p>
-              <p className="text-[10px] text-white/50 uppercase">Playtime</p>
-            </div>
           </div>
         </div>
 
         {/* Owned classes */}
-        <div className="rounded-lg border border-[#c084fc]/15 bg-[#1a0f3a]/60 p-3">
+        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3">
           <p className="text-xs font-bold text-white/80 mb-2">Unlocked Classes</p>
           {access.ownedClasses.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {access.ownedClasses.map(c => (
-                <span key={c} className="rounded-full border border-[#c084fc]/20 bg-[#241a47] px-2.5 py-0.5 text-[10px] font-medium capitalize text-[#f3e8ff]">
+                <span key={c} className="rounded-full border border-[#9B83F5]/20 bg-[#3459C7]/35 px-2.5 py-0.5 text-[10px] font-medium capitalize text-[#F4F2FF]">
                   {c}
                 </span>
               ))}
@@ -189,7 +178,7 @@ export default function DashboardProfilePage() {
         </div>
 
         {/* Account info */}
-        <div className="rounded-lg border border-[#c084fc]/15 bg-[#1a0f3a]/60 p-3 space-y-2">
+        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3 space-y-2">
           <p className="text-xs font-bold text-white/80 mb-1">Account</p>
           <div className="flex justify-between text-xs">
             <span className="text-white/50">Username</span>
@@ -206,7 +195,7 @@ export default function DashboardProfilePage() {
         </div>
 
         {/* Trophies — earned by clearing each level; shown before badges */}
-        <div className="rounded-lg border border-amber-400/20 bg-[#1a0f3a]/60 p-3">
+        <div className="rounded-lg border border-amber-400/20 bg-[#22326f]/55 p-3">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-bold text-white/80">Trophies</p>
             <span className="text-[10px] font-bold text-amber-300">{completedCount}/{levelStories.length}</span>
@@ -215,9 +204,9 @@ export default function DashboardProfilePage() {
             {levelStories.map(t => {
               const earned = (progress?.completedLevels ?? []).includes(t.level)
               return (
-                <div key={t.level} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-amber-400/40 bg-[#241a47]' : 'border-[#c084fc]/10 bg-[#241a47]/50 opacity-50 grayscale'}`}>
+                <div key={t.level} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-amber-400/40 bg-[#3459C7]/35' : 'border-[#9B83F5]/10 bg-[#3459C7]/35/50 opacity-50 grayscale'}`}>
                   <Image src={t.trophyImage} alt={t.trophyName} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
-                  <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#f3e8ff]' : 'text-[#f3e8ff]/50'}`}>{t.trophyName.replace(/ Trophy$/, '')}</p>
+                  <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#F4F2FF]' : 'text-[#F4F2FF]/50'}`}>{t.trophyName.replace(/ Trophy$/, '')}</p>
                 </div>
               )
             })}
@@ -225,10 +214,10 @@ export default function DashboardProfilePage() {
         </div>
 
         {/* Badges — centered, no per-badge card, wraps instead of scrolling */}
-        <div className="rounded-lg border border-[#c084fc]/15 bg-[#1a0f3a]/60 p-3">
+        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-bold text-white/80">Badges</p>
-            <span className="text-[10px] font-bold text-[#c084fc]">{BADGES.filter(b => earnedBadges.includes(b.id)).length}/{BADGES.length}</span>
+            <span className="text-[10px] font-bold text-[#9B83F5]">{BADGES.filter(b => earnedBadges.includes(b.id)).length}/{BADGES.length}</span>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             {BADGES.map(b => {
@@ -236,7 +225,7 @@ export default function DashboardProfilePage() {
               return (
                 <div key={b.id} className={`w-16 text-center ${earned ? '' : 'opacity-50 grayscale'}`}>
                   <Image src={b.image} alt={b.name} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
-                  <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#f3e8ff]' : 'text-[#f3e8ff]/50'}`}>{b.name}</p>
+                  <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#F4F2FF]' : 'text-[#F4F2FF]/50'}`}>{b.name}</p>
                 </div>
               )
             })}

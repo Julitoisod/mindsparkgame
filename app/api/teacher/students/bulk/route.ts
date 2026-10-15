@@ -121,9 +121,9 @@ export async function POST(request: Request) {
       try {
         await execute(
           `INSERT INTO users
-             (username, full_name, last_name, first_name, middle_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-          [username, fullName, lastName || null, firstName || null, middleName || null, email, passwordHash, teacher.id, classroomId],
+             (username, full_name, last_name, first_name, middle_name, email, password_hash, initial_password, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
+          [username, fullName, lastName || null, firstName || null, middleName || null, email, passwordHash, password, teacher.id, classroomId],
         )
       } catch (error) {
         console.error('[teacher/students/bulk] insert', error)

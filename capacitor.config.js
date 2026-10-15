@@ -3,7 +3,7 @@ module.exports = {
   appName: 'MindSpark',
   webDir: 'out',
   server: {
-    url: 'https://blueviolet-manatee-384643.hostingersite.com',
+    url: 'https://palegreen-elephant-128101.hostingersite.com',
     androidScheme: 'https'
   }
 };

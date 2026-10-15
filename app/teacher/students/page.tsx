@@ -71,6 +71,7 @@ type Student = PublicUser & {
   lastName: string | null
   firstName: string | null
   middleName: string | null
+  initialPassword: string | null
   progress: StudentProgress
   teacherUnlockedLevels: number[]
   quizScores: QuizScore[]
@@ -589,8 +590,31 @@ export default function TeacherStudentsPage() {
                                   className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                                 />
                               </div>
+                              {/* Item 6 (2026-10): the password handed to the student stays
+                                  visible here so the teacher has a copy if the student forgets it. */}
                               <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Password</label>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Current Password</label>
+                                <div className="flex items-center gap-2">
+                                  <code className="flex-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-bold text-purple-900">
+                                    {student.initialPassword ?? 'Not recorded — set a new one below'}
+                                  </code>
+                                  {student.initialPassword && (
+                                    <button
+                                      type="button"
+                                      onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation()
+                                        navigator.clipboard?.writeText(student.initialPassword ?? '')
+                                        toast.success('Password copied')
+                                      }}
+                                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                                    >
+                                      Copy
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Change Password</label>
                                 <input
                                   type="text"
                                   placeholder="Leave blank to keep current"

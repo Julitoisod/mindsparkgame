@@ -8,7 +8,6 @@ import { CheckCircle2, Gamepad2, Heart, Lock, LogOut, Sparkles, Star, Swords, Wi
 import { useAuth } from '@/hooks/useAuth'
 import { characterOptions } from '@/lib/characterOptions'
 import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
 import type { CharacterClass, CharacterData } from '@/types/character'
 
 type CharacterAccess = {
@@ -119,8 +118,20 @@ export default function CharacterSelectPage() {
   const selectedAffordable = access.starBalance >= selectedPrice
 
   return (
-    <main className="h-dvh bg-[#0f0a1f] text-white overflow-hidden flex flex-col">
-      <nav className="sticky top-0 z-20 border-b border-primary-200/10 bg-[#1a1233]/90 px-4 py-1 backdrop-blur-md">
+    <main className="relative h-dvh overflow-hidden text-white">
+      {/* 2026-10 revision item 9: artwork supplied by the panel */}
+      <Image
+        src="/revision/character-select-bg.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
+      />
+      <div className="absolute inset-0 bg-[#22326f]/45" />
+
+      <div className="relative z-10 flex h-full flex-col">
+      <nav className="sticky top-0 z-20 border-b border-[#9B83F5]/30 bg-[#22326f]/80 px-4 py-1.5 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <Gamepad2 className="h-5 w-5 shrink-0 text-[#c084fc]" />
@@ -134,48 +145,24 @@ export default function CharacterSelectPage() {
       </nav>
 
       <section className="mx-auto w-full max-w-7xl px-4 py-2 student-scroll-area">
-        <div className="mb-2 flex flex-col gap-2 rounded-lg border border-primary-200/15 bg-[#1a1233]/90 p-2.5 shadow-card backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#c084fc]">
-              {existingCharacter ? 'Current avatar' : 'First login setup'}
-            </p>
-            <h2 className="mt-0.5 text-base font-black leading-tight">Pick your avatar to start</h2>
-            <p className="mt-0.5 text-[11px] font-semibold text-primary-100/65">
-              {existingCharacter
-                ? 'First avatar is locked in. Unlock more with stars from boss clears.'
-                : 'Your first avatar is free. Unlock more later with earned stars.'}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Input
-              aria-label="Character name"
-              value={name}
-              onChange={event => setName(event.target.value)}
-              maxLength={64}
-              placeholder="Character name"
-              containerClassName="w-44"
-            />
-            <div className="rounded-lg border border-primary-200/15 bg-primary-950/30 px-3 py-1 text-center">
-              <p className="text-[9px] font-black uppercase tracking-wide text-primary-100/55">Stars</p>
-              <p className="flex items-center justify-center gap-1 text-sm font-black text-[#e9d5ff]">
-                <Star className="h-3.5 w-3.5 fill-current" />
-                {access.starBalance}
-              </p>
-            </div>
-            <Button
-              size="md"
-              loading={saving}
-              icon={<Sparkles className="h-4 w-4" />}
-              onClick={saveSelection}
-              disabled={!name.trim() || (selectedLocked && !selectedAffordable)}
-            >
-              {firstPick
-                ? 'Enter Dashboard'
-                : selectedLocked
-                  ? `Buy & Equip (${selectedPrice} stars)`
-                  : 'Enter Dashboard'}
-            </Button>
-          </div>
+        {/* Item 8: centered title, avatar row, then one Enter Dashboard button.
+            The star counter that used to sit here is gone — stars live in the
+            dashboard only (item 7). The character name is assigned
+            automatically so the student just picks a face and goes. */}
+        <div className="mb-3 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D9B8FF]">
+            {existingCharacter ? 'Current avatar' : 'First login setup'}
+          </p>
+          <h2 className="mt-1 flex items-center justify-center gap-3 text-xl font-black leading-tight">
+            <Sparkles className="h-4 w-4 text-[#D9B8FF]" />
+            Pick your avatar to start
+            <Sparkles className="h-4 w-4 text-[#D9B8FF]" />
+          </h2>
+          <p className="mt-1 text-[11px] font-semibold text-[#F4F2FF]/75">
+            {existingCharacter
+              ? 'First avatar is locked in. Unlock more with stars from boss clears.'
+              : 'Your first avatar is free! Unlock more later with earned stars.'}
+          </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -267,12 +254,25 @@ export default function CharacterSelectPage() {
           })}
         </div>
 
+        <div className="mt-4 flex justify-center">
+          <Button
+            size="lg"
+            loading={saving}
+            icon={<Sparkles className="h-4 w-4" />}
+            onClick={saveSelection}
+            disabled={!name.trim() || (selectedLocked && !selectedAffordable)}
+          >
+            {firstPick || !selectedLocked ? 'Enter Dashboard' : `Buy & Equip (${selectedPrice} stars)`}
+          </Button>
+        </div>
+
         {error && (
-          <p className="mt-3 rounded-lg border border-primary-200/35 bg-primary-950/45 px-3 py-1.5 text-xs text-primary-100">
+          <p className="mt-3 rounded-lg border border-[#9B83F5]/40 bg-[#22326f]/80 px-3 py-1.5 text-center text-xs text-[#F4F2FF]">
             {error}
           </p>
         )}
       </section>
+      </div>
     </main>
   )
 }

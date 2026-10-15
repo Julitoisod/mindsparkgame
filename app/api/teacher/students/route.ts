@@ -11,6 +11,7 @@
     lastName: string | null
     firstName: string | null
     middleName: string | null
+    initialPassword: string | null
     email: string
     role: 'student'
     enrollmentStatus: EnrollmentStatus
@@ -69,6 +70,9 @@
       lastName: row.lastName,
       firstName: row.firstName,
       middleName: row.middleName,
+      // Item 6 (2026-10): the teacher keeps a readable copy of the password
+      // they handed the student, for when the student forgets it.
+      initialPassword: row.initialPassword,
       email: row.email,
       role: row.role,
       enrollmentStatus: row.enrollmentStatus,
@@ -126,6 +130,7 @@
         u.last_name AS lastName,
         u.first_name AS firstName,
         u.middle_name AS middleName,
+        u.initial_password AS initialPassword,
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,
@@ -267,9 +272,9 @@
     try {
       result = await execute(
         `INSERT INTO users
-          (username, full_name, last_name, first_name, middle_name, email, password_hash, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
-        [username, fullName || null, lastName || null, firstName || null, middleName || null, email, passwordHash, teacher.id, classroomId],
+          (username, full_name, last_name, first_name, middle_name, email, password_hash, initial_password, role, enrollment_status, enrolled_by, classroom_id, enrolled_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'student', 'enrolled', ?, ?, NOW())`,
+        [username, fullName || null, lastName || null, firstName || null, middleName || null, email, passwordHash, password, teacher.id, classroomId],
       )
     } catch (error) {
       console.error('[teacher/students] insert', error)
@@ -287,6 +292,7 @@
         u.last_name AS lastName,
         u.first_name AS firstName,
         u.middle_name AS middleName,
+        u.initial_password AS initialPassword,
         u.email,
         u.role,
         u.enrollment_status AS enrollmentStatus,

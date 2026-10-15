@@ -45,7 +45,7 @@ export default function DashboardLayout({
   if (authLoading || !isAuthed || user?.role === 'teacher') {
     return (
       <div className="flex h-full items-center justify-center bg-[#0f0a1f]">
-        <div className="flex items-center gap-3 text-[#c084fc]">
+        <div className="flex items-center gap-3 text-[#9B83F5]">
           <Gamepad2 className="h-6 w-6 animate-pulse" />
           <span className="font-game text-sm">Loading...</span>
         </div>

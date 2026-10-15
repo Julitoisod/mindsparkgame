@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   middle_name   VARCHAR(60)      DEFAULT NULL,
   email         VARCHAR(255)     NOT NULL,
   password_hash VARCHAR(255)     NOT NULL,
+  initial_password VARCHAR(100)  DEFAULT NULL  COMMENT 'enrollment password, visible to the enrolling teacher (2026-10 revision)',
   role          ENUM('teacher','student') NOT NULL DEFAULT 'student',
   enrollment_status ENUM('pending','enrolled','disabled') NOT NULL DEFAULT 'enrolled',
   enrolled_by   INT UNSIGNED     DEFAULT NULL,
