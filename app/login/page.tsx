@@ -7,6 +7,7 @@
  */
 import Image from 'next/image'
 import LoginForm from '@/components/auth/LoginForm'
+import StudentLoginGate from '@/components/auth/StudentLoginGate'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Student Sign In' }
@@ -37,11 +38,13 @@ export default function LoginPage() {
 
         {/* Form card */}
         <div className="rounded-3xl border-2 border-[#9B83F5]/60 bg-[#F4F2FF]/95 p-7 shadow-2xl backdrop-blur-sm">
-          <div className="mb-5 text-center">
-            <h2 className="text-2xl font-black text-[#3459C7]">✦ Welcome Back! ✦</h2>
-            <p className="mt-1 text-sm text-[#22326f]/70">Log in to continue your learning journey.</p>
-          </div>
-          <LoginForm theme="student" />
+          <StudentLoginGate>
+            <div className="mb-5 text-center">
+              <h2 className="text-2xl font-black text-[#3459C7]">✦ Welcome Back! ✦</h2>
+              <p className="mt-1 text-sm text-[#22326f]/70">Log in to continue your learning journey.</p>
+            </div>
+            <LoginForm theme="student" />
+          </StudentLoginGate>
         </div>
       </div>
     </main>
