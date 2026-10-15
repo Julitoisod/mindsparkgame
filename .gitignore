@@ -16,3 +16,6 @@ android/.gradle/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Live (Hostinger) DB credentials — never commit
+.env.prod.local
