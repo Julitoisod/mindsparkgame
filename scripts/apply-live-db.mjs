@@ -86,13 +86,14 @@ if (!APPLY) {
 }
 
 console.log('\nAPPLYING')
-const migration = readFileSync(join(ROOT, 'database/migrations/2026-10-revision.sql'), 'utf8')
-await conn.query(migration)
-console.log('  1/2 migration 2026-10-revision.sql applied')
+for (const file of ['2026-10-revision.sql', '2026-10b-revision.sql']) {
+  await conn.query(readFileSync(join(ROOT, 'database/migrations', file), 'utf8'))
+  console.log(`  migration ${file} applied`)
+}
 
 const seed = readFileSync(join(ROOT, 'database/seed-questions.sql'), 'utf8')
 await conn.query(seed)
-console.log('  2/2 seed-questions.sql applied')
+console.log('  seed-questions.sql applied')
 
 const seeded = await countQuestions()
 const [[afterOwn]] = await conn.query('SELECT COUNT(*) c FROM quiz_questions WHERE created_by IS NOT NULL')
@@ -104,6 +105,8 @@ console.log('\nAFTER')
 console.log(`  system questions:   ${seeded}`)
 console.log(`  teacher questions:  ${afterOwn.c}  (unchanged: ${afterOwn.c === ownQuestions.c})`)
 console.log(`  initial_password:   ${await hasPasswordColumn() ? 'present' : 'MISSING'}`)
+const [[adminRow]] = await conn.query("SELECT COUNT(*) c FROM users WHERE role = 'admin'")
+console.log(`  admin accounts:     ${adminRow.c}`)
 for (const r of perLevel) console.log(`    L${r.level_number} ${r.phase.padEnd(6)} ${r.n}`)
 
 if (seeded !== 72) throw new Error(`expected 72 system questions, got ${seeded}`)
