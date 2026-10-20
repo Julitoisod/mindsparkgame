@@ -20,6 +20,7 @@ import {
 } from '@/lib/sounds'
 import {
   CalendarClock,
+  Clock,
   CheckCircle2,
   Crown,
   Flame,
@@ -98,6 +99,10 @@ const QUESTIONS_PER_PHASE = 5
 const MAX_HEARTS = 5
 const MAX_BOSS_HP = 100
 const NORMAL_POINTS = 10
+// Gameplay timer (2026-10b revision, item 5). Running out never ends the game:
+// it only asks whether the student is still there.
+const QUESTION_SECONDS = 60
+const BOSS_TRANSITION_MS = 2200
 // The result screen waits for the death animation to play on screen first
 // (panel revision: "the enemy must clearly be seen dying before the result").
 // The Level Up celebration runs over the dying boss, and the single Level
@@ -526,6 +531,11 @@ export default function QuizAdventure({
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [scorePopup, setScorePopup] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [screen, setScreen] = useState<Screen>('map')
+  // Item 5 — visible countdown + "Are you still there?" check
+  const [secondsLeft, setSecondsLeft] = useState(QUESTION_SECONDS)
+  const [idleCheck, setIdleCheck] = useState(false)
+  // Item 6 — animated hand-off from the quiz into the boss battle
+  const [bossTransition, setBossTransition] = useState(false)
 
   // Hide dashboard header when in battle/game screens
   useEffect(() => {
@@ -648,6 +658,30 @@ export default function QuizAdventure({
 
   // Stop all audio when the game unmounts (navigating away)
   useEffect(() => () => { stopMusic(); stopSpeaking() }, [])
+
+  // Item 5 — the question countdown. It is paused while an answer resolves,
+  // during the boss hand-off and while the "still there?" check is up.
+  useEffect(() => {
+    setSecondsLeft(QUESTION_SECONDS)
+  }, [question?.id, phase, screen])
+
+  useEffect(() => {
+    if (screen !== 'battle') return
+    if (phase !== 'normal' && phase !== 'boss') return
+    if (isResolving || idleCheck || bossTransition) return
+
+    const tick = window.setInterval(() => {
+      setSecondsLeft(current => {
+        if (current <= 1) {
+          // Time is up: never close the game, just ask if the student is there.
+          setIdleCheck(true)
+          return 0
+        }
+        return current - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(tick)
+  }, [screen, phase, isResolving, idleCheck, bossTransition, question?.id])
 
   // Voice-over: read each question aloud
   useEffect(() => {
@@ -866,6 +900,9 @@ export default function QuizAdventure({
 
   function startBossPhase() {
     playBossWarningSound()
+    // Item 6: hold on an animated warning before the first boss question
+    setBossTransition(true)
+    window.setTimeout(() => setBossTransition(false), BOSS_TRANSITION_MS)
     setPhase('boss')
     setQuestionIndex(0)
     setBossHp(MAX_BOSS_HP)
@@ -1597,6 +1634,14 @@ export default function QuizAdventure({
             tone="bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/40"
           />
           <StatPill
+            icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
+            label="Time"
+            value={`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
+            tone={secondsLeft <= 10
+              ? 'bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/40 animate-pulse'
+              : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/40'}
+          />
+          <StatPill
             icon={<Star className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />}
             label="Stars"
             value={stars}
@@ -2196,6 +2241,90 @@ export default function QuizAdventure({
                 />
               ))}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Item 6 — Quiz → Boss Battle transition */}
+      <AnimatePresence>
+        {bossTransition && (
+          <motion.div
+            key="boss-transition"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45 }}
+            className="absolute inset-0 z-[60] flex items-center justify-center bg-gradient-to-b from-[#1b0b0b]/95 via-[#3b0d0d]/90 to-[#1b0b0b]/95"
+          >
+            {/* sweeping bands give the backdrop a sense of movement */}
+            {[0, 1, 2].map(i => (
+              <motion.span
+                key={i}
+                className="absolute h-[3px] w-full bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"
+                style={{ top: `${30 + i * 20}%` }}
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: 'linear' }}
+              />
+            ))}
+            <motion.div
+              initial={{ scale: 0.7, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 14 }}
+              className="relative flex flex-col items-center gap-2 text-center"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.08, 1] }}
+                transition={{ duration: 0.9, repeat: Infinity }}
+                className="relative h-24 w-24"
+              >
+                <Image
+                  src={level.bossImage}
+                  alt={level.bossName}
+                  width={96}
+                  height={96}
+                  unoptimized
+                  className="badge-pop-art h-24 w-24 object-contain drop-shadow-[0_0_18px_rgba(255,120,60,0.65)]"
+                />
+              </motion.div>
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">Warning</p>
+              <p className="font-game text-2xl font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
+                Boss Battle Phase
+              </p>
+              <p className="text-xs font-bold text-amber-100/80">{level.bossName} blocks your path!</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Item 5 — "Are you still there?" instead of closing the game */}
+      <AnimatePresence>
+        {idleCheck && (
+          <motion.div
+            key="idle-check"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-sm rounded-2xl border-2 border-[#9B83F5] bg-[#22326f]/95 px-6 py-5 text-center shadow-2xl backdrop-blur-md"
+            >
+              <Clock className="mx-auto h-8 w-8 text-[#D9B8FF]" />
+              <p className="mt-2 font-game text-lg font-black text-[#F4F2FF]">Are you still there?</p>
+              <p className="mt-1 text-xs font-semibold text-[#F4F2FF]/75">
+                The timer ran out, but your progress is safe. Tap below to keep playing.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setIdleCheck(false); setSecondsLeft(QUESTION_SECONDS) }}
+                className="mt-4 w-full rounded-full bg-gradient-to-r from-[#3459C7] to-[#6255E8] py-2.5 text-sm font-black text-white shadow-lg hover:brightness-110"
+              >
+                Yes, I&apos;m still here
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -9,6 +9,7 @@ import {
   LogOut,
   Map,
   Store,
+  Trophy,
   User,
 } from 'lucide-react'
 
@@ -18,6 +19,7 @@ const navItems = [
   { id: 'map', label: 'Map', icon: Map, href: '/dashboard/map' },
   { id: 'profile', label: 'Profile', icon: User, href: '/dashboard/profile' },
   { id: 'store', label: 'Store', icon: Store, href: '/dashboard/store' },
+  { id: 'leaderboard', label: 'Ranks', icon: Trophy, href: '/dashboard/leaderboard' },
   { id: 'attempts', label: 'Attempts', icon: History, href: '/dashboard/attempts' },
 ]
 

@@ -1,5 +1,6 @@
 'use client'
 
+import ClassRecord from '@/components/teacher/ClassRecord'
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { AlertTriangle, BarChart3, CheckCircle2, Star, TrendingUp, Users } from 'lucide-react'
@@ -236,6 +237,9 @@ export default function TeacherReportsPage() {
           <p className="text-center text-purple-400 py-8">No students enrolled yet</p>
         )}
       </div>
+
+      {/* Electronic class record + export (2026-10b revision, item 4) */}
+      <ClassRecord />
 
       {/* Scores Per Level — matrix (panel req: each student's scores per level) */}
       <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5">

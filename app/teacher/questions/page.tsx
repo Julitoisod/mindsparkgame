@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   Power,
+  Search,
   Swords,
   Trash2,
   X,
@@ -35,6 +36,10 @@ export default function TeacherQuestionsPage() {
 
   const [filterLevel, setFilterLevel] = useState<number>(1)
   const [filterPhase, setFilterPhase] = useState<QuizPhase>('normal')
+  // Search + category filter (2026-10b revision, item 3). Both narrow the
+  // level/phase list already loaded, so they combine with it and each other.
+  const [search, setSearch] = useState('')
+  const [filterCategory, setFilterCategory] = useState('all')
 
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -164,7 +169,18 @@ export default function TeacherQuestionsPage() {
     }
   }
 
-  const activeCount = questions.filter(q => q.isActive).length
+  const visibleQuestions = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return questions.filter(q => {
+      if (filterCategory !== 'all' && q.category !== filterCategory) return false
+      if (!needle) return true
+      return q.prompt.toLowerCase().includes(needle)
+        || q.category.toLowerCase().includes(needle)
+        || q.options.some(o => o.toLowerCase().includes(needle))
+    })
+  }, [questions, search, filterCategory])
+
+  const activeCount = visibleQuestions.filter(q => q.isActive).length
 
   return (
     <div className="space-y-5">
@@ -215,22 +231,61 @@ export default function TeacherQuestionsPage() {
         </div>
       </div>
 
+      {/* Search + category (2026-10b revision, item 3) */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search questions, answers or categories..."
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+        </div>
+        <select
+          value={filterCategory}
+          onChange={e => setFilterCategory(e.target.value)}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
+        >
+          <option value="all">All categories</option>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {(search || filterCategory !== 'all') && (
+          <button
+            onClick={() => { setSearch(''); setFilterCategory('all') }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <p className="text-xs text-gray-500">
-        Level {filterLevel} · {filterPhase} phase — {questions.length} questions ({activeCount} active) across {categories.length} categories
+        Level {filterLevel} · {filterPhase} phase
+        {filterCategory !== 'all' && <> · {filterCategory}</>}
+        {search && <> · matching &quot;{search}&quot;</>}
+        {' '}— {visibleQuestions.length} of {questions.length} questions ({activeCount} active) across {categories.length} categories
       </p>
 
       {/* List */}
       {loading ? (
         <p className="text-sm text-gray-500 animate-pulse">Loading questions...</p>
-      ) : questions.length === 0 ? (
+      ) : visibleQuestions.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
           <FileQuestion className="mx-auto h-10 w-10 text-gray-300" />
-          <p className="mt-3 font-bold text-gray-900">No questions yet</p>
-          <p className="text-sm text-gray-500">Add the first question for this level and phase.</p>
+          <p className="mt-3 font-bold text-gray-900">
+            {questions.length === 0 ? 'No questions yet' : 'No questions match those filters'}
+          </p>
+          <p className="text-sm text-gray-500">
+            {questions.length === 0
+              ? 'Add the first question for this level and phase.'
+              : 'Try a different search term, category, level or phase.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {questions.map(q => (
+          {visibleQuestions.map(q => (
             <div key={q.id} className={`rounded-xl border bg-white shadow-sm p-4 ${q.isActive ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

@@ -1,6 +1,6 @@
 // ─── User Types ───────────────────────────────────────────────────────────────
 
-export type UserRole = 'teacher' | 'student'
+export type UserRole = 'admin' | 'teacher' | 'student'
 export type EnrollmentStatus = 'pending' | 'enrolled' | 'disabled'
 
 export interface User {

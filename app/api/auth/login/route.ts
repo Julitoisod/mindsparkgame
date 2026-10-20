@@ -1,5 +1,5 @@
 import { NextResponse }    from 'next/server'
-import { query }            from '@/lib/db'
+import { hasColumn, query } from '@/lib/db'
 import { verifyPassword, signToken, setAuthCookie } from '@/lib/auth'
 import { validateLogin }   from '@/lib/validations'
 import type { User, PublicUser } from '@/types/user'
@@ -27,9 +27,13 @@ export async function POST(request: Request) {
 
   try {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
-    const rows = await query<User>(
+    // is_active arrives with 2026-10b; fall back so a deploy that lands before
+    // its migration still logs people in.
+    const activeColumn = (await hasColumn('users', 'is_active')) ? 'is_active' : '1 AS is_active'
+    const rows = await query<User & { is_active: number }>(
       `SELECT
          id, username, email, password_hash, role, enrollment_status, enrolled_by, enrolled_at,
+         ${activeColumn},
          avatar_url, created_at, updated_at
        FROM users
        WHERE ${isEmail ? 'email = ?' : 'username = ?'}
@@ -47,6 +51,14 @@ export async function POST(request: Request) {
     const valid2 = await verifyPassword(password, user.password_hash!)
     if (!valid2) {
       return NextResponse.json({ success: false, message: 'Invalid email or password' }, { status: 401 })
+    }
+
+    // A teacher the admin deactivated keeps their data but cannot sign in (item 1)
+    if (user.role === 'teacher' && Number(user.is_active) === 0) {
+      return NextResponse.json(
+        { success: false, message: 'This teacher account has been deactivated. Please contact the administrator.' },
+        { status: 403 },
+      )
     }
 
     if (user.role === 'student' && user.enrollment_status !== 'enrolled') {

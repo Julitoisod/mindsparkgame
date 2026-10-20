@@ -9,6 +9,7 @@ import {
   FileQuestion,
   GraduationCap,
   LayoutDashboard,
+  UserPlus,
   LogOut,
   Menu,
   School,
@@ -17,9 +18,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
+// Order follows the evaluators' suggested navigation (2026-10b revision, item 2)
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/teacher/dashboard' },
-  { id: 'classrooms', label: 'Sections', icon: School, href: '/teacher/classrooms' },
+  { id: 'classrooms', label: 'Section', icon: School, href: '/teacher/classrooms' },
+  { id: 'enrollment', label: 'Enrollment', icon: UserPlus, href: '/teacher/enrollment' },
   { id: 'students', label: 'Students', icon: Users, href: '/teacher/students' },
   { id: 'questions', label: 'Question Bank', icon: FileQuestion, href: '/teacher/questions' },
   { id: 'reports', label: 'Reports', icon: BarChart3, href: '/teacher/reports' },

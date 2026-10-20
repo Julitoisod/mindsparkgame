@@ -42,7 +42,7 @@ export default function LoginForm({ theme = 'default' }: { theme?: 'default' | '
     const user = await login({ identifier, password })
 
     // The student app is student-only — block teacher sign-ins here (req #1)
-    if (studentApp && user?.role === 'teacher') {
+    if (studentApp && (user?.role === 'teacher' || user?.role === 'admin')) {
       await logout()
       setLoading(false)
       setErrors({ identifier: 'This app is for students. Teachers, please sign in on the web portal.' })
@@ -51,7 +51,9 @@ export default function LoginForm({ theme = 'default' }: { theme?: 'default' | '
 
     setLoading(false)
 
-    if (user?.role === 'teacher') {
+    if (user?.role === 'admin') {
+      router.replace('/admin/teachers')
+    } else if (user?.role === 'teacher') {
       router.replace('/teacher/dashboard')
     } else if (user?.role === 'student') {
       const charRes = await fetch('/api/character', { credentials: 'include' })
