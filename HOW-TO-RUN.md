@@ -51,9 +51,9 @@ DB_USER=root
 DB_PASSWORD=
 DB_NAME=mindsparkgame
 
-JWT_SECRET=mindsparkgame_dev_secret_replace_in_prod
+JWT_SECRET=<generate: openssl rand -hex 32>
 JWT_EXPIRES_IN=7d
-COOKIE_SECRET=mindsparkgame_cookie_secret_replace_in_prod
+COOKIE_SECRET=<generate: openssl rand -hex 32>
 
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NODE_ENV=development
