@@ -19,3 +19,5 @@ android/.gradle/
 
 # Live (Hostinger) DB credentials — never commit
 .env.prod.local
+.env
+.claude-deploy.json
