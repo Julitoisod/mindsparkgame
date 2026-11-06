@@ -104,6 +104,9 @@ body {
 .character-sprite {
   position: relative;
   z-index: 2;
+  /* Decorative, and scaled 1.4x over the info column — it must never swallow
+     taps meant for the Buy / Select button beside it (Nov 2026 store bug). */
+  pointer-events: none;
   height: clamp(150px, 30vw, 220px);
   width: auto;
   object-fit: contain;
@@ -151,6 +154,18 @@ body:has(.student-app-shell) {
   align-items: center;
   padding: 0 12px;
   overflow: hidden;
+}
+
+/* The floating nav tray: 6 × 48px buttons, 6px gaps, 6px padding, 1px border,
+   8px from the corner. Page headers reserve this box so nothing hides behind
+   it — the Store's star count and the Attempts search used to (Nov 2026). */
+:root {
+  --student-nav-w: 342px;
+  --student-nav-h: 70px;
+}
+.student-page-head {
+  min-height: calc(var(--student-nav-h) - 0.5rem);
+  padding-right: calc(var(--student-nav-w) + 0.25rem);
 }
 
 .student-content {
@@ -260,6 +275,15 @@ body:has(.student-app-shell) {
 .game-screen img.badge-pop-art {
   width: 4rem !important;
   height: 4rem !important;
+}
+
+/* Finale trophy row (Nov 2026) — five small trophies under the victory text */
+.game-screen img.finale-trophy {
+  width: 3rem !important;
+  height: 3rem !important;
+}
+@media (max-height: 460px) {
+  .game-screen img.finale-trophy { width: 2.4rem !important; height: 2.4rem !important; }
 }
 
 .ui-layer {

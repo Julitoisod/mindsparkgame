@@ -35,17 +35,13 @@ export default function HomePage() {
           <Zap className="h-6 w-6 text-[#D9B8FF] fill-[#D9B8FF]" />
           <span className="text-xl font-black text-[#F4F2FF]">MindSpark</span>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/teacher-login" className="text-sm text-[#F4F2FF]/75 hover:text-white transition-colors px-4 py-2">
-            Teacher Login
-          </Link>
-          <Link
-            href="/register"
-            className="text-sm font-bold bg-[#6255E8] text-white px-4 py-2 rounded-lg hover:bg-[#9B83F5] transition-colors shadow-lg shadow-[#6255E8]/40"
-          >
-            Teacher Setup
-          </Link>
-        </div>
+        {/* Teacher accounts are created by the admin now — no self sign-up (Nov 2026) */}
+        <Link
+          href="/teacher-login"
+          className="text-sm font-bold bg-[#6255E8] text-white px-4 py-2 rounded-lg hover:bg-[#9B83F5] transition-colors shadow-lg shadow-[#6255E8]/40"
+        >
+          Sign In
+        </Link>
       </nav>
 
       {/* ── Hero over the school photo ── */}
@@ -89,10 +85,7 @@ export default function HomePage() {
             </div>
 
             <p className="text-sm text-[#F4F2FF]/70">
-              New teacher?{' '}
-              <Link href="/register" className="font-semibold text-[#D9B8FF] underline underline-offset-2 hover:text-white">
-                Set up your account
-              </Link>
+              New teacher? Your MindSpark administrator creates your account.
             </p>
           </div>
         </div>

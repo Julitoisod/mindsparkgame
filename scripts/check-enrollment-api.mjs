@@ -12,6 +12,7 @@
  * Creates a throwaway teacher + section, so it is safe to re-run.
  */
 import assert from 'node:assert/strict'
+import { createTeacher } from './lib/teacher-account.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000'
 const stamp = Date.now().toString(36)
@@ -33,12 +34,13 @@ const step = msg => console.log(`  ${msg}`)
 console.log('Enrollment API check\n')
 
 // ── Teacher + section ────────────────────────────────────────────────────────
-const reg = await api('/api/auth/register', {
+await createTeacher(BASE, { username: teacher, email: `${teacher}@mindspark.test`, password: 'Passw0rd123' })
+const signIn = await api('/api/auth/login', {
   method: 'POST',
-  body: JSON.stringify({ username: teacher, email: `${teacher}@mindspark.test`, password: 'Passw0rd123' }),
+  body: JSON.stringify({ identifier: teacher, password: 'Passw0rd123' }),
 })
-assert.equal(reg.status, 201, `register failed: ${JSON.stringify(reg.json)}`)
-step(`teacher ${teacher} registered`)
+assert.equal(signIn.status, 200, `teacher login failed: ${JSON.stringify(signIn.json)}`)
+step(`teacher ${teacher} created by the admin and signed in`)
 
 const section = await api('/api/teacher/classrooms', {
   method: 'POST',

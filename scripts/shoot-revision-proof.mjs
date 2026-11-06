@@ -12,6 +12,7 @@ import puppeteer from 'puppeteer-core'
 import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createTeacher } from './lib/teacher-account.mjs'
 
 const CHROME = process.env.CHROME_PATH
   ?? 'C:/Users/ISOD/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe'
@@ -39,7 +40,7 @@ async function api(p, body) {
 
 // ── Teacher + student, every level unlocked ──────────────────────────────────
 const teacher = `r${stamp}`
-await api('/api/auth/register', { username: teacher, email: `${teacher}@mindspark.test`, password: PASS })
+await createTeacher(BASE, { username: teacher, email: `${teacher}@mindspark.test`, password: PASS })
 await api('/api/auth/login', { identifier: teacher, password: PASS })
 const section = await api('/api/teacher/classrooms', { name: `Grade 5 - Revision ${stamp}`, schoolYear: '2026-2027' })
 const student = `s${stamp}`
@@ -47,8 +48,9 @@ const enrolled = await api('/api/teacher/students', {
   classroomId: section.data.id, lastName: 'Cabusao', firstName: 'Prescillia', middleName: 'Basmayor',
   username: student, password: STUDENT_PASS,
 })
-console.log('  enrolled student returns initialPassword:', JSON.stringify(enrolled.data.initialPassword))
-if (enrolled.data.initialPassword !== STUDENT_PASS) throw new Error('item 6: password not readable back')
+// Nov 2026 revision reversed 2026-10 item 6: students change their own password,
+// so the teacher must no longer be able to read it back.
+if (enrolled.data.initialPassword) throw new Error('Nov 2026: the student password is still readable by the teacher')
 
 const db = await mysql.createConnection({ host: 'localhost', user: 'root', database: 'mindsparkgame', charset: 'utf8mb4' })
 const [[{ id: teacherId }]] = await db.query('SELECT id FROM users WHERE username = ?', [teacher])
@@ -163,7 +165,7 @@ for (const [name, url] of [['store', '/dashboard/store'], ['attempts', '/dashboa
   await shot(`rev-08-${name}-same-background`)
 }
 
-// ── 6. Teacher sees the student's password ───────────────────────────────────
+// ── 6 (reversed Nov 2026). Teacher no longer sees the student's password ─────
 const teacherPage = await browser.newPage()
 await teacherPage.setViewport({ width: 1280, height: 950 })
 await teacherPage.setCookie({ name: cookie.split('=')[0], value: cookie.split('=').slice(1).join('='), url: BASE })
@@ -174,10 +176,10 @@ await teacherPage.evaluate(() => {
   card?.click()
 })
 await wait(1500)
-await teacherPage.screenshot({ path: `${OUT}/rev-09-teacher-sees-password.png` })
-console.log('  shot rev-09-teacher-sees-password')
+await teacherPage.screenshot({ path: `${OUT}/rev-09-teacher-no-password.png` })
+console.log('  shot rev-09-teacher-no-password')
 const teacherText = await teacherPage.evaluate(() => document.body.innerText)
-if (!teacherText.includes(STUDENT_PASS)) throw new Error('item 6: password not visible in Account Details')
+if (teacherText.includes(STUDENT_PASS) || /Current Password/.test(teacherText)) throw new Error('Nov 2026: the student password is still shown to the teacher')
 
 await browser.close()
 console.log('\nAll revision checks PASSED. Screenshots in proof-screenshots/rev-*.png')

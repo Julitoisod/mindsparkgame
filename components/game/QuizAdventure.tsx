@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -19,6 +19,8 @@ import {
   loadMutedPreference,
 } from '@/lib/sounds'
 import {
+  Award,
+  BellRing,
   CalendarClock,
   Clock,
   CheckCircle2,
@@ -42,7 +44,19 @@ import {
 
 import * as quizContent from '@/lib/quizContent'
 import { BADGES } from '@/lib/badges'
-import { getLevelStory, overallStory } from '@/lib/storyContent'
+import { getLevelStory, levelStories, overallStory } from '@/lib/storyContent'
+import {
+  BOSS_POINTS,
+  MAX_LEVELS,
+  QUESTIONS_PER_LEVEL,
+  QUESTIONS_PER_PHASE,
+  QUIZ_POINTS,
+  isBossDefeated,
+  levelPoints,
+  levelStarRating,
+  trophyFlag,
+  trophyLevels,
+} from '@/lib/scoring'
 import {
   bossSpriteAnimations,
   heroSpriteAnimationsByClass,
@@ -52,8 +66,22 @@ import {
 } from '@/lib/quizSprites'
 import type { CharacterClass, CharacterStats } from '@/types/character'
 
-type Phase = 'normal' | 'boss' | 'levelComplete' | 'gameComplete' | 'gameOver'
+type Phase = 'normal' | 'boss' | 'levelComplete' | 'gameComplete'
 type Screen = 'map' | 'story' | 'battle'
+
+/** Snapshot of a finished level, taken once so the result screen never reads stale state. */
+type LevelResult = {
+  quizCorrect: number
+  bossCorrect: number
+  hearts: number
+  bossDefeated: boolean
+  /** The trophy was already owned before this run — it is not shown as new again. */
+  hadTrophy: boolean
+  /** All 5 levels are now cleared in the current run — Level 5's Next opens the finale. */
+  allCleared: boolean
+  /** First time this level was ever completed (Level 1's first clear opens 2–5). */
+  firstClear: boolean
+}
 
 type RawRecord = Record<string, unknown>
 
@@ -94,11 +122,14 @@ interface QuizAdventureProps {
   initialLevel?: number
 }
 
-const MAX_LEVELS = 5
-const QUESTIONS_PER_PHASE = 5
 const MAX_HEARTS = 5
 const MAX_BOSS_HP = 100
-const NORMAL_POINTS = 10
+// A badge popup holds the game this long before the boss / result follows it.
+// Kept >= the 3 s answer beat, so a badge won on the last quiz answer stays up
+// until the boss animation takes over ("badge first, then boss").
+const BADGE_POPUP_MS = 3000
+// Set by LoginForm on a student sign-in: the deadline reminder shows once per login
+const REMINDER_FLAG = 'mindspark-show-reminder'
 // Gameplay timer (2026-10b revision, item 5). Running out never ends the game:
 // it only asks whether the student is still there.
 const QUESTION_SECONDS = 60
@@ -521,15 +552,13 @@ export default function QuizAdventure({
   const [levelIndex, setLevelIndex] = useState(initialLevel - 1)
   const [phase, setPhase] = useState<Phase>('normal')
   const [questionIndex, setQuestionIndex] = useState(0)
+  // Hearts belong to the boss battle only (panel revision, Nov 2026)
   const [hearts, setHearts] = useState(MAX_HEARTS)
-  const [score, setScore] = useState(0)
   const [stars, setStars] = useState(0)
-  const [savedStarBalance, setSavedStarBalance] = useState(0)
   const [bossHp, setBossHp] = useState(MAX_BOSS_HP)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
-  const [scorePopup, setScorePopup] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [screen, setScreen] = useState<Screen>('map')
   // Item 5 — visible countdown + "Are you still there?" check
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_SECONDS)
@@ -547,6 +576,18 @@ export default function QuizAdventure({
     return () => document.body.classList.remove('game-battle-active')
   }, [screen])
   const [normalCorrectCount, setNormalCorrectCount] = useState(0)
+  const [bossCorrectCount, setBossCorrectCount] = useState(0)
+  const [resultInfo, setResultInfo] = useState<LevelResult | null>(null)
+  // Levels whose boss was defeated — one Forest Trophy each (quest_flags)
+  const [trophies, setTrophies] = useState<number[]>([])
+  // "Play Again" run: levels cleared since restarting at Level 1, or null when
+  // not replaying. Lifetime completedLevels stay intact for the teacher.
+  const [replayLevels, setReplayLevels] = useState<number[] | null>(null)
+  // Deadline reminder shown after a student signs in
+  const [reminderOpen, setReminderOpen] = useState(false)
+  // Mid-game badge popups, shown one at a time
+  const [badgeQueue, setBadgeQueue] = useState<string[]>([])
+  const badgePopupUntil = useRef(0)
   const [completedLevels, setCompletedLevels] = useState<number[]>([])
   const [teacherUnlockedLevels, setTeacherUnlockedLevels] = useState<number[]>([])
   const [progressLoaded, setProgressLoaded] = useState(!characterId)
@@ -557,7 +598,6 @@ export default function QuizAdventure({
   const [showParticles, setShowParticles] = useState<'correct' | 'wrong' | null>(null)
   const [levelStars, setLevelStars] = useState<Record<number, number>>({})
   const [earnedBadges, setEarnedBadges] = useState<string[]>([])
-  const [newBadgeNotification, setNewBadgeNotification] = useState<string | null>(null)
   // Badges first earned during THIS level run. A badge is shown once, on the
   // level that earned it, and never again (panel revision, Aug 2026).
   const [newBadgesThisLevel, setNewBadgesThisLevel] = useState<string[]>([])
@@ -611,20 +651,28 @@ export default function QuizAdventure({
   const phaseLabel = phase === 'boss' ? 'Boss Battle' : 'Quiz Run' // eslint-disable-line @typescript-eslint/no-unused-vars
   const progressLabel = // eslint-disable-line @typescript-eslint/no-unused-vars
     phase === 'boss' ? `Boss ${questionIndex + 1}/${QUESTIONS_PER_PHASE}` : `Correct ${normalCorrectCount}/${QUESTIONS_PER_PHASE}`
-  // Accessible if: already completed (replay), teacher unlocked the starting gate,
-  // or Level 1 is passed — the teacher only ever opens Level 1; passing it
-  // automatically opens Levels 2–5 for the student (panel revision).
+  // The map reads the current run: after "Play Again" that is the replay run,
+  // otherwise every level the student has ever completed.
+  const runLevels = replayLevels ?? completedLevels
+  // Accessible if: cleared in this run, teacher unlocked it, or Level 1 is
+  // cleared — passing Level 1 opens Levels 2–5 (panel revision). A replay
+  // always restarts at Level 1, whatever the teacher unlocks say.
   function isLevelAccessible(lvlNum: number): boolean {
-    if (completedLevels.includes(lvlNum)) return true
+    if (runLevels.includes(lvlNum)) return true
+    if (replayLevels && lvlNum === 1) return true
     if (teacherUnlockedLevels.includes(lvlNum)) return true
-    if (completedLevels.includes(1)) return true
+    if (runLevels.includes(1)) return true
     return false
   }
-  // Star rating for the level just cleared — 3 stars means a flawless run.
-  const levelRating = hearts >= 5 ? 3 : hearts >= 3 ? 2 : 1
+  // This level's points so far (HUD) — quiz 10 each, boss 20 each
+  const runPoints = levelPoints(normalCorrectCount, bossCorrectCount)
   const shouldShowBoss = phase === 'boss' || phase === 'levelComplete' || phase === 'gameComplete'
-  // The enemy is clearly "defeated" once its HP hits zero or the level is cleared (req #15)
-  const bossDefeated = phase === 'levelComplete' || phase === 'gameComplete' || (phase === 'boss' && bossHp <= 0)
+  // The boss falls only if the student landed at least one hit (req #15 + Nov 2026)
+  const bossDefeated =
+    phase === 'gameComplete' ||
+    (phase === 'levelComplete' && resultInfo?.bossDefeated === true) ||
+    (phase === 'boss' && bossHp <= 0)
+  const heroLost = phase === 'levelComplete' && resultInfo?.bossDefeated === false
   // Avatar color fades with each wrong answer; turns fully gray when all are wrong (req #16)
   const fadeRatio = Math.min(1, wrongCount / MAX_HEARTS)
   const heroFadeStyle: React.CSSProperties = {
@@ -633,9 +681,9 @@ export default function QuizAdventure({
     transition: 'filter 0.5s ease, opacity 0.5s ease',
   }
   const heroAction: SpriteAction =
-    feedback === 'correct' ? 'attack' : feedback === 'wrong' || phase === 'gameOver' ? 'hurt' : 'idle'
+    feedback === 'correct' ? 'attack' : feedback === 'wrong' || heroLost ? 'hurt' : 'idle'
   const bossAction: SpriteAction =
-    phase === 'levelComplete' || phase === 'gameComplete'
+    bossDefeated && phase !== 'boss'
       ? 'defeat'
       : phase === 'boss' && feedback === 'correct'
         ? 'hurt'
@@ -704,16 +752,58 @@ export default function QuizAdventure({
   // Voice-over: announce the level result once the popup appears
   useEffect(() => {
     if (soundMuted || !resultShown) return
-    if (phase === 'levelComplete') {
+    if (phase === 'levelComplete' && resultInfo) {
       const story = getLevelStory(level.number)
-      speak(`Level ${level.number} complete! You earned the ${story.trophyName}!`)
+      if (!resultInfo.bossDefeated) speak(`Level ${level.number} complete. The ${story.enemy} is still undefeated. Don't give up, hero!`)
+      else if (resultInfo.hadTrophy) speak(`Level ${level.number} complete! Well done, hero!`)
+      else speak(`Level ${level.number} complete! You earned the ${story.trophyName}!`)
     } else if (phase === 'gameComplete') {
-      speak('Congratulations, hero! You defeated the Dark Oracle and restored peace to the Enchanted Forest!')
-    } else if (phase === 'gameOver') {
-      speak('Oh no, your hearts ran out. Try again, hero!')
+      speak("Congratulations, hero! You've completed all five levels. The kingdom is saved!")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultShown, phase, soundMuted])
+
+  // Mid-game badge popups: one at a time, each held for BADGE_POPUP_MS
+  useEffect(() => {
+    if (badgeQueue.length === 0) return
+    const timer = window.setTimeout(() => setBadgeQueue(queue => queue.slice(1)), BADGE_POPUP_MS)
+    return () => window.clearTimeout(timer)
+  }, [badgeQueue])
+
+  function popBadges(ids: string[]) {
+    if (ids.length === 0) return
+    badgePopupUntil.current = Math.max(Date.now(), badgePopupUntil.current) + ids.length * BADGE_POPUP_MS
+    setBadgeQueue(queue => [...queue, ...ids])
+  }
+
+  /** Runs `next` once every badge popup on screen has finished (badge first, then the boss / result). */
+  function afterBadgePopups(next: () => void) {
+    window.setTimeout(next, Math.max(0, badgePopupUntil.current - Date.now()))
+  }
+
+  // Deadline reminder: shown on the map once per sign-in while a level the
+  // teacher set a deadline for is still not completed (panel revision, Nov 2026).
+  const pendingDeadline = useMemo(() => {
+    const pending = Object.entries(deadlines)
+      .map(([lvl, dueAt]) => ({ level: Number(lvl), dueAt }))
+      .filter(item => !completedLevels.includes(item.level))
+      .sort((a, b) => (parseDeadline(a.dueAt)?.getTime() ?? 0) - (parseDeadline(b.dueAt)?.getTime() ?? 0))
+    return pending[0] ?? null
+  }, [deadlines, completedLevels])
+
+  useEffect(() => {
+    if (!progressLoaded || screen !== 'map') return
+    let flagged = false
+    try { flagged = window.sessionStorage.getItem(REMINDER_FLAG) === '1' } catch { /* storage blocked */ }
+    if (!flagged) return
+    if (pendingDeadline) setReminderOpen(true)
+    else dismissReminder()
+  }, [progressLoaded, screen, pendingDeadline])
+
+  function dismissReminder() {
+    try { window.sessionStorage.removeItem(REMINDER_FLAG) } catch { /* storage blocked */ }
+    setReminderOpen(false)
+  }
 
   useEffect(() => {
     if (!characterId) {
@@ -731,7 +821,8 @@ export default function QuizAdventure({
         if (!active) return
         const loadedCompleted = normalizeCompletedLevels(json.data?.completedLevels)
         const loadedStars = Number(json.meta?.starBalance ?? 0)
-        const loadedScore = Number(json.meta?.totalScore ?? 0)
+        const flags = asRecord(json.data?.questFlags)
+        const loadedReplay = Array.isArray(flags.replayLevels) ? normalizeCompletedLevels(flags.replayLevels) : null
         const loadedTeacherUnlocks: number[] = Array.isArray(json.meta?.teacherUnlockedLevels)
           ? json.meta.teacherUnlockedLevels.filter((n: unknown) => typeof n === 'number' && n >= 1 && n <= MAX_LEVELS)
           : []
@@ -756,13 +847,14 @@ export default function QuizAdventure({
         setCompletedLevels(loadedCompleted)
         setTeacherUnlockedLevels(loadedTeacherUnlocks)
         setStars(Number.isFinite(loadedStars) ? loadedStars : 0)
-        setSavedStarBalance(Number.isFinite(loadedStars) ? loadedStars : 0)
-        setScore(Number.isFinite(loadedScore) ? loadedScore : 0)
+        setTrophies(trophyLevels(flags))
+        setReplayLevels(loadedReplay)
         setLevelStars(loadedLevelStars)
         setEarnedBadges(loadedBadges)
-        setLevelIndex(nextPlayableLevelIndex(loadedCompleted))
-        setPhase(loadedCompleted.length >= MAX_LEVELS ? 'gameComplete' : 'normal')
-        setScreen(loadedCompleted.length >= MAX_LEVELS ? 'battle' : 'map')
+        setLevelIndex(nextPlayableLevelIndex(loadedReplay ?? loadedCompleted))
+        // Always open on the map — the finale shows once, after Level 5's result
+        setPhase('normal')
+        setScreen('map')
         setQuestionIndex(0)
         setBossHp(MAX_BOSS_HP)
         setNormalCorrectCount(0)
@@ -781,20 +873,23 @@ export default function QuizAdventure({
     }
   }, [characterId])
 
-  async function saveLevelProgress(nextCompletedLevels: number[], starRating?: number, perfectRun?: boolean) {
+  /** One POST /api/progress. quest_flags are MERGED on the server, so only changed flags are sent. */
+  async function saveProgress(opts: {
+    completed: number[]
+    questFlags: Record<string, unknown>
+    starRating?: number
+    perfectRun?: boolean
+    gainedExp?: number
+  }) {
     if (!characterId) return
 
     const stats = characterStats ?? FALLBACK_CHARACTER_STATS
     const nextLevel = Math.min(MAX_LEVELS, Math.max(stats.level, Math.min(level.number + 1, MAX_LEVELS)))
-
-    // Build levelStars payload with the new rating
-    const updatedLevelStars: Record<string, number> = {}
-    for (const [k, v] of Object.entries(levelStars)) {
-      updatedLevelStars[String(k)] = v
-    }
-    if (starRating && starRating > 0) {
-      const existing = updatedLevelStars[String(level.number)] ?? 0
-      updatedLevelStars[String(level.number)] = Math.max(existing, starRating)
+    const updatedLevelStars: Record<string, number> = Object.fromEntries(
+      Object.entries(levelStars).map(([k, v]) => [String(k), v]),
+    )
+    if (opts.starRating && opts.starRating > 0) {
+      updatedLevelStars[String(level.number)] = Math.max(updatedLevelStars[String(level.number)] ?? 0, opts.starRating)
     }
 
     setProgressSaving(true)
@@ -813,15 +908,14 @@ export default function QuizAdventure({
             ...stats,
             hp: Math.max(1, hearts * 20),
             level: nextLevel,
-            experience: stats.experience + level.rewards.exp,
+            experience: stats.experience + (opts.gainedExp ?? 0),
           },
           currentZone: `zone_${nextLevel}`,
-          questFlags: Object.fromEntries(nextCompletedLevels.map(item => [`level${item}BossDefeated`, true])),
-          completedLevels: nextCompletedLevels,
+          questFlags: opts.questFlags,
+          completedLevels: opts.completed,
           playtimeSeconds: 0,
-          starsEarned: QUESTIONS_PER_PHASE,
           levelStars: updatedLevelStars,
-          perfectRun: perfectRun === true,
+          perfectRun: opts.perfectRun === true,
         }),
       })
       const json = await response.json()
@@ -868,33 +962,45 @@ export default function QuizAdventure({
     }
   }
 
-  function resetGame() {
-    setLevelIndex(0)
-    setPhase('normal')
-    setScreen('map')
-    setQuestionIndex(0)
-    setHearts(MAX_HEARTS)
-    setStars(savedStarBalance)
-    setBossHp(MAX_BOSS_HP)
-    setNormalCorrectCount(0)
-    setWrongCount(0)
-    setSelectedAnswer(null)
-    setFeedback(null)
-    setCompletedLevels([])
-    void loadQuizSet(1)
-  }
-
-  function retryLevel() {
-    setPhase('normal')
-    setScreen('battle')
+  /** Clears everything that belongs to a single level run. */
+  function resetRun() {
     setQuestionIndex(0)
     setHearts(MAX_HEARTS)
     setBossHp(MAX_BOSS_HP)
     setNormalCorrectCount(0)
+    setBossCorrectCount(0)
     setWrongCount(0)
     setSelectedAnswer(null)
     setFeedback(null)
     setNewBadgesThisLevel([])
+    setResultInfo(null)
+  }
+
+  // Finale "Play Again" (panel revision, Nov 2026): back to Level 1 with
+  // Levels 2–5 locked until Level 1 is cleared again. Trophies, badges, stars
+  // and the teacher's record are untouched — only the map restarts.
+  function playAgain() {
+    playClickSound()
+    setReplayLevels([])
+    void saveProgress({ completed: completedLevels, questFlags: { replayLevels: [] } })
+    resetRun()
+    setLevelIndex(0)
+    setPhase('normal')
+    setScreen('map')
+    void loadQuizSet(1)
+  }
+
+  function backToMap() {
+    playClickSound()
+    resetRun()
+    setPhase('normal')
+    setScreen('map')
+  }
+
+  function retryLevel() {
+    resetRun()
+    setPhase('normal')
+    setScreen('battle')
     void loadQuizSet(level.number) // re-sample so retries aren't memorized
   }
 
@@ -914,72 +1020,94 @@ export default function QuizAdventure({
     setFeedback(null)
   }
 
-  function completeLevel(nextBossHp: number) {
-    playLevelCompleteSound()
-    const nextCompleted = Array.from(new Set([...completedLevels, level.number]))
-    setCompletedLevels(nextCompleted)
+  /**
+   * Every level ends here — even 0/10 (panel revision, Nov 2026). The level
+   * counts as completed; the trophy only comes with a defeated boss.
+   */
+  function completeLevel(final: { quizCorrect: number; bossCorrect: number; hearts: number }) {
+    const defeated = isBossDefeated(final.bossCorrect)
+    const correct = final.quizCorrect + final.bossCorrect
+    const starRating = levelStarRating(correct)
+    const nextCompleted = normalizeCompletedLevels([...completedLevels, level.number])
+    const nextRun = replayLevels ? normalizeCompletedLevels([...replayLevels, level.number]) : null
+    const allCleared = (nextRun ?? nextCompleted).length >= MAX_LEVELS
 
-    const starRating = levelRating
-    setLevelStars(prev => {
-      const existing = prev[level.number] ?? 0
-      return { ...prev, [level.number]: Math.max(existing, starRating) }
+    setCompletedLevels(nextCompleted)
+    // Finishing all five again ends the replay; the map shows everything cleared
+    setReplayLevels(nextRun && !allCleared ? nextRun : null)
+    if (defeated) setTrophies(prev => normalizeCompletedLevels([...prev, level.number]))
+    if (starRating > 0) {
+      setLevelStars(prev => ({ ...prev, [level.number]: Math.max(prev[level.number] ?? 0, starRating) }))
+    }
+    setResultInfo({
+      ...final,
+      bossDefeated: defeated,
+      hadTrophy: trophies.includes(level.number),
+      allCleared,
+      firstClear: !completedLevels.includes(level.number),
     })
 
-    // 10/10 run: every quiz answer correct AND the boss brought to 0 HP
-    // (0 HP is only reachable when all 5 boss answers were correct)
-    const perfectRun = normalCorrectCount >= QUESTIONS_PER_PHASE && Math.max(0, nextBossHp) <= 0
+    const questFlags: Record<string, unknown> = {}
+    if (defeated) questFlags[trophyFlag(level.number)] = true
+    if (replayLevels) questFlags.replayLevels = allCleared ? null : nextRun
+    void saveProgress({
+      completed: nextCompleted,
+      questFlags,
+      starRating,
+      perfectRun: correct >= QUESTIONS_PER_LEVEL,
+      gainedExp: level.rewards.exp,
+    })
 
-    void saveLevelProgress(nextCompleted, starRating, perfectRun)
-    setSavedStarBalance(current => current + QUESTIONS_PER_PHASE)
-    setBossHp(Math.max(0, nextBossHp))
+    setHearts(final.hearts)
+    if (defeated) setBossHp(0)
     setScreen('battle')
-    setPhase(levelIndex >= MAX_LEVELS - 1 ? 'gameComplete' : 'levelComplete')
+    setPhase('levelComplete')
     setSelectedAnswer(null)
     setFeedback(null)
-
-    // Sequence (panel revision, Aug 2026): boss death + Level Up animation
-    // first, then ONE Level Complete screen carrying result, trophy and badges.
     setResultShown(false)
-    window.setTimeout(() => setResultShown(true), LEVEL_UP_ANIM_MS)
 
-    setShowLevelUp(true)
-    window.setTimeout(() => setShowLevelUp(false), LEVEL_UP_ANIM_MS)
+    if (defeated) {
+      // Boss death + Level Up first, then ONE result screen (Aug 2026 sequence)
+      playLevelCompleteSound()
+      setShowLevelUp(true)
+      window.setTimeout(() => setShowLevelUp(false), LEVEL_UP_ANIM_MS)
+      window.setTimeout(() => setResultShown(true), LEVEL_UP_ANIM_MS)
+    } else {
+      // The boss stands; a short beat on the hurt hero, then the result
+      playGameOverSound()
+      window.setTimeout(() => setResultShown(true), HERO_DEFEAT_ANIM_MS)
+    }
   }
 
   function continueToNextLevel() {
-    const nextLevelNumber = Math.min(level.number + 1, MAX_LEVELS)
-    setLevelIndex(current => Math.min(current + 1, MAX_LEVELS - 1))
+    playClickSound()
+    // Level 5: Next opens the finale once all five are cleared (panel revision, Nov 2026)
+    if (level.number >= MAX_LEVELS) {
+      if (resultInfo?.allCleared) {
+        playLevelCompleteSound()
+        setPhase('gameComplete')
+        return
+      }
+      backToMap()
+      return
+    }
+    const nextLevelNumber = level.number + 1
+    resetRun()
+    setLevelIndex(nextLevelNumber - 1)
     setPhase('normal')
     setScreen('map')
-    setQuestionIndex(0)
-    setBossHp(MAX_BOSS_HP)
-    setHearts(MAX_HEARTS)
-    setNormalCorrectCount(0)
-    setWrongCount(0)
-    setSelectedAnswer(null)
-    setFeedback(null)
-    setNewBadgesThisLevel([])
     void loadQuizSet(nextLevelNumber) // preload the next level's fresh set
   }
 
   function enterLevel(targetIndex: number) {
     const targetLevel = levels[targetIndex]
     if (!targetLevel) return
+    if (!isLevelAccessible(targetLevel.number)) return
 
-    const unlocked = isLevelAccessible(targetLevel.number)
-    if (!unlocked) return
-
+    resetRun()
     setLevelIndex(targetIndex)
     setPhase('normal')
     setScreen('story') // show the storyline before the battle begins (req #9)
-    setQuestionIndex(0)
-    setBossHp(MAX_BOSS_HP)
-    setHearts(MAX_HEARTS)
-    setNormalCorrectCount(0)
-    setWrongCount(0)
-    setSelectedAnswer(null)
-    setFeedback(null)
-    setNewBadgesThisLevel([])
     void loadQuizSet(targetLevel.number)
   }
 
@@ -990,9 +1118,7 @@ export default function QuizAdventure({
   }
 
   function handleAnswer(option: string, optionIndex: number) {
-    if (screen === 'map' || isResolving || phase === 'levelComplete' || phase === 'gameComplete' || phase === 'gameOver') {
-      return
-    }
+    if (screen === 'map' || isResolving || (phase !== 'normal' && phase !== 'boss')) return
 
     const correct = isCorrectAnswer(question, option, optionIndex)
     setSelectedAnswer(option)
@@ -1018,7 +1144,10 @@ export default function QuizAdventure({
       window.setTimeout(() => { setScreenShake(false); setShowParticles(null) }, 500)
     }
 
-    // Fire-and-forget: record attempt to the database
+    // Hearts are a boss-battle resource only; a wrong quiz answer costs none
+    const nextHearts = phase === 'boss' && !correct ? Math.max(0, hearts - 1) : hearts
+
+    // Record the attempt; mid-game badges (Math Streak, Star Collector) come back here
     if (characterId) {
       fetch('/api/attempts', {
         method: 'POST',
@@ -1031,88 +1160,55 @@ export default function QuizAdventure({
           questionId: question.id,
           selectedAnswer: option,
           isCorrect: correct,
-          heartsRemaining: correct ? hearts : Math.max(0, hearts - 1),
-          scoreEarned: correct ? (phase === 'boss' ? NORMAL_POINTS * 2 : NORMAL_POINTS) : 0,
+          heartsRemaining: nextHearts,
+          scoreEarned: correct ? (phase === 'boss' ? BOSS_POINTS : QUIZ_POINTS) : 0,
         }),
       })
         .then(response => response.json())
         .then(json => {
-          // math_streak is awarded per-answer by the server
           if (Array.isArray(json?.newBadges) && json.newBadges.length > 0) {
             setEarnedBadges(prev => Array.from(new Set([...prev, ...json.newBadges])))
             setNewBadgesThisLevel(prev => Array.from(new Set([...prev, ...json.newBadges])))
-            setNewBadgeNotification(json.newBadges[0])
-            window.setTimeout(() => setNewBadgeNotification(null), 4000)
+            popBadges(json.newBadges)
           }
         })
         .catch(() => { /* silent fail — don't block gameplay */ })
     }
 
     window.setTimeout(() => {
-      if (phase === 'normal') {
-        if (correct) {
-          setNormalCorrectCount(current => current + 1)
-          setScore(current => current + NORMAL_POINTS)
-          setStars(current => current + 1)
-          setScorePopup(`+${NORMAL_POINTS} points, +1 star`)
-          window.setTimeout(() => setScorePopup(null), 1500)
-        } else {
-          const nextHearts = Math.max(0, hearts - 1)
-          setHearts(nextHearts)
-          if (nextHearts === 0) {
-            playGameOverSound()
-            setPhase('gameOver')
-            setSelectedAnswer(null)
-            // Brief pause so the hero's defeat is visible before the popup
-            setResultShown(false)
-            window.setTimeout(() => setResultShown(true), HERO_DEFEAT_ANIM_MS)
-            return
-          }
-        }
+      // One star per correct answer, quiz or boss
+      if (correct) setStars(current => current + 1)
+      const lastQuestion = questionIndex >= QUESTIONS_PER_PHASE - 1
 
-        // Fixed 5 questions — advance regardless of right/wrong
-        if (questionIndex >= QUESTIONS_PER_PHASE - 1) {
-          startBossPhase()
-        } else {
+      if (phase === 'normal') {
+        if (correct) setNormalCorrectCount(current => current + 1)
+        // The quiz never ends early: all 5 questions, then the boss — even at 0/5.
+        // A badge earned on the last answer is shown before the boss arrives.
+        if (lastQuestion) afterBadgePopups(startBossPhase)
+        else {
           setQuestionIndex(current => current + 1)
           setSelectedAnswer(null)
           setFeedback(null)
         }
-
         return
       }
 
-      if (phase === 'boss') {
-        if (correct) {
-          const nextBossHp = Math.max(0, bossHp - BOSS_DAMAGE)
-          setBossHp(nextBossHp)
-          setScore(current => current + NORMAL_POINTS * 2)
-          setScorePopup(`+${NORMAL_POINTS * 2} points, ${BOSS_DAMAGE} damage`)
-          window.setTimeout(() => setScorePopup(null), 1500)
-        } else {
-          const nextHearts = Math.max(0, hearts - 1)
-          setHearts(nextHearts)
-          if (nextHearts === 0) {
-            playGameOverSound()
-            setPhase('gameOver')
-            setSelectedAnswer(null)
-            // Brief pause so the hero's defeat is visible before the popup
-            setResultShown(false)
-            window.setTimeout(() => setResultShown(true), HERO_DEFEAT_ANIM_MS)
-            return
-          }
-        }
-
-        // Fixed 5 boss questions — complete level after last question
-        if (questionIndex >= QUESTIONS_PER_PHASE - 1) {
-          completeLevel(Math.max(0, bossHp - (correct ? BOSS_DAMAGE : 0)))
-          return
-        }
-
-        setQuestionIndex(current => current + 1)
-        setSelectedAnswer(null)
-        setFeedback(null)
+      // Boss battle: all 5 questions, then the result — even at 0/5
+      const nextBossCorrect = bossCorrectCount + (correct ? 1 : 0)
+      if (correct) {
+        setBossCorrectCount(nextBossCorrect)
+        setBossHp(current => Math.max(0, current - BOSS_DAMAGE))
+      } else {
+        setHearts(nextHearts)
       }
+
+      if (lastQuestion) {
+        afterBadgePopups(() => completeLevel({ quizCorrect: normalCorrectCount, bossCorrect: nextBossCorrect, hearts: nextHearts }))
+        return
+      }
+      setQuestionIndex(current => current + 1)
+      setSelectedAnswer(null)
+      setFeedback(null)
     }, 3000)
   }
 
@@ -1135,7 +1231,7 @@ export default function QuizAdventure({
     ]
 
     function getLevelStatus(lvlNum: number): 'cleared' | 'open' | 'locked' {
-      if (completedLevels.includes(lvlNum)) return 'cleared'
+      if (runLevels.includes(lvlNum)) return 'cleared'
       if (isLevelAccessible(lvlNum)) return 'open' // teacher unlock OR prev level cleared (auto-progress)
       return 'locked'
     }
@@ -1161,7 +1257,7 @@ export default function QuizAdventure({
     const openIdx = levels.findIndex(lvl => getLevelStatus(lvl.number) === 'open')
     // ponytail: treats nodes as evenly spaced along the path — close enough visually
     const clearedFraction =
-      openIdx > 0 ? openIdx / (MAX_LEVELS - 1) : completedLevels.length >= MAX_LEVELS ? 1 : 0
+      openIdx > 0 ? openIdx / (MAX_LEVELS - 1) : runLevels.length >= MAX_LEVELS ? 1 : 0
 
     return (
       <section className="game-screen map-stage text-white">
@@ -1178,11 +1274,12 @@ export default function QuizAdventure({
         <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-black/25 via-transparent to-black/30" />
 
         <div className="ui-layer flex flex-col">
-          {/* Forest Trophies collected banner (req #17) */}
-          <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2">
+          {/* Forest Trophies collected banner (req #17). Sits beside the sound
+              button: centred, it ran under the nav rail on a phone (Nov 2026). */}
+          <div className="absolute left-14 top-2 z-20">
             <div className="flex items-center gap-1.5 rounded-full border-2 border-amber-400/60 bg-[#2a1a0a]/85 px-4 py-1.5 shadow-lg backdrop-blur-sm">
               <Trophy className="h-4 w-4 text-amber-300" />
-              <span className="text-xs font-black text-amber-200">Trophies: {completedLevels.length}/{MAX_LEVELS}</span>
+              <span className="text-xs font-black text-amber-200">Trophies: {trophies.length}/{MAX_LEVELS}</span>
               <span className="text-amber-400/50">•</span>
               <span className="text-xs font-black text-amber-200">Badges: {earnedBadges.length}/{BADGES.length}</span>
             </div>
@@ -1372,6 +1469,83 @@ export default function QuizAdventure({
             </div>
           </div>
         </div>
+
+        {/* Deadline reminder — once per sign-in, auto-worded from the teacher's
+            level + date + time (panel revision, Nov 2026) */}
+        <AnimatePresence>
+          {reminderOpen && pendingDeadline && (() => {
+            const due = parseDeadline(pendingDeadline.dueAt)
+            const overdue = isDeadlineOverdue(pendingDeadline.dueAt)
+            const meta = levelMeta[pendingDeadline.level - 1]
+            // A still-locked level opens once Level 1 is cleared, so start there
+            const startLevel = isLevelAccessible(pendingDeadline.level) ? pendingDeadline.level : 1
+            return (
+              <motion.div
+                key="deadline-reminder"
+                data-testid="deadline-reminder"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[90] flex items-center justify-center bg-[#140d2e]/70 p-3 backdrop-blur-sm"
+              >
+                <motion.div
+                  initial={{ scale: 0.85, y: 12 }}
+                  animate={{ scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                  className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl border-2 border-[#9B83F5] bg-[#F4F2FF] p-4 text-center shadow-2xl"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <motion.span animate={{ rotate: [0, -14, 12, -8, 0] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.4 }}>
+                      <BellRing className="h-6 w-6 text-[#6255E8]" />
+                    </motion.span>
+                    <h2 className="text-lg font-black text-[#4c2fa8]">Activity Reminder!</h2>
+                    {overdue && (
+                      <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black uppercase text-white">Overdue</span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm font-bold text-[#22326f]">Don&apos;t Forget Your Mission!</p>
+                  <p className="mt-1 text-xs text-[#22326f]/75">
+                    You still need to complete <b className="text-[#22326f]">Level {pendingDeadline.level} – {meta.env}: {meta.subtitle}</b> assigned by your teacher.
+                  </p>
+                  <dl className="mt-2 grid grid-cols-3 gap-1 rounded-2xl bg-white px-2 py-1.5 text-left shadow-sm">
+                    {[
+                      ['Activity', `Level ${pendingDeadline.level}`],
+                      ['Deadline', due ? due.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : pendingDeadline.dueAt],
+                      ['Time', due ? due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0 text-center">
+                        <dt className="text-[10px] font-bold uppercase text-[#22326f]/55">{label}</dt>
+                        <dd className={`truncate text-xs font-black ${overdue && label !== 'Activity' ? 'text-red-600' : 'text-[#22326f]'}`}>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className={`mt-2 rounded-xl px-3 py-1.5 text-xs font-bold ${overdue ? 'bg-red-100 text-red-700' : 'bg-[#e8dcff] text-[#4c2fa8]'}`}>
+                    {overdue
+                      ? 'This mission is overdue. Finish it as soon as you can, hero!'
+                      : 'Complete your mission before the deadline. You can do it!'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { dismissReminder(); playClickSound(); enterLevel(startLevel - 1) }}
+                    className="mt-2 w-full rounded-2xl bg-gradient-to-r from-[#3459C7] to-[#6255E8] py-2 text-sm font-black uppercase tracking-wide text-white shadow-lg hover:brightness-110"
+                  >
+                    Start Level {startLevel}
+                  </button>
+                  {startLevel !== pendingDeadline.level && (
+                    <p className="mt-1 text-[10px] font-semibold text-[#22326f]/60">Clear Level 1 first — it opens Level {pendingDeadline.level}.</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { playClickSound(); dismissReminder() }}
+                    className="mt-1 text-[11px] font-semibold text-[#22326f]/60 underline-offset-2 hover:underline"
+                  >
+                    Remind me later
+                  </button>
+                </motion.div>
+              </motion.div>
+            )
+          })()}
+        </AnimatePresence>
       </section>
     )
   }
@@ -1458,7 +1632,7 @@ export default function QuizAdventure({
                     Level {level.number} • {story.place}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-bold text-purple-200/80">
-                    <Trophy className="h-3 w-3" /> Trophies: {completedLevels.length}/{MAX_LEVELS}
+                    <Trophy className="h-3 w-3" /> Trophies: {trophies.length}/{MAX_LEVELS}
                   </span>
                   {deadlines[level.number] && (
                     <span
@@ -1650,7 +1824,7 @@ export default function QuizAdventure({
           <StatPill
             icon={<Trophy className="h-4 w-4 sm:h-5 sm:w-5" />}
             label="Points"
-            value={score}
+            value={runPoints}
             tone="bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/40"
           />
         </div>
@@ -1901,7 +2075,6 @@ export default function QuizAdventure({
 
               {phase === 'levelComplete' && (<span className="hidden" />)}
               {phase === 'gameComplete' && (<span className="hidden" />)}
-              {phase === 'gameOver' && (<span className="hidden" />)}
             </AnimatePresence>
           </div>
         </main>
@@ -1909,260 +2082,275 @@ export default function QuizAdventure({
       </div>
 
       {/* ── Level Complete ────────────────────────────────────────────────
-          One screen for Result + Trophy + Badges (panel revision, Aug 2026).
-          It opens after the Level Up animation. The badge column is dropped
-          from the DOM entirely when nothing new was earned, so the result and
-          trophy widen and the screen stays clean on a landscape phone. */}
+          One screen for Result + Trophy + Badges. Every level reaches it —
+          even 0/10 (panel revision, Nov 2026): the stats are quiz + boss
+          combined, hearts are the boss battle's, the trophy needs a defeated
+          boss, and a trophy or badge is only celebrated the first time. */}
       <AnimatePresence>
-        {phase === 'levelComplete' && resultShown && (
-          <motion.div
-            key="level-complete-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/75 backdrop-blur-sm p-3"
-          >
+        {phase === 'levelComplete' && resultShown && resultInfo && (() => {
+          const story = getLevelStory(level.number)
+          const correct = resultInfo.quizCorrect + resultInfo.bossCorrect
+          const rating = levelStarRating(correct)
+          const newTrophy = resultInfo.bossDefeated && !resultInfo.hadTrophy
+          const message = resultInfo.bossDefeated
+            ? null
+            : correct === 0
+              ? 'You can continue your adventure! Try harder in the next battle.'
+              : "You completed the level, but the boss is still undefeated. Don't give up! You can continue your adventure and improve your skills in the next battle."
+          return (
             <motion.div
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.85, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-              className="m-auto w-full max-w-[860px] [@media(max-height:560px)]:max-w-[760px]"
+              key="level-complete-modal"
+              data-testid="level-result"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/75 backdrop-blur-sm p-3"
             >
-              {/* Banner */}
-              <div className="text-center">
-                <h2 className="font-game text-2xl sm:text-3xl [@media(max-height:560px)]:text-xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-yellow-400 to-amber-500 drop-shadow-[0_3px_8px_rgba(250,204,21,0.5)]">
-                  Level {level.number} Complete!
-                </h2>
-                <div className="mt-1 flex items-center justify-center gap-1">
-                  {[1, 2, 3].map(s => (
-                    <motion.span
-                      key={s}
-                      initial={{ scale: 0, rotate: -40 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 12, delay: 0.1 + s * 0.12 }}
-                    >
-                      <Star className={`h-7 w-7 [@media(max-height:560px)]:h-5 [@media(max-height:560px)]:w-5 ${s <= levelRating ? 'fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.7)]' : 'text-white/25'}`} />
-                    </motion.span>
-                  ))}
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-0.5 text-xs font-black uppercase tracking-wide text-emerald-300">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> {levelRating === 3 ? 'Perfect!' : levelRating === 2 ? 'Great!' : 'Passed'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Result / Trophy / Badges — the badge panel only exists when earned */}
-              <div className={`mt-2 grid gap-2.5 [@media(max-height:560px)]:gap-2 ${newBadgesThisLevel.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                {/* Your Results */}
-                <div className="rounded-xl border border-purple-400/40 bg-[#2e1065]/80 p-3 [@media(max-height:560px)]:p-2">
-                  <p className="mb-2 text-center text-[11px] font-black uppercase tracking-wide text-purple-200">Your Results</p>
-                  <dl className="space-y-1.5 [@media(max-height:560px)]:space-y-0.5 text-sm [@media(max-height:560px)]:text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <dt className="flex items-center gap-1.5 text-white/80"><CheckCircle2 className="h-4 w-4 text-emerald-400" /> Correct Answers</dt>
-                      <dd className="font-black text-emerald-300">{QUESTIONS_PER_PHASE}/{QUESTIONS_PER_PHASE}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <dt className="flex items-center gap-1.5 text-white/80"><Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> Stars Earned</dt>
-                      <dd className="font-black text-yellow-300">+{QUESTIONS_PER_PHASE}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <dt className="flex items-center gap-1.5 text-white/80"><Sparkles className="h-4 w-4 text-cyan-300" /> Points Earned</dt>
-                      <dd className="font-black text-cyan-300">{score}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <dt className="flex items-center gap-1.5 text-white/80"><Heart className="h-4 w-4 fill-red-500 text-red-500" /> Hearts Left</dt>
-                      <dd className="font-black text-red-300">{hearts}/{MAX_HEARTS}</dd>
-                    </div>
-                  </dl>
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.85, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                className="m-auto w-full max-w-[860px] [@media(max-height:560px)]:max-w-[760px]"
+              >
+                {/* Banner */}
+                <div className="text-center">
+                  <h2 className="font-game text-2xl sm:text-3xl [@media(max-height:560px)]:text-xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-yellow-400 to-amber-500 drop-shadow-[0_3px_8px_rgba(250,204,21,0.5)]">
+                    Level {level.number} Complete!
+                  </h2>
+                  <div className="mt-1 flex items-center justify-center gap-1">
+                    {[1, 2, 3].map(s => (
+                      <motion.span
+                        key={s}
+                        initial={{ scale: 0, rotate: -40 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 12, delay: 0.1 + s * 0.12 }}
+                      >
+                        <Star className={`h-7 w-7 [@media(max-height:560px)]:h-5 [@media(max-height:560px)]:w-5 ${s <= rating ? 'fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.7)]' : 'text-white/25'}`} />
+                      </motion.span>
+                    ))}
+                    <span className={`ml-2 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-black uppercase tracking-wide ${resultInfo.bossDefeated ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-300' : 'border-amber-400/40 bg-amber-500/20 text-amber-200'}`}>
+                      {resultInfo.bossDefeated ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Skull className="h-3.5 w-3.5" />}
+                      {rating === 3 ? 'Perfect!' : resultInfo.bossDefeated ? 'Boss Defeated' : 'Boss Undefeated'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Trophy Earned */}
-                <div className="rounded-xl border border-yellow-400/40 bg-[#2e1065]/80 p-3 [@media(max-height:560px)]:p-2 text-center">
-                  <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-yellow-200">Trophy Earned</p>
-                  <motion.div
-                    initial={{ scale: 0, rotate: -18 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 13, delay: 0.15 }}
-                  >
-                    <Image
-                      src={getLevelStory(level.number).trophyImage}
-                      alt={getLevelStory(level.number).trophyName}
-                      width={200}
-                      height={160}
-                      unoptimized
-                      priority
-                      className="result-trophy mx-auto object-contain drop-shadow-[0_0_16px_rgba(250,204,21,0.55)]"
-                    />
-                  </motion.div>
-                  <p className="mt-1 text-[11px] font-black uppercase tracking-wide text-yellow-300">
-                    {getLevelStory(level.number).trophyName}
-                  </p>
-                </div>
+                {/* Result / Trophy / Badges */}
+                <div className="mt-2 grid gap-2.5 [@media(max-height:560px)]:gap-2 sm:grid-cols-3">
+                  {/* Your Results — quiz + boss combined */}
+                  <div className="rounded-xl border border-purple-400/40 bg-[#2e1065]/80 p-3 [@media(max-height:560px)]:p-2">
+                    <p className="mb-2 text-center text-[11px] font-black uppercase tracking-wide text-purple-200">Your Results</p>
+                    <dl className="space-y-1.5 [@media(max-height:560px)]:space-y-0.5 text-sm [@media(max-height:560px)]:text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="flex items-center gap-1.5 text-white/80"><CheckCircle2 className="h-4 w-4 text-emerald-400" /> Correct Answers</dt>
+                        <dd data-testid="result-correct" className="font-black text-emerald-300">{correct}/{QUESTIONS_PER_LEVEL}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="flex items-center gap-1.5 text-white/80"><Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> Stars Earned</dt>
+                        <dd data-testid="result-stars" className="font-black text-yellow-300">+{correct}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="flex items-center gap-1.5 text-white/80"><Sparkles className="h-4 w-4 text-cyan-300" /> Points Earned</dt>
+                        <dd data-testid="result-points" className="font-black text-cyan-300">+{levelPoints(resultInfo.quizCorrect, resultInfo.bossCorrect)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="flex items-center gap-1.5 text-white/80"><Heart className="h-4 w-4 fill-red-500 text-red-500" /> Hearts Left</dt>
+                        <dd data-testid="result-hearts" className="font-black text-red-300">{resultInfo.hearts}/{MAX_HEARTS}</dd>
+                      </div>
+                    </dl>
+                    <p className="mt-1.5 text-center text-[9px] text-white/45">Quiz {resultInfo.quizCorrect}/5 · Boss {resultInfo.bossCorrect}/5</p>
+                  </div>
 
-                {/* Badges Earned — rendered only when this level earned new ones */}
-                {newBadgesThisLevel.length > 0 && (
-                  <div className="rounded-xl border border-amber-300/40 bg-[#2e1065]/80 p-3 [@media(max-height:560px)]:p-2">
-                    <p className="mb-2 [@media(max-height:560px)]:mb-1 text-center text-[11px] font-black uppercase tracking-wide text-amber-200">
-                      Badges Earned ({newBadgesThisLevel.length})
-                    </p>
-                    {/* 1 badge stands alone; 2 sit side by side; 3–4 compact into a 2×2 */}
-                    <div className={`grid justify-items-center gap-2 [@media(max-height:560px)]:gap-1 ${newBadgesThisLevel.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                      {BADGES.filter(b => newBadgesThisLevel.includes(b.id)).map((badge, i) => (
+                  {/* Trophy — decided by the boss battle alone */}
+                  <div data-testid="result-trophy-panel" className="rounded-xl border border-yellow-400/40 bg-[#2e1065]/80 p-3 [@media(max-height:560px)]:p-2 text-center">
+                    {newTrophy ? (
+                      <>
+                        <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-yellow-200">Trophy Earned</p>
                         <motion.div
-                          key={badge.id}
-                          initial={{ scale: 0, y: 10 }}
-                          animate={{ scale: 1, y: 0 }}
-                          transition={{ type: 'spring', stiffness: 300, damping: 16, delay: 0.3 + i * 0.1 }}
-                          className="flex flex-col items-center"
+                          initial={{ scale: 0, rotate: -18 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 13, delay: 0.15 }}
                         >
                           <Image
-                            src={badge.image}
-                            alt={badge.name}
-                            width={56}
-                            height={56}
+                            src={story.trophyImage}
+                            alt={story.trophyName}
+                            width={200}
+                            height={160}
                             unoptimized
-                            className="result-badge object-contain drop-shadow-[0_2px_5px_rgba(0,0,0,0.45)]"
+                            priority
+                            className="result-trophy mx-auto object-contain drop-shadow-[0_0_16px_rgba(250,204,21,0.55)]"
                           />
-                          <span className="mt-1 max-w-[86px] text-center text-[9px] font-bold uppercase leading-tight text-white/80">{badge.name}</span>
                         </motion.div>
-                      ))}
-                    </div>
+                        <p className="mt-1 text-[11px] font-black uppercase tracking-wide text-yellow-300">{story.trophyName}</p>
+                      </>
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center gap-1 py-1">
+                        <Trophy className={`h-11 w-11 ${resultInfo.bossDefeated ? 'text-yellow-300/60' : 'text-white/25'}`} />
+                        <p className="text-sm font-black text-white/80">{resultInfo.bossDefeated ? 'Trophy Collected' : 'Trophy Not Earned'}</p>
+                        <p className="text-[10px] leading-snug text-white/55">
+                          {resultInfo.bossDefeated
+                            ? `The ${story.trophyName} is already in your collection.`
+                            : `Defeat the ${story.enemy} to earn the ${story.trophyName}.`}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Guardian line, with the Level 1 unlock note beside it */}
-              <div className="mt-2 [@media(max-height:560px)]:mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
-                <p className="text-[11px] [@media(max-height:560px)]:text-[10px] text-purple-100/80">
-                  &ldquo;{getLevelStory(level.number).afterBoss}&rdquo; <span className="text-purple-300">— Forest Guardian</span>
-                </p>
-                {/* Passing Level 1 opens every remaining level (panel revision) */}
-                {level.number === 1 && (
-                  <motion.span
-                    animate={{ scale: [1, 1.03, 1] }}
-                    transition={{ repeat: Infinity, duration: 1.6 }}
-                    className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-1 text-[11px] font-black text-emerald-300"
-                  >
-                    Levels 2, 3, 4 &amp; 5 are now OPEN!
-                  </motion.span>
-                )}
-              </div>
+                  {/* Badges — only the ones earned for the first time on this run */}
+                  <div data-testid="result-badge-panel" className="rounded-xl border border-amber-300/40 bg-[#2e1065]/80 p-3 [@media(max-height:560px)]:p-2">
+                    {newBadgesThisLevel.length > 0 ? (
+                      <>
+                        <p className="mb-2 [@media(max-height:560px)]:mb-1 text-center text-[11px] font-black uppercase tracking-wide text-amber-200">
+                          Badges Earned ({newBadgesThisLevel.length})
+                        </p>
+                        {/* 1 badge stands alone; 2 sit side by side; 3–4 compact into a 2×2 */}
+                        <div className={`grid justify-items-center gap-2 [@media(max-height:560px)]:gap-1 ${newBadgesThisLevel.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          {BADGES.filter(b => newBadgesThisLevel.includes(b.id)).map((badge, i) => (
+                            <motion.div
+                              key={badge.id}
+                              initial={{ scale: 0, y: 10 }}
+                              animate={{ scale: 1, y: 0 }}
+                              transition={{ type: 'spring', stiffness: 300, damping: 16, delay: 0.3 + i * 0.1 }}
+                              className="flex flex-col items-center"
+                            >
+                              <Image
+                                src={badge.image}
+                                alt={badge.name}
+                                width={56}
+                                height={56}
+                                unoptimized
+                                className="result-badge object-contain drop-shadow-[0_2px_5px_rgba(0,0,0,0.45)]"
+                              />
+                              <span className="mt-1 max-w-[86px] text-center text-[9px] font-bold uppercase leading-tight text-white/80">{badge.name}</span>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center gap-1 py-1 text-center">
+                        <Award className="h-11 w-11 text-white/25" />
+                        <p className="text-sm font-black text-white/80">Badge Not Earned</p>
+                        <p className="text-[10px] leading-snug text-white/55">Keep playing to unlock your next badge.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-              <div className="mt-2.5 [@media(max-height:560px)]:mt-1.5 flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-lg border border-purple-400/40 bg-purple-800/70 px-4 py-2 [@media(max-height:560px)]:py-1.5 text-sm font-black text-purple-100 hover:bg-purple-700/70">
-                  <RotateCcw className="h-4 w-4" /> Retry
-                </button>
-                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/40 bg-emerald-700/70 px-4 py-2 [@media(max-height:560px)]:py-1.5 text-sm font-black text-emerald-100 hover:bg-emerald-600/70">
-                  <MapIcon className="h-4 w-4" /> Map
-                </button>
-                <button type="button" onClick={continueToNextLevel} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-5 py-2 [@media(max-height:560px)]:py-1.5 text-sm font-black text-white shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-cyan-400">
-                  <Flame className="h-4 w-4" /> Next
-                </button>
-              </div>
+                {/* Guardian line (boss defeated) or encouragement, with the Level 1 unlock note */}
+                <div className="mt-2 [@media(max-height:560px)]:mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
+                  <p data-testid="result-message" className="max-w-[640px] text-[11px] [@media(max-height:560px)]:text-[10px] text-purple-100/85">
+                    {message ?? <>&ldquo;{story.afterBoss}&rdquo; <span className="text-purple-300">— Forest Guardian</span></>}
+                  </p>
+                  {/* The first Level 1 clear opens every remaining level (panel revision) */}
+                  {level.number === 1 && resultInfo.firstClear && (
+                    <motion.span
+                      animate={{ scale: [1, 1.03, 1] }}
+                      transition={{ repeat: Infinity, duration: 1.6 }}
+                      className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-1 text-[11px] font-black text-emerald-300"
+                    >
+                      Levels 2, 3, 4 &amp; 5 are now OPEN!
+                    </motion.span>
+                  )}
+                </div>
+
+                <div className="mt-2.5 [@media(max-height:560px)]:mt-1.5 flex flex-wrap justify-center gap-2">
+                  <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-lg border border-purple-400/40 bg-purple-800/70 px-4 py-2 [@media(max-height:560px)]:py-1.5 text-sm font-black text-purple-100 hover:bg-purple-700/70">
+                    <RotateCcw className="h-4 w-4" /> Retry
+                  </button>
+                  <button type="button" onClick={backToMap} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/40 bg-emerald-700/70 px-4 py-2 [@media(max-height:560px)]:py-1.5 text-sm font-black text-emerald-100 hover:bg-emerald-600/70">
+                    <MapIcon className="h-4 w-4" /> Map
+                  </button>
+                  <button type="button" onClick={continueToNextLevel} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-5 py-2 [@media(max-height:560px)]:py-1.5 text-sm font-black text-white shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-cyan-400">
+                    <Flame className="h-4 w-4" /> Next
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          )
+        })()}
 
-        {phase === 'gameComplete' && resultShown && (
+        {/* ── Finale ────────────────────────────────────────────────────────
+            Opens from Level 5's "Next" once all five levels are cleared — the
+            result comes first (panel revision, Nov 2026). Sized to fit a
+            landscape phone with no scrolling. */}
+        {phase === 'gameComplete' && (
           <motion.div
             key="game-complete-modal"
+            data-testid="finale"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
+            className="absolute inset-0 z-[200] flex items-center justify-center overflow-hidden bg-[#140d2e]/85 p-3 backdrop-blur-sm"
           >
+            {/* Slow light rays behind the card */}
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-              className="relative m-auto rounded-xl border border-yellow-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(250,204,21,0.3)]"
-              style={{ width: '90vw', maxWidth: '340px' }}
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[160vmax] w-[160vmax] -translate-x-1/2 -translate-y-1/2 opacity-25"
+              style={{ background: 'conic-gradient(from 0deg, transparent 0deg, rgba(250,204,21,0.6) 10deg, transparent 22deg, transparent 60deg, rgba(217,184,255,0.6) 70deg, transparent 82deg, transparent 120deg, rgba(250,204,21,0.6) 130deg, transparent 142deg, transparent 180deg, rgba(217,184,255,0.6) 190deg, transparent 202deg, transparent 240deg, rgba(250,204,21,0.6) 250deg, transparent 262deg, transparent 300deg, rgba(217,184,255,0.6) 310deg, transparent 322deg)' }}
+              initial={{ scale: 0.2 }}
+              animate={{ scale: 1, rotate: 360 }}
+              transition={{ scale: { duration: 0.8, ease: 'easeOut' }, rotate: { duration: 24, repeat: Infinity, ease: 'linear' } }}
+            />
+            {/* Falling stars */}
+            {Array.from({ length: 18 }).map((_, i) => (
+              <motion.span
+                key={i}
+                className="pointer-events-none absolute top-0"
+                style={{ left: `${(i * 53) % 100}%` }}
+                initial={{ y: '-8vh', opacity: 0 }}
+                animate={{ y: '108vh', opacity: [0, 1, 1, 0], rotate: 360 }}
+                transition={{ duration: 3.4 + (i % 5) * 0.6, delay: (i % 7) * 0.35, repeat: Infinity, ease: 'linear' }}
+              >
+                <Star className={`${i % 3 === 0 ? 'h-4 w-4' : 'h-2.5 w-2.5'} fill-yellow-300 text-yellow-300`} />
+              </motion.span>
+            ))}
+
+            <motion.div
+              initial={{ scale: 0.3, opacity: 0, y: 40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.3 }}
+              className="relative max-h-full w-full max-w-xl overflow-y-auto rounded-3xl border-2 border-yellow-400/60 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-5 py-3.5 text-center shadow-[0_0_40px_rgba(250,204,21,0.35)]"
             >
-              <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
-
-              <Image
-                src={getLevelStory(5).trophyImage}
-                alt={getLevelStory(5).trophyName}
-                width={220}
-                height={176}
-                unoptimized
-                priority
-                className="mx-auto h-24 w-auto object-contain drop-shadow-[0_0_14px_rgba(250,204,21,0.55)]"
-              />
-
-              <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-300">
-                You are the Forest Hero!
-              </h2>
-
-              <p className="mt-1 text-sm font-semibold text-purple-200/80">&ldquo;{getLevelStory(5).afterBoss}&rdquo; — Forest Guardian</p>
-              <p className="mt-1 flex items-center justify-center gap-1 text-sm font-black text-yellow-300"><Trophy className="h-4 w-4 shrink-0" /> You earned the {getLevelStory(5).trophyName}!</p>
-
-              <div className="mt-3 flex gap-2 justify-center">
-                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
+              <motion.h2
+                animate={{ scale: [1, 1.04, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="font-game text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-yellow-400 to-amber-500 drop-shadow-[0_3px_8px_rgba(250,204,21,0.45)]"
+              >
+                CONGRATULATIONS, HERO!
+              </motion.h2>
+              <p className="mt-0.5 text-sm font-black text-white">You&apos;ve Completed All 5 Levels!</p>
+              <p className="mt-1 text-xs leading-relaxed text-purple-100/85">
+                Through courage, knowledge, and determination, you have defeated every challenge and restored peace to the Enchanted Forest!
+              </p>
+              {/* The five Forest Trophies — a missing one stays grey */}
+              <div className="mt-2 flex items-end justify-center gap-2">
+                {levelStories.map((t, i) => (
+                  <motion.div
+                    key={t.level}
+                    initial={{ scale: 0, y: 12 }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 14, delay: 0.6 + i * 0.12 }}
+                    title={t.trophyName}
+                  >
+                    <Image
+                      src={t.trophyImage}
+                      alt={t.trophyName}
+                      width={48}
+                      height={48}
+                      unoptimized
+                      className={`finale-trophy object-contain ${trophies.includes(t.level) ? 'drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'opacity-40 grayscale'}`}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+              <p className="mt-2 font-game text-lg font-black tracking-wide text-yellow-300">THE KINGDOM IS SAVED!</p>
+              <p className="text-[11px] text-purple-200/75">Your adventure may end, but your journey of learning continues!</p>
+              <div className="mt-3 flex justify-center gap-2">
+                <button type="button" onClick={backToMap} className="inline-flex items-center gap-1.5 rounded-xl border border-purple-400/40 bg-purple-900/60 px-5 py-2 text-sm font-black text-purple-100 hover:bg-purple-800/70">
                   <MapIcon className="h-4 w-4" /> Map
                 </button>
-                <button type="button" onClick={resetGame} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-yellow-500 to-orange-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-yellow-500/30 hover:from-yellow-400 hover:to-orange-400">
+                <button type="button" onClick={playAgain} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 px-5 py-2 text-sm font-black text-white shadow-md shadow-yellow-500/30 hover:from-yellow-400 hover:to-orange-400">
                   <RotateCcw className="h-4 w-4" /> Play Again
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {phase === 'gameOver' && resultShown && (
-          <motion.div
-            key="game-over-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[200] flex overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
-          >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-              className="relative m-auto rounded-xl border border-red-400/50 bg-gradient-to-br from-[#2e1065] via-[#3b0764] to-[#1e1b4b] px-4 py-3 text-center shadow-[0_0_24px_rgba(239,68,68,0.25)]"
-              style={{ width: '90vw', maxWidth: '340px' }}
-            >
-              <div className="absolute -top-px left-1/2 -translate-x-1/2 h-[2px] w-2/3 rounded-full bg-gradient-to-r from-transparent via-red-400 to-transparent" />
-
-              <XCircle className="mx-auto h-8 w-8 text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-
-              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-400/40 px-3 py-0.5 text-sm font-bold text-red-300"><XCircle className="h-4 w-4" /> Failed</span>
-
-              <h2 className="mt-1 text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-300 via-pink-300 to-purple-300">
-                Level {level.number} Result
-              </h2>
-
-              <div className="mt-2 grid grid-cols-2 [@media(max-height:480px)]:grid-cols-4 gap-1.5 text-left">
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Correct</p>
-                  <p className="text-lg font-black text-white">{normalCorrectCount}/{QUESTIONS_PER_PHASE}</p>
-                </div>
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Stars</p>
-                  <p className="text-lg font-black text-yellow-300">{stars}</p>
-                </div>
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Points</p>
-                  <p className="text-lg font-black text-white">{score}</p>
-                </div>
-                <div className="rounded-md bg-white/5 border border-white/10 px-2.5 py-2">
-                  <p className="text-[10px] uppercase text-white/50 font-bold leading-none">Hearts</p>
-                  <p className="text-lg font-black text-red-300">0/{MAX_HEARTS}</p>
-                </div>
-              </div>
-
-              <p className="mt-2 text-sm font-semibold text-purple-200/80">Try again, hero!</p>
-
-              <div className="mt-3 flex gap-2 justify-center">
-                <button type="button" onClick={retryLevel} className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-3.5 py-2 text-sm font-black text-white shadow-md shadow-purple-500/30 hover:from-purple-400 hover:to-pink-400">
-                  <RotateCcw className="h-4 w-4" /> Retry
-                </button>
-                <button type="button" onClick={() => { setScreen('map'); setPhase('normal') }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-900/50 px-3.5 py-2 text-sm font-bold text-purple-200 hover:bg-purple-800/60">
-                  <MapIcon className="h-4 w-4" /> Map
                 </button>
               </div>
             </motion.div>
@@ -2329,26 +2517,34 @@ export default function QuizAdventure({
         )}
       </AnimatePresence>
 
-      {/* Badge Notification */}
+      {/* Mid-game badge popup — appears the moment a badge is earned, and a
+          badge is only ever earned once (panel revision, Nov 2026). */}
       <AnimatePresence>
-        {newBadgeNotification && (
-          <motion.div
-            key="badge-notification"
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            transition={{ duration: 0.35 }}
-            className="pointer-events-none absolute bottom-5 left-1/2 z-50 -translate-x-1/2 px-4"
-          >
-            <div className="flex items-center gap-3 rounded-2xl border-2 border-[#9B83F5] bg-[#22326f]/95 px-5 py-3 text-center shadow-2xl backdrop-blur-md">
-              {(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b ? <Image src={b.image} alt={b.name} width={64} height={64} unoptimized className="badge-pop-art h-16 w-16 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" /> : <Trophy className="h-10 w-10 text-[#D9B8FF]" /> })()}
-              <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#D9B8FF]">Badge Earned!</p>
-                <p className="text-base font-black text-[#F4F2FF]">{(() => { const b = BADGES.find(b => b.id === newBadgeNotification); return b?.name ?? 'New Badge' })()}</p>
+        {badgeQueue.length > 0 && (() => {
+          const badge = BADGES.find(b => b.id === badgeQueue[0])
+          return (
+            <motion.div
+              key={`badge-${badgeQueue[0]}`}
+              data-testid="badge-popup"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+              className="pointer-events-none absolute inset-0 z-[95] flex items-center justify-center bg-black/35 px-4"
+            >
+              <div className="flex flex-col items-center rounded-3xl border-2 border-[#9B83F5] bg-[#22326f]/95 px-8 py-4 text-center shadow-[0_0_40px_rgba(155,131,245,0.55)] backdrop-blur-md">
+                <motion.div animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }} transition={{ duration: 1.2, repeat: Infinity }}>
+                  {badge
+                    ? <Image src={badge.image} alt={badge.name} width={64} height={64} unoptimized className="badge-pop-art object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" />
+                    : <Trophy className="h-12 w-12 text-[#D9B8FF]" />}
+                </motion.div>
+                <p className="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-[#D9B8FF]">Badge Earned!</p>
+                <p className="font-game text-lg font-black text-[#F4F2FF]">{badge?.name ?? 'New Badge'}</p>
+                {badge && <p className="text-[11px] text-[#F4F2FF]/70">{badge.description}</p>}
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )
+        })()}
       </AnimatePresence>
     </section>
   )

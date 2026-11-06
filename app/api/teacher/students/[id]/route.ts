@@ -154,10 +154,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
     updates.push('password_hash = ?')
     params.push(await hashPassword(body.password))
-    // Keep the teacher's readable copy in step with the real password (item 6)
+    // No readable copy is kept any more: students now change their own
+    // password, so the teacher only ever resets it (panel revision, Nov 2026)
     if (await hasColumn('users', 'initial_password')) {
-      updates.push('initial_password = ?')
-      params.push(body.password)
+      updates.push('initial_password = NULL')
     }
   }
 

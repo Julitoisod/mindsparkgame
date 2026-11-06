@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { execute, query } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { awardBadges, starsCollected, STAR_COLLECTOR_TARGET } from '@/lib/badgeAwards'
 
 /**
  * POST /api/attempts
@@ -58,21 +59,21 @@ export async function POST(request: Request) {
     )
   }
 
-  // math_streak badge: 5 correct answers in a row (quiz + boss combined)
-  const newBadges: string[] = []
+  // Mid-game badges (panel revision, Nov 2026): they pop up the moment they are
+  // earned, so they are decided here, per answer, not at the end of the level.
+  //   math_streak    — 5 correct answers in a row (quiz + boss combined)
+  //   star_collector — the 100th star collected
+  // awardBadges also grants Forest Champion if this completed the set.
+  const candidates: string[] = []
   if (isCorrect) {
     const recent = await query<{ is_correct: number }>(
       'SELECT is_correct FROM quiz_attempts WHERE user_id = ? ORDER BY id DESC LIMIT 5',
       [session.userId],
     )
-    if (recent.length === 5 && recent.every(row => Number(row.is_correct) === 1)) {
-      const awarded = await execute(
-        'INSERT IGNORE INTO student_badges (user_id, badge_id) VALUES (?, ?)',
-        [session.userId, 'math_streak'],
-      )
-      if (awarded.affectedRows > 0) newBadges.push('math_streak')
-    }
+    if (recent.length === 5 && recent.every(row => Number(row.is_correct) === 1)) candidates.push('math_streak')
+    if ((await starsCollected(session.userId)) >= STAR_COLLECTOR_TARGET) candidates.push('star_collector')
   }
+  const newBadges = candidates.length ? await awardBadges(session.userId, candidates) : []
 
   return NextResponse.json({ success: true, message: 'Attempt recorded', newBadges })
 }

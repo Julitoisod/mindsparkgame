@@ -13,6 +13,7 @@
 import puppeteer from 'puppeteer-core'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createTeacher } from './lib/teacher-account.mjs'
 
 const CHROME = process.env.CHROME_PATH
   ?? 'C:/Users/ISOD/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe'
@@ -38,7 +39,7 @@ async function api(p, body) {
 }
 
 const teacher = `fit${stamp}`
-await api('/api/auth/register', { username: teacher, email: `${teacher}@mindspark.test`, password: 'Passw0rd123' })
+await createTeacher(BASE, { username: teacher, email: `${teacher}@mindspark.test`, password: 'Passw0rd123' })
 await api('/api/auth/login', { identifier: teacher, password: 'Passw0rd123' })
 const section = await api('/api/teacher/classrooms', { name: `Grade 5 - Fit ${stamp}`, schoolYear: '2026-2027' })
 const student = `s${stamp}`

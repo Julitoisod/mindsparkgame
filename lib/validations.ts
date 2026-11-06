@@ -8,31 +8,23 @@ export interface ValidationResult {
   errors: Record<string, string>
 }
 
-export function validateRegister(body: unknown): ValidationResult {
-  const errors: Record<string, string> = {}
-  const data = body as Record<string, unknown>
+/** Field rules shared by every account form (null = valid). */
+export function usernameError(value: string): string | null {
+  const v = value.trim()
+  if (v.length < 3) return 'Username must be at least 3 characters.'
+  if (v.length > 32) return 'Username must be 32 characters or fewer.'
+  if (!/^[a-zA-Z0-9_]+$/.test(v)) return 'Username can only contain letters, numbers, and underscores.'
+  return null
+}
 
-  if (!data.username || typeof data.username !== 'string' || data.username.trim().length < 3) {
-    errors.username = 'Username must be at least 3 characters.'
-  } else if (data.username.trim().length > 32) {
-    errors.username = 'Username must be 32 characters or fewer.'
-  } else if (!/^[a-zA-Z0-9_]+$/.test(data.username.trim())) {
-    errors.username = 'Username can only contain letters, numbers, and underscores.'
-  }
+export function emailError(value: string): string | null {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? null : 'A valid email address is required.'
+}
 
-  if (!data.email || typeof data.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    errors.email = 'A valid email address is required.'
-  }
-
-  if (!data.password || typeof data.password !== 'string') {
-    errors.password = 'Password is required.'
-  } else if (data.password.length < 8) {
-    errors.password = 'Password must be at least 8 characters.'
-  } else if (!/[a-zA-Z]/.test(data.password) || !/\d/.test(data.password)) {
-    errors.password = 'Password must contain at least one letter and one number.'
-  }
-
-  return { valid: Object.keys(errors).length === 0, errors }
+export function passwordError(value: string): string | null {
+  if (value.length < 8) return 'Password must be at least 8 characters.'
+  if (!/[a-zA-Z]/.test(value) || !/\d/.test(value)) return 'Password must contain at least one letter and one number.'
+  return null
 }
 
 export function validateLogin(body: unknown): ValidationResult {

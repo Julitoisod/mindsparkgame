@@ -16,7 +16,7 @@ type RecordRow = {
   name: string
   username: string
   section: string | null
-  levels: Record<number, { score: number; attempts: number }>
+  levels: Record<number, { score: number; attempts: number; runs?: number }>
   categories: Record<string, { correct: number; asked: number }>
   total: number
 }
@@ -56,9 +56,18 @@ export default function ClassRecord() {
       .catch(() => {})
   }, [])
 
+  // Averages count only students who have played — a level nobody tried is
+  // "—", not 0 (panel revision, Nov 2026)
+  const levelAverage = useCallback((level: number) => {
+    const played = rows.filter(r => (r.levels[level]?.attempts ?? 0) > 0)
+    if (!played.length) return null
+    return Math.round((played.reduce((sum, r) => sum + r.levels[level].score, 0) / played.length) * 10) / 10
+  }, [rows])
+
   const classAverage = useMemo(() => {
-    if (rows.length === 0) return 0
-    return Math.round(rows.reduce((sum, r) => sum + r.total, 0) / rows.length)
+    const played = rows.filter(r => LEVELS.some(l => (r.levels[l]?.attempts ?? 0) > 0))
+    if (!played.length) return null
+    return Math.round((played.reduce((sum, r) => sum + r.total, 0) / played.length) * 10) / 10
   }, [rows])
 
   /** CSV — opens directly in Excel, and carries names, levels, categories and scores. */
@@ -66,13 +75,13 @@ export default function ClassRecord() {
     const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
     const header = [
       'Student Name', 'Username', 'Section',
-      ...LEVELS.map(l => `L${l}`),
-      'Total',
-      ...categories.map(c => `${c} (correct/asked)`),
+      ...LEVELS.map(l => `L${l} (/10)`),
+      'Total (/50)',
+      ...categories.map(c => `${c} (correct/total, best runs)`),
     ]
     const lines = rows.map(r => [
       r.name, r.username, r.section ?? '',
-      ...LEVELS.map(l => r.levels[l]?.score ?? 0),
+      ...LEVELS.map(l => (r.levels[l]?.attempts ? r.levels[l].score : '—')),
       r.total,
       ...categories.map(c => {
         const cell = r.categories[c]
@@ -102,7 +111,7 @@ export default function ClassRecord() {
             <FileSpreadsheet className="h-4 w-4 text-[#9B83F5]" /> Class Record
           </h3>
           <p className="text-xs text-purple-400">
-            Every enrolled student with their score per level and category — each level scored out of 10 (best run)
+            L1–L5: the student&apos;s best run, out of 10 · Total: out of 50 · Categories: correct / total questions in those same best runs, so retries never count twice · — = not attempted yet
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -141,10 +150,10 @@ export default function ClassRecord() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-purple-400/20 text-left text-xs font-bold uppercase text-purple-400">
-                <th className="pb-3 pr-4">Student Name</th>
+                <th className="pb-3 pr-4 whitespace-nowrap">Student Name</th>
                 <th className="pb-3 pr-4">Section</th>
                 {LEVELS.map(l => <th key={l} className="pb-3 pr-4 text-center">L{l}</th>)}
-                <th className="pb-3 pr-4 text-center">Total</th>
+                <th className="pb-3 pr-4 text-center whitespace-nowrap">Total /50</th>
                 {showCategories && categories.map(c => (
                   <th key={c} className="pb-3 pr-4 text-center whitespace-nowrap">{c}</th>
                 ))}
@@ -153,11 +162,11 @@ export default function ClassRecord() {
             <tbody className="divide-y divide-purple-400/10">
               {rows.map(r => (
                 <tr key={r.id} className="text-[#374151]">
-                  <td className="py-2.5 pr-4">
+                  <td className="py-2.5 pr-4 whitespace-nowrap">
                     <p className="font-bold text-[#111827]">{r.name}</p>
                     <p className="text-[10px] text-[#6B7280]">@{r.username}</p>
                   </td>
-                  <td className="py-2.5 pr-4 text-xs">{r.section ?? '—'}</td>
+                  <td className="py-2.5 pr-4 text-xs whitespace-nowrap">{r.section ?? '—'}</td>
                   {LEVELS.map(l => {
                     const cell = r.levels[l]
                     const score = cell?.score ?? 0
@@ -185,13 +194,9 @@ export default function ClassRecord() {
               <tr className="border-t border-purple-400/20 text-xs font-bold text-[#374151]">
                 <td className="pt-3 pr-4" colSpan={2}>Class average</td>
                 {LEVELS.map(l => (
-                  <td key={l} className="pt-3 pr-4 text-center">
-                    {rows.length
-                      ? Math.round(rows.reduce((sum, r) => sum + (r.levels[l]?.score ?? 0), 0) / rows.length)
-                      : 0}
-                  </td>
+                  <td key={l} className="pt-3 pr-4 text-center">{levelAverage(l) ?? '—'}</td>
                 ))}
-                <td className="pt-3 pr-4 text-center text-[#111827]">{classAverage}</td>
+                <td className="pt-3 pr-4 text-center text-[#111827]">{classAverage ?? '—'}</td>
                 {showCategories && categories.map(c => <td key={c} />)}
               </tr>
             </tfoot>

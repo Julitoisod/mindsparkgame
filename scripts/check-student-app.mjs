@@ -14,6 +14,7 @@
 import puppeteer from 'puppeteer-core'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createTeacher } from './lib/teacher-account.mjs'
 
 const CHROME = process.env.CHROME_PATH
   ?? 'C:/Users/ISOD/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe'
@@ -52,12 +53,7 @@ console.log('  no teacher route on the student login')
 if (LOCAL) {
   const stamp = Date.now().toString(36)
   const teacher = `appcheck${stamp}`
-  const res = await fetch(`${BASE}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: teacher, email: `${teacher}@mindspark.test`, password: 'Passw0rd123' }),
-  })
-  if (res.status !== 201) throw new Error(`could not create the test teacher: ${res.status}`)
+  await createTeacher(BASE, { username: teacher, email: `${teacher}@mindspark.test`, password: 'Passw0rd123' })
 
   await page.type('input[aria-label="Username"]', teacher)
   await page.type('input[type="password"]', 'Passw0rd123')

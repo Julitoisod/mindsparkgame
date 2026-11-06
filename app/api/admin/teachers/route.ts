@@ -85,11 +85,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const keepsPassword = await hasColumn('users', 'initial_password')
     const result = await execute(
-      `INSERT INTO users (username, full_name, email, password_hash, ${keepsPassword ? 'initial_password, ' : ''}role, enrollment_status)
-       VALUES (?, ?, ?, ?, ${keepsPassword ? '?, ' : ''}'teacher', 'enrolled')`,
-      [username, fullName || null, email, await hashPassword(password), ...(keepsPassword ? [password] : [])],
+      `INSERT INTO users (username, full_name, email, password_hash, role, enrollment_status)
+       VALUES (?, ?, ?, ?, 'teacher', 'enrolled')`,
+      [username, fullName || null, email, await hashPassword(password)],
     )
     return NextResponse.json({
       success: true,

@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import AccountMenu from '@/components/account/AccountMenu'
 
 // Order follows the evaluators' suggested navigation (2026-10b revision, item 2)
 const navItems = [
@@ -31,7 +32,7 @@ const navItems = [
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, loading: authLoading, isAuthed, logout } = useAuth()
+  const { user, loading: authLoading, isAuthed, logout, refresh } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const sidebarRef = useRef<HTMLDivElement>(null)
 
@@ -51,10 +52,17 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     setSidebarOpen(false)
   }, [pathname])
 
+  // The account page edits the username shown in the header
+  useEffect(() => {
+    const reload = () => { void refresh() }
+    window.addEventListener('account-updated', reload)
+    return () => window.removeEventListener('account-updated', reload)
+  }, [refresh])
+
   // Auth guard
   useEffect(() => {
     if (!authLoading && !isAuthed) router.replace('/teacher-login')
-    if (!authLoading && isAuthed && user?.role !== 'teacher') router.replace('/dashboard/map')
+    if (!authLoading && isAuthed && user?.role !== 'teacher') router.replace(user?.role === 'admin' ? '/admin/dashboard' : '/dashboard/map')
   }, [authLoading, isAuthed, user?.role, router])
 
   if (authLoading || !isAuthed || user?.role !== 'teacher') {
@@ -68,7 +76,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     )
   }
 
-  const activeItem = navItems.find(item => pathname.startsWith(item.href))?.id ?? 'dashboard'
+  const activeItem = navItems.find(item => pathname.startsWith(item.href))?.id ?? (pathname.startsWith('/teacher/account') ? 'account' : 'dashboard')
+  const pageTitle = activeItem === 'account' ? 'My Account' : navItems.find(i => i.id === activeItem)?.label ?? 'Dashboard'
 
   function handleLogout() {
     logout()
@@ -122,27 +131,27 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         <header className="shrink-0 flex items-center justify-between border-b border-[#ece8f5] bg-white px-4 py-3 lg:hidden">
           <div className="flex items-center gap-3">
             <button
+              aria-label="Open menu"
               onClick={() => setSidebarOpen(true)}
               className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#7c58d8] text-white shadow-[0_8px_20px_rgba(124,88,216,0.25)]"
             >
               <Menu className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-base font-bold text-[#1f2430]">Teacher Management</h1>
-              <p className="text-[10px] text-[#8f88a1]">{user.username}</p>
+              <h1 className="text-base font-bold text-[#1f2430]">{pageTitle}</h1>
+              <p className="text-[10px] text-[#8f88a1]">Teacher Management</p>
             </div>
           </div>
+          <AccountMenu name={user.username} roleLabel="Teacher Account" accountHref="/teacher/account" onLogout={handleLogout} />
         </header>
 
         {/* Desktop Header */}
         <header className="hidden lg:flex shrink-0 items-center justify-between border-b border-[#ece8f5] bg-white px-6 py-3">
           <div>
-            <h1 className="text-lg font-bold text-[#1f2430]">{navItems.find(i => i.id === activeItem)?.label ?? 'Dashboard'}</h1>
+            <h1 className="text-lg font-bold text-[#1f2430]">{pageTitle}</h1>
             <p className="text-xs text-[#8f88a1]">Teacher Management</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-[#5f5677]">{user.username}</span>
-          </div>
+          <AccountMenu name={user.username} roleLabel="Teacher Account" accountHref="/teacher/account" onLogout={handleLogout} />
         </header>
 
         {/* Page Content */}
@@ -167,11 +176,11 @@ function SidebarContent({ activeItem, username, onLogout }: { activeItem: string
     <>
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7c58d8] text-white shadow-[0_8px_20px_rgba(124,88,216,0.25)]">
-          <GraduationCap className="h-5 w-5" />
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#7c5cf0] to-[#5a3fd4] text-xl font-black text-[#fff] shadow-[0_8px_20px_rgba(124,88,216,0.3)]">
+          M
         </span>
         <div>
-          <h1 className="text-sm font-bold text-[#1f2430]">MindSpark</h1>
+          <h1 className="text-base font-black leading-tight text-[#1f2430]">MindSpark Math</h1>
           <p className="text-[10px] text-[#8f88a1]">{username}&apos;s sections</p>
         </div>
       </div>

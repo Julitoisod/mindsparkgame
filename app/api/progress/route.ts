@@ -1,7 +1,8 @@
 import { NextResponse }  from 'next/server'
 import { query, execute } from '@/lib/db'
 import { getSession }     from '@/lib/auth'
-import { CAPSTONE_BADGE_ID, REQUIRED_FOR_CHAMPION } from '@/lib/badges'
+import { awardBadges, starsCollected, STAR_COLLECTOR_TARGET } from '@/lib/badgeAwards'
+import { trophyLevels } from '@/lib/scoring'
 import type { SavePayload } from '@/types/game'
 
 /**
@@ -174,78 +175,33 @@ export async function POST(request: Request) {
   // Stars are now added in real-time via /api/attempts on each correct answer
   // No need to add them again here to avoid double-counting
 
-  // ── Badge evaluation (panel-approved badge table) ─────────────────────────
-  // math_streak is awarded per-answer in /api/attempts.
-  const newBadges: string[] = []
+  // ── End-of-level badges (shown on the result screen) ──────────────────────
+  // math_streak and star_collector pop up mid-game from /api/attempts; this
+  // re-checks star_collector only for students who passed 100 before that.
+  const candidates: string[] = []
   const completedArray = Array.isArray(completedLevels) ? completedLevels : []
 
-  // first_victory: cleared a level for the first time
-  if (completedArray.length >= 1) {
-    newBadges.push('first_victory')
-  }
+  // first_victory: the first level completed (any score — panel: "default na")
+  if (completedArray.length >= 1) candidates.push('first_victory')
 
-  // boss_slayer: a true boss kill — 3 stars means every boss answer was
-  // correct, which is the only way the boss reaches 0 HP
-  if (Object.values(mergedLevelStars).some(s => s >= 3)) {
-    newBadges.push('boss_slayer')
-  }
+  // boss_slayer: the first boss defeated — the same rule that awards a trophy
+  if (trophyLevels(mergedQuestFlags).length >= 1) candidates.push('boss_slayer')
 
-  // forest_explorer: all 5 levels cleared at least once
-  // (forest_champion is the capstone — handled after the other badges are saved)
-  if ([1, 2, 3, 4, 5].every(n => completedArray.includes(n))) {
-    newBadges.push('forest_explorer')
-  }
+  // forest_explorer: all 5 levels completed at least once
+  if ([1, 2, 3, 4, 5].every(n => completedArray.includes(n))) candidates.push('forest_explorer')
 
-  // perfect_score: 10/10 in one run (client-tracked; quiz + boss both flawless)
-  if (body.perfectRun === true) {
-    newBadges.push('perfect_score')
-  }
+  // perfect_score: 10/10 in one run (quiz + boss both flawless)
+  if (body.perfectRun === true) candidates.push('perfect_score')
 
-  // star_collector: 100 stars collected lifetime — each correct answer earns
-  // exactly one star, so count attempts rather than the spendable wallet
-  const collectedRows = await query<{ collected: number }>(
-    'SELECT COUNT(*) AS collected FROM quiz_attempts WHERE user_id = ? AND is_correct = 1',
-    [session.userId],
-  )
-  if (Number(collectedRows[0]?.collected ?? 0) >= 100) {
-    newBadges.push('star_collector')
-  }
+  if ((await starsCollected(session.userId)) >= STAR_COLLECTOR_TARGET) candidates.push('star_collector')
 
-  // Insert new badges (INSERT IGNORE to skip duplicates)
-  const awardedBadges: string[] = []
-  for (const badgeId of newBadges) {
-    try {
-      const result = await execute(
-        'INSERT IGNORE INTO student_badges (user_id, badge_id) VALUES (?, ?)',
-        [session.userId, badgeId],
-      )
-      if (result.affectedRows > 0) {
-        awardedBadges.push(badgeId)
-      }
-    } catch {
-      // Skip if duplicate or error
-    }
-  }
-
-  // forest_champion: the capstone — unlocks only once every OTHER badge is
-  // earned. Re-read the full set (includes math_streak, awarded in /api/attempts).
-  const earnedRows = await query<{ badge_id: string }>(
-    'SELECT badge_id FROM student_badges WHERE user_id = ?',
-    [session.userId],
-  )
-  const earnedSet = new Set(earnedRows.map(r => r.badge_id))
-  if (!earnedSet.has(CAPSTONE_BADGE_ID) && REQUIRED_FOR_CHAMPION.every(id => earnedSet.has(id))) {
-    try {
-      const result = await execute(
-        'INSERT IGNORE INTO student_badges (user_id, badge_id) VALUES (?, ?)',
-        [session.userId, CAPSTONE_BADGE_ID],
-      )
-      if (result.affectedRows > 0) {
-        awardedBadges.push(CAPSTONE_BADGE_ID)
-      }
-    } catch {
-      // Skip if duplicate or error
-    }
+  // forest_champion (the capstone) is granted inside awardBadges
+  let awardedBadges: string[] = []
+  try {
+    awardedBadges = await awardBadges(session.userId, candidates)
+  } catch (error) {
+    // Progress is already saved; a badge failure must not lose the level
+    console.error('[API /api/progress] badge award failed', error)
   }
 
   return NextResponse.json({ success: true, message: 'Progress saved', newBadges: awardedBadges })

@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import PageHeader from '@/components/teacher/PageHeader'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import type { QuizPhase, QuizQuestionDTO } from '@/types/quiz'
@@ -184,18 +185,19 @@ export default function TeacherQuestionsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-black flex items-center gap-2"><FileQuestion className="h-6 w-6 text-purple-600" /> Question Bank</h2>
-          <p className="text-sm text-gray-500">Add and manage the questions students answer. Each quiz randomly draws one question per category.</p>
-        </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
-        >
-          <Plus className="h-4 w-4" /> Add Question
-        </button>
-      </div>
+      <PageHeader
+        icon={FileQuestion}
+        title="Question Bank"
+        subtitle="Add and manage the questions students answer. Each quiz randomly draws one question per category."
+        actions={
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
+          >
+            <Plus className="h-4 w-4" /> Add Question
+          </button>
+        }
+      />
 
       {error && <div className="rounded-lg bg-red-100 border border-red-300 px-4 py-2.5 text-sm text-red-800 font-medium">{error}</div>}
 

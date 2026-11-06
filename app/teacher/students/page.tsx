@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import type { PublicUser } from '@/types/user'
 import toast from 'react-hot-toast'
+import PageHeader from '@/components/teacher/PageHeader'
 
 type StudentProgress = {
   levelsCompleted: number
@@ -71,7 +72,6 @@ type Student = PublicUser & {
   lastName: string | null
   firstName: string | null
   middleName: string | null
-  initialPassword: string | null
   progress: StudentProgress
   teacherUnlockedLevels: number[]
   quizScores: QuizScore[]
@@ -117,7 +117,9 @@ export default function TeacherStudentsPage() {
   const [insightMap, setInsightMap] = useState<Record<number, InsightData>>({})
   const [insightLoading, setInsightLoading] = useState<number | null>(null)
   const [deadlineMap, setDeadlineMap] = useState<Record<number, Deadline[]>>({})
-  const [deadlineDraft, setDeadlineDraft] = useState<{ level: number; value: string }>({ level: 1, value: '' })
+  // Three inputs only — level, date, time (panel revision, Nov 2026); the
+  // student app words the reminder itself
+  const [deadlineDraft, setDeadlineDraft] = useState({ level: 1, date: '', time: '23:59' })
   const [savingDeadline, setSavingDeadline] = useState(false)
 
   /** Form state for the currently expanded student's account edit. */
@@ -157,20 +159,22 @@ export default function TeacherStudentsPage() {
   }, [expandedId, students, loadInsight, loadDeadlines])
 
   async function setDeadline(studentId: number) {
-    if (!deadlineDraft.value) { toast.error('Pick a date first'); return }
+    if (!deadlineDraft.date || !deadlineDraft.time) { toast.error('Pick a deadline date and time first'); return }
+    const due = new Date(`${deadlineDraft.date}T${deadlineDraft.time}`)
+    if (Number.isNaN(due.getTime())) { toast.error('That date or time is not valid'); return }
     setSavingDeadline(true)
     try {
       const res = await fetch(`/api/teacher/students/${studentId}/deadline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ levelNumber: deadlineDraft.level, dueAt: new Date(deadlineDraft.value).toISOString() }),
+        body: JSON.stringify({ levelNumber: deadlineDraft.level, dueAt: due.toISOString() }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
       setDeadlineMap(prev => ({ ...prev, [studentId]: json.data.deadlines }))
-      setDeadlineDraft({ level: 1, value: '' })
-      toast.success(json.message ?? 'Deadline set')
+      setDeadlineDraft({ level: 1, date: '', time: '23:59' })
+      toast.success(`${json.message ?? 'Deadline set'} — the student sees a reminder after signing in`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to set deadline')
     } finally {
@@ -214,6 +218,26 @@ export default function TeacherStudentsPage() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Deep links: Sections → "View Students" (?section=) and the dashboard's
+  // "Students Who Need Attention" → View (?student=)
+  const [focusStudentId, setFocusStudentId] = useState<number | null>(null)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const section = Number(params.get('section'))
+    if (section > 0) setFilterClassroom(section)
+    const student = Number(params.get('student'))
+    if (student > 0) setFocusStudentId(student)
+  }, [])
+  useEffect(() => {
+    if (!focusStudentId || students.length === 0) return
+    const target = students.find(st => st.id === focusStudentId)
+    if (target) {
+      setSearch(target.username)
+      setExpandedId(target.id)
+    }
+    setFocusStudentId(null)
+  }, [focusStudentId, students])
 
   // Filtered + paginated
   const filtered = useMemo(() => {
@@ -355,13 +379,11 @@ export default function TeacherStudentsPage() {
 
   return (
     <div data-page="teacher-students" className="space-y-5">
-      {/* Page Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-black">All Students</h2>
-          <p className="text-sm text-gray-500">Manage and monitor student accounts</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={Users}
+        title="All Students"
+        subtitle="Manage and monitor student accounts."
+        actions={<>
           <button
             onClick={openLevelOneForAll}
             disabled={openingAll}
@@ -371,15 +393,15 @@ export default function TeacherStudentsPage() {
             <Unlock className="h-4 w-4" />
             {openingAll ? 'Opening…' : 'Open Level 1 for All'}
           </button>
-          <button
-            onClick={() => window.location.href = '/teacher/dashboard'}
+          <a
+            href="/teacher/enrollment"
             className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
           >
             <UserPlus className="h-4 w-4" />
             Add Student
-          </button>
-        </div>
-      </div>
+          </a>
+        </>}
+      />
 
       {error && <div className="rounded-lg bg-red-100 border border-red-300 px-4 py-2.5 text-sm text-red-800 font-medium">{error}</div>}
       {success && (
@@ -590,31 +612,10 @@ export default function TeacherStudentsPage() {
                                   className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                                 />
                               </div>
-                              {/* Item 6 (2026-10): the password handed to the student stays
-                                  visible here so the teacher has a copy if the student forgets it. */}
+                              {/* The current password is no longer shown (Nov 2026): students
+                                  change their own in the app, so the teacher only resets it. */}
                               <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Current Password</label>
-                                <div className="flex items-center gap-2">
-                                  <code className="flex-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-bold text-purple-900">
-                                    {student.initialPassword ?? 'Not recorded — set a new one below'}
-                                  </code>
-                                  {student.initialPassword && (
-                                    <button
-                                      type="button"
-                                      onClick={(e: React.MouseEvent) => {
-                                        e.stopPropagation()
-                                        navigator.clipboard?.writeText(student.initialPassword ?? '')
-                                        toast.success('Password copied')
-                                      }}
-                                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
-                                    >
-                                      Copy
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Change Password</label>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Reset Password</label>
                                 <input
                                   type="text"
                                   placeholder="Leave blank to keep current"
@@ -622,7 +623,7 @@ export default function TeacherStudentsPage() {
                                   onChange={e => setDraft(prev => ({ ...prev, password: e.target.value }))}
                                   className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
                                 />
-                                <p className="text-[10px] text-gray-400 mt-0.5">Min 8 chars, with a letter & a number</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">Only if the student forgot it — students change their own password in the app. Min 8 chars, with a letter &amp; a number.</p>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 {([
@@ -679,21 +680,30 @@ export default function TeacherStudentsPage() {
                           </div>
                         </div>
 
-                        {/* Quiz Scores Per Level */}
+                        {/* Quiz Scores Per Level — every answer on the level, retries
+                            included, with the labels the panel asked for (Nov 2026) */}
                         {student.quizScores && student.quizScores.length > 0 && (
                           <div className="mt-4 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
-                            <p className="text-xs font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-gray-800 mb-1 flex items-center gap-1.5">
                               <BarChart3 className="h-4 w-4 text-purple-600" /> Quiz Scores
+                            </p>
+                            <p className="mb-3 text-[11px] text-gray-500">
+                              Correct / Total Answered counts every answer the student has given on that level, re-attempts included.
+                              The class record in Reports scores each level from the best run only.
                             </p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                               {student.quizScores.map(qs => {
                                 const accuracy = qs.totalAttempts > 0 ? Math.round((qs.correctAttempts / qs.totalAttempts) * 100) : 0
-                                const accColor = accuracy >= 70 ? 'text-emerald-700' : accuracy >= 40 ? 'text-yellow-700' : 'text-red-700'
+                                const accColor = accuracy >= 70 ? 'text-emerald-700' : accuracy >= 40 ? 'text-amber-600' : 'text-red-600'
                                 return (
-                                  <div key={qs.levelNumber} className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2.5">
-                                    <p className="text-[10px] font-bold text-gray-500">Level {qs.levelNumber}</p>
-                                    <p className={`text-sm font-black ${accColor}`}>{qs.correctAttempts}/{qs.totalAttempts} <span className="text-[10px] font-bold">({accuracy}%)</span></p>
-                                    <p className="text-[9px] text-gray-500 mt-0.5">Score: {qs.totalScore} • {new Date(qs.lastAttempt).toLocaleDateString()}</p>
+                                  <div key={qs.levelNumber} data-testid="quiz-score-card" className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2.5">
+                                    <p className="text-xs font-bold text-gray-700">Level {qs.levelNumber}</p>
+                                    <p className={`mt-0.5 text-xl font-black ${accColor}`}>{qs.correctAttempts}/{qs.totalAttempts}</p>
+                                    <p className="text-[11px] font-semibold text-gray-600">{accuracy}% Accuracy</p>
+                                    <p className="text-[10px] text-gray-500">Correct / Total Answered</p>
+                                    <div className="my-1.5 border-t border-gray-200" />
+                                    <p className="text-[11px] font-bold text-gray-800">Total Points Earned: {qs.totalScore}</p>
+                                    <p className="text-[9px] text-gray-400">Last played {new Date(qs.lastAttempt).toLocaleDateString()}</p>
                                   </div>
                                 )
                               })}
@@ -777,18 +787,33 @@ export default function TeacherStudentsPage() {
                           )}
                           <div className="flex flex-wrap items-center gap-2">
                             <select
+                              aria-label="Deadline level"
                               value={deadlineDraft.level}
                               onChange={e => setDeadlineDraft(d => ({ ...d, level: Number(e.target.value) }))}
                               className="rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
                             >
                               {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>Level {l}</option>)}
                             </select>
-                            <input
-                              type="datetime-local"
-                              value={deadlineDraft.value}
-                              onChange={e => setDeadlineDraft(d => ({ ...d, value: e.target.value }))}
-                              className="flex-1 min-w-[180px] rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
-                            />
+                            <label className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
+                              Date
+                              <input
+                                type="date"
+                                aria-label="Deadline date"
+                                value={deadlineDraft.date}
+                                onChange={e => setDeadlineDraft(d => ({ ...d, date: e.target.value }))}
+                                className="rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
+                              />
+                            </label>
+                            <label className="flex items-center gap-1 text-[11px] font-bold text-gray-500">
+                              Time
+                              <input
+                                type="time"
+                                aria-label="Deadline time"
+                                value={deadlineDraft.time}
+                                onChange={e => setDeadlineDraft(d => ({ ...d, time: e.target.value }))}
+                                className="rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
+                              />
+                            </label>
                             <button
                               onClick={() => setDeadline(student.id)}
                               disabled={savingDeadline}

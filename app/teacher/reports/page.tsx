@@ -1,9 +1,10 @@
 'use client'
 
 import ClassRecord from '@/components/teacher/ClassRecord'
+import PageHeader from '@/components/teacher/PageHeader'
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, BarChart3, CheckCircle2, Star, TrendingUp, Users } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, FileText, Star, TrendingUp, Users } from 'lucide-react'
 import { buildRecommendation, proficiencyFromAccuracy } from '@/lib/proficiency'
 
 const bandTone: Record<string, string> = {
@@ -86,11 +87,11 @@ export default function TeacherReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-black">Quiz & Boss Battle Intervention Report</h2>
-        <p className="text-sm text-purple-300">Track student performance and intervention status</p>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="Reports"
+        subtitle="Quiz & boss battle intervention report — student performance, the class record, and every attempt."
+      />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

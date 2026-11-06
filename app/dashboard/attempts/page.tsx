@@ -105,8 +105,8 @@ export default function DashboardAttemptsPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Fixed Header */}
-      <div className="shrink-0 px-3 pt-2 pb-2">
-        <div className="flex items-center justify-between mb-2">
+      <div className="shrink-0 px-3 pt-2 pb-1">
+        <div className="student-page-head flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-purple-300" />
             <h2 className="font-game text-base font-black">Attempts</h2>
@@ -129,7 +129,8 @@ export default function DashboardAttemptsPage() {
         <div className="grid gap-1.5 mb-3">
           {levelNodes.map(level => {
             const complete = completedLevels.includes(level.id)
-            const open = level.id === Math.min(5, completedLevels.length + 1) && !complete
+            // Completing Level 1 opens Levels 2–5 (same rule as the map)
+            const open = !complete && (level.id === 1 || completedLevels.includes(1))
             return (
               <div key={level.id} onClick={() => setFilterLevel(filterLevel === level.id ? null : level.id)} className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer transition ${filterLevel === level.id ? 'border-purple-400/40 bg-purple-800/40' : 'border-purple-400/15 bg-purple-950/30'}`}>
                 <div className="min-w-0">
@@ -168,7 +169,8 @@ export default function DashboardAttemptsPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-black ${correct ? 'text-green-400' : 'text-red-400'}`}>{correct ? 'Passed' : 'Failed'}</span>
+                        <span className={`text-xs font-black ${correct ? 'text-green-400' : 'text-red-400'}`}>{correct ? 'Correct' : 'Wrong'}</span>
+                        <span className="rounded-full bg-white/10 px-1.5 text-[9px] font-bold uppercase text-white/60">{attempt.phase === 'boss' ? 'Boss' : 'Quiz'}</span>
                         <span className="text-[10px] text-white/40">{formatDate(attempt.attemptedAt)}</span>
                       </div>
                       <p className="text-[10px] text-white/50 truncate">{getLevelTitle(attempt.levelNumber)}</p>

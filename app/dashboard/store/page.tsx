@@ -88,7 +88,7 @@ export default function DashboardStorePage() {
           ownedClasses: json.meta.ownedClasses,
         }))
         setCharacter(json.data)
-        toast.success(`Unlocked ${option.label}!`)
+        toast.success(json.message === 'Character selected' ? `${option.label} is now your hero!` : `Unlocked ${option.label}!`)
       } else {
         toast.error(json.message || 'Purchase failed')
       }
@@ -129,7 +129,7 @@ export default function DashboardStorePage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
+      <div className="student-page-head flex items-center justify-between gap-3 px-4 pt-1 shrink-0">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wide text-purple-300">Store</p>
           <h2 className="font-game text-lg font-black">Unlocks</h2>
@@ -197,20 +197,23 @@ export default function DashboardStorePage() {
             {/* Action */}
             <div className="mt-1">
               {owned ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1">
-                    <Check className="h-3.5 w-3.5 text-green-400" />
-                    <span className="text-[10px] font-black text-green-300">{current ? 'Equipped' : 'Owned'}</span>
+                current ? (
+                  <div className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-[#9B83F5]/60 bg-white/10 py-2 text-sm font-black text-[#D9B8FF]">
+                    <Check className="h-4 w-4" /> Equipped
                   </div>
-                  {!current && (
-                    <button
-                      onClick={() => handlePurchase(currentOption.class)}
-                      className="ml-auto rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-black text-white transition hover:bg-white/20"
-                    >
-                      Select
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  // Owned characters switch for free — a full-size button, like Buy
+                  <button
+                    onClick={() => handlePurchase(currentOption.class)}
+                    disabled={purchasing === currentOption.class}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 py-2 text-sm font-black text-white transition hover:bg-white/10 disabled:opacity-50"
+                    style={{ borderColor: theme.accent }}
+                  >
+                    {purchasing === currentOption.class
+                      ? <><Loader2 className="h-4 w-4 animate-spin" />Switching...</>
+                      : <><Check className="h-4 w-4" />Owned — Use this hero</>}
+                  </button>
+                )
               ) : (
                 <button
                   onClick={() => handlePurchase(currentOption.class)}

@@ -61,7 +61,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     updates.push('password_hash = ?'); params.push(await hashPassword(body.password))
     if (await hasColumn('users', 'initial_password')) {
-      updates.push('initial_password = ?'); params.push(body.password)
+      updates.push('initial_password = NULL')
     }
   }
   if (typeof body.isActive === 'boolean') {

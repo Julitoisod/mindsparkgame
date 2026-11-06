@@ -1,11 +1,13 @@
 /**
- * Renders the MindSpark launcher icon (scripts/icon/*.svg) into every Android
- * density, plus a round version and the splash screen.
+ * Renders the MindSpark launcher icon into every Android density, plus a round
+ * version and the splash screen.
  *
  *   node scripts/icon/build-icons.mjs
  *
- * Uses the Playwright Chromium already on this machine — no image library and
- * no AI credits; the art is vector, so every size stays crisp.
+ * Source art (Nov 2026): the panel's MindSpark Math knight logo,
+ * scripts/icon/mindspark-logo.webp. Android rounds the corners itself — the
+ * launcher masks every adaptive icon to its own shape (squircle or circle).
+ * Uses the Playwright Chromium already on this machine — no image library.
  */
 import puppeteer from 'puppeteer-core'
 import fs from 'node:fs'
@@ -25,8 +27,17 @@ const FOREGROUND = [
   ['mdpi', 108], ['hdpi', 162], ['xhdpi', 216], ['xxhdpi', 324], ['xxxhdpi', 432],
 ]
 
-const square = fs.readFileSync(path.join(HERE, 'mindspark-icon.svg'), 'utf8')
-const foreground = fs.readFileSync(path.join(HERE, 'mindspark-foreground.svg'), 'utf8')
+const LOGO = `data:image/webp;base64,${fs.readFileSync(path.join(HERE, 'mindspark-logo.webp')).toString('base64')}`
+// The logo's own edge blue — also ic_launcher_background, so the scaled-down
+// adaptive foreground melts into the launcher tile with no visible seam.
+const EDGE_BLUE = '#0140AE'
+// Legacy square icon: the logo, full bleed
+const square = `<img src="${LOGO}" style="width:100%;height:100%;display:block">`
+// Adaptive foreground (108dp canvas): the logo shrunk so its art sits inside the
+// launcher's safe zone, its edges feathered into the background colour
+const foreground = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${EDGE_BLUE}">
+  <img src="${LOGO}" style="width:80%;height:80%;display:block;-webkit-mask-image:radial-gradient(circle,#000 58%,transparent 71%);mask-image:radial-gradient(circle,#000 58%,transparent 71%)">
+</div>`
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new' })
 const page = await browser.newPage()
@@ -37,7 +48,7 @@ async function render(svg, size, outFile, { round = false } = {}) {
     <style>
       html,body{margin:0;padding:0;background:transparent}
       #w{width:${size}px;height:${size}px;overflow:hidden;${round ? 'border-radius:50%;' : ''}}
-      svg{width:${size}px;height:${size}px;display:block}
+      #w > *{width:${size}px;height:${size}px;display:block}
     </style>
     <div id="w">${svg}</div>`
   await page.setViewport({ width: size, height: size, deviceScaleFactor: 1 })
@@ -60,21 +71,19 @@ for (const [density, size] of FOREGROUND) {
   console.log(`  mipmap-${density}: foreground @ ${size}px`)
 }
 
-// Splash: the bolt alone (no square tile) on the brand gradient, with the
-// wordmark under it — a pasted icon tile shows its edges against the gradient.
+// Splash: the logo as a rounded tile on the brand gradient (it carries its
+// own "MindSpark Math" wordmark, so no extra text).
 const splashHtml = (w, h) => {
-  const bolt = Math.min(w, h) * 0.55 // the art fills ~62% of this box
+  const tile = Math.round(Math.min(w, h) * 0.62)
   return `<!doctype html><meta charset="utf-8">
   <style>
     html,body{margin:0;padding:0}
-    #s{width:${w}px;height:${h}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(bolt * 0.14)}px;
-       background:linear-gradient(135deg,#22326f 0%,#3459C7 60%,#6255E8 100%);
-       font-family:"Segoe UI",system-ui,sans-serif}
-    #s svg{width:${bolt}px;height:${bolt}px;display:block;filter:drop-shadow(0 ${Math.round(bolt * 0.04)}px ${Math.round(bolt * 0.08)}px rgba(0,0,0,.35))}
-    b{color:#F4F2FF;font-size:${Math.round(bolt * 0.19)}px;letter-spacing:${Math.round(bolt * 0.03)}px;font-weight:800}
-    small{color:#D9B8FF;font-size:${Math.round(bolt * 0.11)}px;letter-spacing:${Math.round(bolt * 0.05)}px;font-weight:700}
+    #s{width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;
+       background:linear-gradient(135deg,#22326f 0%,#3459C7 60%,#6255E8 100%)}
+    #s img{width:${tile}px;height:${tile}px;display:block;border-radius:22%;
+       box-shadow:0 ${Math.round(tile * 0.04)}px ${Math.round(tile * 0.1)}px rgba(0,0,0,.4)}
   </style>
-  <div id="s">${foreground}<b>MINDSPARK</b><small>MATH</small></div>`
+  <div id="s"><img src="${LOGO}"></div>`
 }
 
 for (const [dir, w, h] of [

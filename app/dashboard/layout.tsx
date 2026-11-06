@@ -57,8 +57,10 @@ export default function DashboardLayout({
 
   return (
     <div className="student-app-shell text-white">
-      {/* Floating icon nav — students tap icons directly (hidden during battle via CSS) */}
-      <nav className="student-nav-rail absolute right-2 top-2 z-40 flex items-center gap-1.5">
+      {/* Floating icon nav — one rounded tray, every button the same shape
+          (Nov 2026). Its size lives in --student-nav-w / -h (globals.css) so
+          page headers can keep clear of it. Hidden during battle via CSS. */}
+      <nav className="student-nav-rail absolute right-2 top-2 z-40 flex items-center gap-1.5 rounded-[22px] border border-white/15 bg-[#1a1233]/55 p-1.5 shadow-xl backdrop-blur-md">
         {navItems.map(item => {
           const Icon = item.icon
           const active = activeItem === item.id
@@ -67,14 +69,15 @@ export default function DashboardLayout({
               key={item.id}
               href={item.href}
               aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
               className={[
-                'flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl border shadow-lg backdrop-blur-sm transition',
+                'flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-2xl border transition',
                 active
-                  ? 'border-yellow-300/60 bg-gradient-to-b from-purple-500 to-fuchsia-600 shadow-purple-500/50'
-                  : 'border-purple-300/25 bg-[#1a1233]/80 hover:bg-purple-500/30',
+                  ? 'border-yellow-300/70 bg-gradient-to-b from-[#9B83F5] to-[#6255E8] shadow-md shadow-[#6255E8]/50'
+                  : 'border-white/10 bg-white/5 hover:bg-[#6255E8]/40',
               ].join(' ')}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-[18px] w-[18px]" />
               <span className="text-[8px] font-black uppercase leading-none tracking-wide">{item.label}</span>
             </Link>
           )
@@ -83,9 +86,9 @@ export default function DashboardLayout({
           type="button"
           onClick={logout}
           aria-label="Log out"
-          className="flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl border border-pink-300/30 bg-[#1a1233]/80 shadow-lg backdrop-blur-sm transition hover:bg-pink-500/30"
+          className="flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-2xl border border-pink-300/25 bg-white/5 transition hover:bg-pink-500/30"
         >
-          <LogOut className="h-5 w-5 text-pink-200" />
+          <LogOut className="h-[18px] w-[18px] text-pink-200" />
           <span className="text-[8px] font-black uppercase leading-none tracking-wide text-pink-200">Logout</span>
         </button>
       </nav>

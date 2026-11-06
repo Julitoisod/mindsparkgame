@@ -1,58 +1,41 @@
 /**
- * app/teacher-login/page.tsx — Teacher sign-in (web portal)
+ * app/teacher-login/page.tsx — the web portal's ONE sign-in page.
  *
- * Separate from the student /login page (req #1). Lives outside the /teacher
- * route group so it isn't caught by the teacher layout's auth guard.
- * Uses the same LoginForm + /api/auth/login; teachers are routed to the
- * teacher dashboard after a successful sign-in.
+ * Panel revision (Nov 2026): teachers and the administrator share this page;
+ * the account's role decides where it lands (LoginForm routes admin →
+ * /admin/dashboard, teacher → /teacher/dashboard) and each still gets only its
+ * own tools. Teachers no longer sign themselves up — the admin creates their
+ * accounts — and students have no web access, so both links are gone.
+ * /admin-login redirects here.
  */
-import Link from 'next/link'
-import { GraduationCap } from 'lucide-react'
 import LoginForm from '@/components/auth/LoginForm'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Teacher Sign In' }
+export const metadata: Metadata = { title: 'Sign In' }
 
-export default function TeacherLoginPage() {
+export default function PortalLoginPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#22326f] via-[#3459C7] to-[#6255E8] flex items-center justify-center p-4">
-      <div className="relative z-10 w-full max-w-md space-y-8">
-        {/* Logo */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <GraduationCap className="w-8 h-8 text-[#D9B8FF]" />
-            <span className="text-2xl font-black font-game text-[#F4F2FF]">MindSpark</span>
-          </div>
-          <h1 className="text-3xl font-bold text-[#F4F2FF]">Teacher Sign In</h1>
-          <p className="text-[#F4F2FF]/70 text-sm">Manage your sections, students, questions, and reports</p>
+      <div className="relative z-10 w-full max-w-md space-y-6">
+        <div className="text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/mindspark-logo.webp"
+            alt="MindSpark Math"
+            width={112}
+            height={112}
+            className="mx-auto h-28 w-28 rounded-[26px] shadow-2xl shadow-[#22326f]/50"
+          />
+          <h1 className="mt-4 text-3xl font-bold text-[#F4F2FF]">Sign In</h1>
+          <p className="mt-1 text-sm text-[#F4F2FF]/75">For teachers and administrators — your account opens your own dashboard.</p>
         </div>
 
-        {/* Form card */}
-        <div className="glass rounded-2xl p-8 space-y-6">
+        <div className="glass rounded-2xl p-8">
           <LoginForm />
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-primary-200/15" />
-            </div>
-            <div className="relative text-center">
-              <span className="px-3 bg-transparent text-xs text-primary-100/55">new here?</span>
-            </div>
-          </div>
-
-          <p className="text-center text-sm text-primary-100/65">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-[#D9B8FF] hover:underline font-semibold">
-              Create teacher account
-            </Link>
-          </p>
         </div>
 
-        <p className="text-center text-xs text-primary-100/45">
-          Are you a student?{' '}
-          <Link href="/login" className="text-primary-300 hover:underline font-semibold">
-            Student sign in
-          </Link>
+        <p className="text-center text-xs text-[#F4F2FF]/60">
+          Need an account or forgot your password? Ask your MindSpark administrator.
         </p>
       </div>
     </main>

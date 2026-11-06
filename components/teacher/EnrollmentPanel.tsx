@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { formatSchoolYear } from '@/lib/enrollment'
+import { CLASS_LIST_TEMPLATE, decodeClassList, parseClassList } from '@/lib/classList'
 
 type Classroom = { id: number; name: string; schoolYear: string | null; studentCount: number }
 type BulkResult = { row: number; name: string; status: 'enrolled' | 'skipped'; reason?: string; username?: string; password?: string }
@@ -28,6 +29,8 @@ type BulkResult = { row: number; name: string; status: 'enrolled' | 'skipped'; r
 type PreviewStudent = { lastName: string; firstName: string; middleName: string }
 
 const EMPTY_MANUAL_FORM = { lastName: '', firstName: '', middleName: '', username: '', password: '' }
+/** The bulk endpoint enrols at most this many per request. */
+const MAX_CLASS_LIST = 100
 
 export default function EnrollmentPanel() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
@@ -64,42 +67,9 @@ export default function EnrollmentPanel() {
 
   useEffect(() => { loadClassrooms() }, [loadClassrooms])
 
-  function parseCSV(text: string): Record<string, string>[] {
-    // Remove BOM if present (Excel adds this)
-    const cleaned = text.replace(/^﻿/, '').trim()
-    const lines = cleaned.split(/\r?\n/).filter(l => l.trim())
-    if (lines.length < 2) return []
-
-    function parseLine(line: string): string[] {
-      const result: string[] = []
-      let current = ''
-      let inQuotes = false
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i]
-        if (ch === '"') {
-          inQuotes = !inQuotes
-        } else if (ch === ',' && !inQuotes) {
-          result.push(current.trim())
-          current = ''
-        } else {
-          current += ch
-        }
-      }
-      result.push(current.trim())
-      return result
-    }
-
-    const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''))
-    return lines.slice(1).map(line => {
-      const values = parseLine(line)
-      const row: Record<string, string> = {}
-      headers.forEach((h, i) => { row[h] = values[i] ?? '' })
-      return row
-    }).filter(row => Object.values(row).some(v => v.trim()))
-  }
-
   /** Step 1 — pick the Registrar's file. Nothing is enrolled yet: the records
-   *  are only displayed for review. */
+   *  are only displayed for review. lib/classList reads title rows, other
+   *  separators, other header names and Excel's encodings (Nov 2026). */
   async function handleClassListSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -110,30 +80,33 @@ export default function EnrollmentPanel() {
     setError(null)
 
     try {
-      const rows = parseCSV(await file.text())
-      if (rows.length === 0) {
-        setError('That file is empty or has no student rows')
-        return
-      }
+      const decoded = decodeClassList(new Uint8Array(await file.arrayBuffer()))
+      if (decoded.error || decoded.text === undefined) { setError(decoded.error ?? 'Could not read that file'); return }
 
-      const preview: PreviewStudent[] = rows.map(row => ({
-        lastName: row.last_name ?? row.lastname ?? row.surname ?? '',
-        firstName: row.first_name ?? row.firstname ?? row.given_name ?? '',
-        middleName: row.middle_name ?? row.middlename ?? row.middle_initial ?? '',
-      })).filter(s => s.lastName || s.firstName)
-
-      if (preview.length === 0) {
-        setError('No Last Name / First Name columns found in that file')
+      const { students, error: parseError } = parseClassList(decoded.text)
+      if (parseError) { setError(parseError); return }
+      if (students.length > MAX_CLASS_LIST) {
+        setError(`That list has ${students.length} students — upload at most ${MAX_CLASS_LIST} per file.`)
         return
       }
 
       setCsvFileName(file.name)
-      setCsvPreview(preview)
+      setCsvPreview(students)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not read that file')
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([CLASS_LIST_TEMPLATE], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'mindspark_class_list_template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   /** Step 2b — Cancel: nothing is enrolled and another file can be picked. */
@@ -264,13 +237,26 @@ export default function EnrollmentPanel() {
             ))}
           </select>
 
-          <div className="space-y-1 rounded-lg border border-purple-400/15 bg-purple-900/30 p-3 text-xs text-[#4B5563]">
-            <p className="font-bold text-[#374151]">Columns read from the class list:</p>
+          <div className="space-y-1.5 rounded-lg border border-purple-400/15 bg-purple-900/30 p-3 text-xs text-[#4B5563]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold text-[#374151]">Columns read from the class list:</p>
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#d8cdf3] bg-white px-2.5 py-1 text-[11px] font-bold text-[#6f54ba] hover:bg-[#f4efff]"
+              >
+                <Download className="h-3.5 w-3.5" /> Download template (CSV)
+              </button>
+            </div>
             <p className="rounded bg-[#f8fafc] px-2 py-1 font-mono text-[10px] text-[#4B5563]">Last Name, First Name, Middle Name</p>
+            <p className="text-[10px] text-[#6B7280]">
+              Also accepted: Surname / Given Name / M.I. headers, one &quot;Name&quot; column written &quot;Last, First Middle&quot;, title rows above the header,
+              and CSV saved from Excel (comma or semicolon). Excel workbooks (.xlsx): use File → Save As → CSV first.
+            </p>
             <p className="text-[10px] text-[#6B7280]">MindSpark generates each username and a default password (username + &quot;123&quot;). Max 100 students per file.</p>
           </div>
 
-          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleClassListSelected} className="hidden" />
+          <input ref={fileInputRef} type="file" accept=".csv,.txt,text/csv" onChange={handleClassListSelected} className="hidden" />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}

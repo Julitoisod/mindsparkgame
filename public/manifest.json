@@ -1,11 +1,11 @@
 {
-  "name": "MindSpark Game",
+  "name": "MindSpark Math",
   "short_name": "MindSpark",
   "description": "A 2D/3D anime-inspired browser RPG - Quiz Adventure Game",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#041008",
-  "theme_color": "#00441b",
+  "background_color": "#22326f",
+  "theme_color": "#22326f",
   "orientation": "portrait-primary",
   "categories": ["games", "education"],
   "icons": [

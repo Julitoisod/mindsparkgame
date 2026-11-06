@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { characterOptions } from '@/lib/characterOptions'
 import { BADGES } from '@/lib/badges'
 import { levelStories } from '@/lib/storyContent'
+import { trophyLevels } from '@/lib/scoring'
+import { ChangePasswordForm } from '@/components/account/AccountSettings'
 
 import type { CharacterData, CharacterStats } from '@/types/character'
 
@@ -13,6 +15,8 @@ interface GameProgress {
   currentZone: number
   completedLevels: number[]
   playtimeSeconds: number
+  /** Levels whose boss was defeated — one Forest Trophy each */
+  trophies: number[]
 }
 
 interface CharacterAccess {
@@ -62,6 +66,7 @@ export default function DashboardProfilePage() {
             currentZone: progRes.data.currentZone ?? 1,
             completedLevels: progRes.data.completedLevels ?? [],
             playtimeSeconds: progRes.data.playtimeSeconds ?? 0,
+            trophies: trophyLevels(progRes.data.questFlags),
           })
           setAccess(prev => ({ ...prev, starBalance: progRes.meta?.starBalance ?? prev.starBalance }))
           if (Array.isArray(progRes.meta?.earnedBadges)) {
@@ -95,8 +100,8 @@ export default function DashboardProfilePage() {
     <div className="h-full flex flex-col overflow-hidden">
       {/* Scrollable content */}
       <div className="student-scroll-area px-3 py-4 space-y-4">
-        {/* Profile Header */}
-        <div className="flex items-center gap-3">
+        {/* Profile Header — keeps clear of the nav tray */}
+        <div className="student-page-head -mt-2 flex items-center gap-3">
           <div className="relative shrink-0 h-14 w-14 rounded-xl overflow-hidden border-2 border-purple-400/30">
             <Image
               src={charOption?.imagePath ?? '/AVATAR CHARACTERS/3 AVATAR/2D-KNIGHT BOY CHARACTER/_PNG/1_KNIGHT_ AVATAR/Knight_01__IDLE_000.png'}
@@ -181,15 +186,15 @@ export default function DashboardProfilePage() {
             username and password only, and the email here is a generated
             placeholder (name@student.mindspark) that only confused them. */}
 
-        {/* Trophies — earned by clearing each level; shown before badges */}
+        {/* Trophies — one per boss defeated (Nov 2026); shown before badges */}
         <div className="rounded-lg border border-amber-400/20 bg-[#22326f]/55 p-3">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-bold text-white/80">Trophies</p>
-            <span className="text-[10px] font-bold text-amber-300">{completedCount}/{levelStories.length}</span>
+            <span className="text-[10px] font-bold text-amber-300">{progress?.trophies.length ?? 0}/{levelStories.length}</span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
             {levelStories.map(t => {
-              const earned = (progress?.completedLevels ?? []).includes(t.level)
+              const earned = (progress?.trophies ?? []).includes(t.level)
               return (
                 <div key={t.level} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-amber-400/40 bg-[#3459C7]/35' : 'border-[#9B83F5]/10 bg-[#3459C7]/35/50 opacity-50 grayscale'}`}>
                   <Image src={t.trophyImage} alt={t.trophyName} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
@@ -217,6 +222,13 @@ export default function DashboardProfilePage() {
               )
             })}
           </div>
+        </div>
+
+        {/* Change Password — students manage their own password (Nov 2026) */}
+        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3" data-testid="student-change-password">
+          <p className="text-xs font-bold text-white/80">Change Password</p>
+          <p className="mb-2 text-[10px] text-white/50">Pick a password only you know.</p>
+          <ChangePasswordForm tone="dark" />
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import puppeteer from 'puppeteer-core'
 import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createTeacher } from './lib/teacher-account.mjs'
 
 const CHROME = process.env.CHROME_PATH
   ?? 'C:/Users/ISOD/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe'
@@ -84,7 +85,7 @@ await api(adminBox, `/api/admin/teachers/${teacherId}`, { isActive: true }, 'PAT
 // ── Set up a working teacher with a section, students and attempts ───────────
 const workBox = { v: '' }
 const workTeacher = `work${stamp}`
-await api(workBox, '/api/auth/register', { username: workTeacher, email: `${workTeacher}@mindspark.test`, password: TEACHER_PASS })
+await createTeacher(BASE, { username: workTeacher, email: `${workTeacher}@mindspark.test`, password: TEACHER_PASS })
 await api(workBox, '/api/auth/login', { identifier: workTeacher, password: TEACHER_PASS })
 const section = await api(workBox, '/api/teacher/classrooms', { name: `Grade 5 - Eval ${stamp}`, schoolYear: '2026-2027' })
 const student = `s${stamp}`
@@ -159,7 +160,9 @@ await page.goto(`${BASE}/admin-login`, { waitUntil: 'networkidle2' })
 await typeInto('input[placeholder="hero123"]', 'admin')
 await typeInto('input[type="password"]', 'Admin@12345')
 await clickText('Sign In')
-if (!await waitForUrl('/admin/teachers')) throw new Error(`admin was not routed to /admin/teachers (at ${page.url()})`)
+// Nov 2026: admins land on the Admin Dashboard, Teacher Management is one click away
+if (!await waitForUrl('/admin/dashboard')) throw new Error(`admin was not routed to /admin/dashboard (at ${page.url()})`)
+await page.goto(`${BASE}/admin/teachers`, { waitUntil: 'networkidle2' })
 await wait(2000)
 await shot('eval-01-admin-teacher-accounts')
 ok('item 1 — admin UI lists teacher accounts')

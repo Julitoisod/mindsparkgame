@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react'
 import Input  from '@/components/ui/Input'
-import Button from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
 import { isStudentApp } from '@/lib/appTarget'
 
@@ -52,10 +51,12 @@ export default function LoginForm({ theme = 'default' }: { theme?: 'default' | '
     setLoading(false)
 
     if (user?.role === 'admin') {
-      router.replace('/admin/teachers')
+      router.replace('/admin/dashboard')
     } else if (user?.role === 'teacher') {
       router.replace('/teacher/dashboard')
     } else if (user?.role === 'student') {
+      // The game shows the deadline reminder once after each sign-in (Nov 2026)
+      try { window.sessionStorage.setItem('mindspark-show-reminder', '1') } catch { /* storage blocked */ }
       const charRes = await fetch('/api/character', { credentials: 'include' })
       const charJson = await charRes.json()
       const hasCharacter = charJson.success && charJson.data?.length > 0
@@ -150,16 +151,16 @@ export default function LoginForm({ theme = 'default' }: { theme?: 'default' | '
           <LogIn className="h-5 w-5" />
         </button>
       ) : (
-        <Button
+        // Portal sign-in: the palette's blue → violet, so the violet stays but
+        // sits with the blue page instead of fighting it (Nov 2026)
+        <button
           type="submit"
-          variant="primary"
-          size="lg"
-          loading={loading}
-          icon={<LogIn className="w-4 h-4" />}
-          className="w-full"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3459C7] via-[#4b57dc] to-[#6255E8] py-3.5 text-base font-black text-white shadow-lg shadow-[#22326f]/40 ring-1 ring-white/20 transition-all hover:brightness-110 disabled:opacity-60"
         >
-          Sign In
-        </Button>
+          <LogIn className="h-4 w-4" />
+          {loading ? 'Signing in…' : 'Sign In'}
+        </button>
       )}
     </motion.form>
   )

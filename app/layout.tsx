@@ -19,8 +19,8 @@ const orbitron = Orbitron({
 
 export const metadata: Metadata = {
   title: {
-    default: 'MindSpark Game',
-    template: '%s | MindSpark',
+    default: 'MindSpark Math',
+    template: '%s | MindSpark Math',
   },
   description: 'A 2D/3D anime-inspired browser RPG built with Next.js, Three.js and MySQL.',
   manifest: '/manifest.json',
@@ -40,7 +40,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#00441b',
+  themeColor: '#22326f',
 }
 
 /**
@@ -64,18 +64,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-dark-900 text-primary-100 font-body antialiased min-h-screen">
         {children}
+        {/* MindSpark palette — the old dark-green toast was the "green" the
+            panel kept seeing after sign-in and character purchases (Nov 2026). */}
         <Toaster
-          position="top-right"
+          position="top-center"
           toastOptions={{
             style: {
-              background: '#0d2b18',
-              color:      '#f7fcf5',
-              border:     '1px solid rgba(199,233,192,0.18)',
-              borderRadius: '12px',
+              background: '#22326f',
+              color:      '#F4F2FF',
+              border:     '1px solid rgba(155,131,245,0.55)',
+              borderRadius: '14px',
               fontSize:   '14px',
+              fontWeight: 600,
+              boxShadow:  '0 10px 30px rgba(34,50,111,0.35)',
             },
-            success: { iconTheme: { primary: '#74c476', secondary: '#041008' } },
-            error:   { iconTheme: { primary: '#c7e9c0', secondary: '#041008' } },
+            success: { iconTheme: { primary: '#9B83F5', secondary: '#F4F2FF' } },
+            error:   { iconTheme: { primary: '#F472B6', secondary: '#F4F2FF' } },
           }}
         />
       </body>

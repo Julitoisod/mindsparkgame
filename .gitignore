@@ -21,3 +21,6 @@ android/.gradle/
 .env.prod.local
 .env
 .claude-deploy.json
+
+# Nov 2026 panel proof screenshots — regenerate with node scripts/check-panel-revision.mjs
+proof-screenshots/panel-2026-11/

@@ -4,7 +4,7 @@
  * Client-side authentication state manager.
  */
 import { useState, useEffect, useCallback } from 'react'
-import type { PublicUser, LoginInput, RegisterInput } from '@/types/user'
+import type { PublicUser, LoginInput } from '@/types/user'
 import toast from 'react-hot-toast'
 
 interface AuthState {
@@ -15,17 +15,6 @@ interface AuthState {
 
 interface UseAuthOptions {
   checkSession?: boolean
-}
-
-interface RegisterResult {
-  user: PublicUser | null
-  errors?: Record<string, string>
-  message?: string
-}
-
-function isFieldErrors(value: unknown): value is Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  return Object.values(value).every(item => typeof item === 'string')
 }
 
 export function useAuth({ checkSession = true }: UseAuthOptions = {}) {
@@ -80,33 +69,6 @@ export function useAuth({ checkSession = true }: UseAuthOptions = {}) {
     }
   }, [])
 
-  const register = useCallback(async (input: RegisterInput): Promise<RegisterResult> => {
-    setState(s => ({ ...s, loading: true, error: null }))
-    try {
-      const res = await fetch('/api/auth/register', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(input),
-        credentials: 'include',
-      })
-      const json = await res.json()
-      if (res.ok && json.success) {
-        setState({ user: json.data, loading: false, error: null })
-        toast.success('Teacher account created!')
-        return { user: json.data as PublicUser }
-      }
-      const fieldErrors = isFieldErrors(json.data) ? json.data : undefined
-      const message = json.message ?? 'Registration failed'
-      setState(s => ({ ...s, loading: false, error: message }))
-      toast.error(fieldErrors ? Object.values(fieldErrors)[0] : message)
-      return { user: null, errors: fieldErrors, message }
-    } catch {
-      setState(s => ({ ...s, loading: false, error: 'Network error' }))
-      toast.error('Network error')
-      return { user: null, message: 'Network error' }
-    }
-  }, [])
-
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     setState({ user: null, loading: false, error: null })
@@ -119,7 +81,6 @@ export function useAuth({ checkSession = true }: UseAuthOptions = {}) {
     error:    state.error,
     isAuthed: state.user !== null,
     login,
-    register,
     logout,
     refresh:  fetchMe,
   }

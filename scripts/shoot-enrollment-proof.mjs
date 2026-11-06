@@ -16,6 +16,7 @@ import puppeteer from 'puppeteer-core'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createTeacher } from './lib/teacher-account.mjs'
 
 const CHROME = process.env.CHROME_PATH
   ?? 'C:/Users/ISOD/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe'
@@ -33,12 +34,7 @@ fs.writeFileSync(
   'Last Name,First Name,Middle Name\nSantos,John Mark,Cruz\nReyes,Maria,Dela\nBautista,Ana,Lim',
 )
 
-const reg = await fetch(`${BASE}/api/auth/register`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: TEACHER, email: `${TEACHER}@mindspark.test`, password: PASS }),
-})
-if (reg.status !== 201) throw new Error(`register failed: ${reg.status}`)
+await createTeacher(BASE, { username: TEACHER, email: `${TEACHER}@mindspark.test`, password: PASS })
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new' })
 const page = await browser.newPage()

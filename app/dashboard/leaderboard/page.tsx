@@ -43,7 +43,7 @@ export default function LeaderboardPage() {
 
   return (
     <div className="student-scroll-area px-3 py-4 space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="student-page-head -mt-2 flex items-center gap-2">
         <Trophy className="h-5 w-5 text-[#D9B8FF]" />
         <div>
           <h2 className="font-game text-base font-bold text-white">Leaderboard</h2>
