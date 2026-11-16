@@ -24,7 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (loading) return
-    if (!isAuthed) { router.replace('/teacher-login'); return }
+    if (!isAuthed) { router.replace('/admin-login'); return }
     if (user?.role !== 'admin') {
       router.replace(user?.role === 'teacher' ? '/teacher/dashboard' : '/login')
     }
@@ -47,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   async function handleLogout() {
     await logout()
-    router.replace('/teacher-login')
+    router.replace('/admin-login')
   }
 
   const active = navItems.find(item => pathname.startsWith(item.href)) ?? navItems[0]

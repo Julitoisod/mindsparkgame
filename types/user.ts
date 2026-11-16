@@ -39,9 +39,14 @@ export interface AuthPayload {
   exp?: number
 }
 
+/** Which web sign-in link was used — the admin and teachers each have their own. */
+export type LoginPortal = 'admin' | 'teacher'
+
 export interface LoginInput {
   identifier: string
   password: string
+  /** Omitted by the student app; the web links always send it. */
+  portal?: LoginPortal
 }
 
 export interface RegisterInput {

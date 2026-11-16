@@ -4,9 +4,22 @@ import { verifyPassword, signToken, setAuthCookie } from '@/lib/auth'
 import { validateLogin }   from '@/lib/validations'
 import type { User, PublicUser } from '@/types/user'
 
+/** Message for an account signing in on the other role's link, or null when it matches. */
+function portalMismatch(portal: string | undefined, role: User['role']): string | null {
+  if (portal === 'admin' && role !== 'admin') {
+    return 'This sign-in page is for the administrator only. Teachers, please use the teacher sign-in page.'
+  }
+  if (portal === 'teacher' && role !== 'teacher') {
+    return role === 'admin'
+      ? 'This sign-in page is for teachers. Administrators have their own sign-in page.'
+      : 'This sign-in page is for teachers. Students, please sign in on the MindSpark app.'
+  }
+  return null
+}
+
 /**
  * POST /api/auth/login
- * Body: { identifier, password } | { email, password }
+ * Body: { identifier, password, portal? } | { email, password, portal? }
  */
 export async function POST(request: Request) {
   let body: unknown
@@ -59,6 +72,14 @@ export async function POST(request: Request) {
         { success: false, message: 'This teacher account has been deactivated. Please contact the administrator.' },
         { status: 403 },
       )
+    }
+
+    // Separate links: /admin-login for the admin, /teacher-login for teachers.
+    // Same database — the role only decides which door the account may use,
+    // and a wrong door is refused before any session cookie is set.
+    const portalError = portalMismatch(data.portal, user.role)
+    if (portalError) {
+      return NextResponse.json({ success: false, message: portalError }, { status: 403 })
     }
 
     if (user.role === 'student' && user.enrollment_status !== 'enrolled') {

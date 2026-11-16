@@ -1,17 +1,15 @@
 /**
- * app/teacher-login/page.tsx — the web portal's ONE sign-in page.
+ * app/teacher-login/page.tsx — the teachers' sign-in link.
  *
- * Panel revision (Nov 2026): teachers and the administrator share this page;
- * the account's role decides where it lands (LoginForm routes admin →
- * /admin/dashboard, teacher → /teacher/dashboard) and each still gets only its
- * own tools. Teachers no longer sign themselves up — the admin creates their
- * accounts — and students have no web access, so both links are gone.
- * /admin-login redirects here.
+ * Adviser request (Nov 2026): the administrator has a separate link
+ * (/admin-login); this page signs in teachers only and the server refuses
+ * admin and student accounts here (`portal: 'teacher'`). Teachers no longer
+ * sign themselves up — the admin creates their accounts.
  */
 import LoginForm from '@/components/auth/LoginForm'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Sign In' }
+export const metadata: Metadata = { title: 'Teacher Sign In' }
 
 export default function PortalLoginPage() {
   return (
@@ -26,12 +24,12 @@ export default function PortalLoginPage() {
             height={112}
             className="mx-auto h-28 w-28 rounded-[26px] shadow-2xl shadow-[#22326f]/50"
           />
-          <h1 className="mt-4 text-3xl font-bold text-[#F4F2FF]">Sign In</h1>
-          <p className="mt-1 text-sm text-[#F4F2FF]/75">For teachers and administrators — your account opens your own dashboard.</p>
+          <h1 className="mt-4 text-3xl font-bold text-[#F4F2FF]">Teacher Sign In</h1>
+          <p className="mt-1 text-sm text-[#F4F2FF]/75">Manage your sections, students, questions and reports.</p>
         </div>
 
         <div className="glass rounded-2xl p-8">
-          <LoginForm />
+          <LoginForm portal="teacher" />
         </div>
 
         <p className="text-center text-xs text-[#F4F2FF]/60">

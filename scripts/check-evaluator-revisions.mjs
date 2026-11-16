@@ -75,6 +75,19 @@ const forbidden = await api(teacherBox, '/api/admin/teachers', null, 'GET')
 if (forbidden.status !== 403) throw new Error(`a teacher reached the admin API (${forbidden.status})`)
 ok('item 1 — admin and teacher access are separate (teacher gets 403)')
 
+// Separate links (Nov 2026): each sign-in page refuses the other role, same database
+const adminAtTeacher = await api({ v: '' }, '/api/auth/login', { identifier: 'admin', password: 'Admin@12345', portal: 'teacher' })
+const teacherAtAdmin = await api({ v: '' }, '/api/auth/login', { identifier: newTeacher, password: TEACHER_PASS, portal: 'admin' })
+const adminAtAdmin = await api({ v: '' }, '/api/auth/login', { identifier: 'admin', password: 'Admin@12345', portal: 'admin' })
+const teacherAtTeacher = await api({ v: '' }, '/api/auth/login', { identifier: newTeacher, password: TEACHER_PASS, portal: 'teacher' })
+if (adminAtTeacher.status !== 403 || teacherAtAdmin.status !== 403) {
+  throw new Error(`a wrong-door sign-in got through (admin@teacher ${adminAtTeacher.status}, teacher@admin ${teacherAtAdmin.status})`)
+}
+if (adminAtAdmin.status !== 200 || teacherAtTeacher.status !== 200) {
+  throw new Error(`a right-door sign-in failed (admin@admin ${adminAtAdmin.status}, teacher@teacher ${teacherAtTeacher.status})`)
+}
+ok('item 1 — separate links: /admin-login refuses teachers, /teacher-login refuses the admin')
+
 // Deactivate -> that teacher can no longer sign in
 await api(adminBox, `/api/admin/teachers/${teacherId}`, { isActive: false }, 'PATCH')
 const blocked = await api({ v: '' }, '/api/auth/login', { identifier: newTeacher, password: TEACHER_PASS })
@@ -155,8 +168,23 @@ const clickText = text => page.evaluate(t => {
   return Boolean(el)
 }, text)
 
-// Admin UI
+// Separate links: the admin is refused on the teacher page, in the real UI
+await page.goto(`${BASE}/teacher-login`, { waitUntil: 'networkidle2' })
+await typeInto('input[placeholder="hero123"]', 'admin')
+await typeInto('input[type="password"]', 'Admin@12345')
+await clickText('Sign In')
+await wait(2500)
+const refusedText = await page.evaluate(() => document.body.innerText)
+if (!page.url().includes('/teacher-login') || !/Administrators have their own sign-in page/.test(refusedText)) {
+  throw new Error(`admin was not refused on /teacher-login (at ${page.url()})`)
+}
+await shot('eval-00b-admin-refused-on-teacher-login')
+ok('item 1 — the teacher sign-in page tells the admin to use its own link')
+
+// Admin UI — its own sign-in link
 await page.goto(`${BASE}/admin-login`, { waitUntil: 'networkidle2' })
+await wait(800)
+await shot('eval-00a-admin-login-page')
 await typeInto('input[placeholder="hero123"]', 'admin')
 await typeInto('input[type="password"]', 'Admin@12345')
 await clickText('Sign In')

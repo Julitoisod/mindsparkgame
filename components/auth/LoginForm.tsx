@@ -9,12 +9,14 @@ import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react'
 import Input  from '@/components/ui/Input'
 import { useAuth } from '@/hooks/useAuth'
 import { isStudentApp } from '@/lib/appTarget'
+import type { LoginPortal } from '@/types/user'
 
 /**
  * `theme="student"` renders the light card used by the student login page
  * (2026-10 revision item 12); the default dark theme stays for the teacher.
+ * `portal` tells the server which web link this is, so it refuses the other role.
  */
-export default function LoginForm({ theme = 'default' }: { theme?: 'default' | 'student' }) {
+export default function LoginForm({ theme = 'default', portal }: { theme?: 'default' | 'student'; portal?: LoginPortal }) {
   const student = theme === 'student'
   const router = useRouter()
   const { login, logout } = useAuth({ checkSession: false })
@@ -38,7 +40,7 @@ export default function LoginForm({ theme = 'default' }: { theme?: 'default' | '
 
     setLoading(true)
     setErrors({})
-    const user = await login({ identifier, password })
+    const user = await login({ identifier, password, portal })
 
     // The student app is student-only — block teacher sign-ins here (req #1)
     if (studentApp && (user?.role === 'teacher' || user?.role === 'admin')) {

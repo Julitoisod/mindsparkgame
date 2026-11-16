@@ -38,6 +38,9 @@ export function validateLogin(body: unknown): ValidationResult {
   if (!data.password || typeof data.password !== 'string') {
     errors.password = 'Password is required.'
   }
+  if (data.portal !== undefined && data.portal !== 'admin' && data.portal !== 'teacher') {
+    errors.portal = 'Unknown sign-in page.'
+  }
 
   return { valid: Object.keys(errors).length === 0, errors }
 }
