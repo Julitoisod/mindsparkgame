@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
   CONSTRAINT fk_users_enrolled_by FOREIGN KEY (enrolled_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- â”€â”€ Classrooms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ── Classrooms ─────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS classrooms (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   teacher_id  INT UNSIGNED NOT NULL,
@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS classrooms (
 
 ALTER TABLE users
   ADD CONSTRAINT fk_users_classroom FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL;
+
+-- First administrator (same row as migrations/2026-10b-revision.sql), so a fresh
+-- install can sign in at /admin-login. Password: Admin@12345 — change it after the
+-- first login. INSERT IGNORE never clobbers a changed password.
+INSERT IGNORE INTO users (username, full_name, email, password_hash, role, enrollment_status, is_active)
+VALUES ('admin', 'System Administrator', 'admin@mindspark.local',
+        '$2a$12$BXawYrttE709pvxXRZF06OxkRtVOj1G6SDhPvA98gcL4n19.WZqIG', 'admin', 'enrolled', 1);
 
 -- ── Character Data ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS character_data (
