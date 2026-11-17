@@ -6,6 +6,7 @@
  * admin and student accounts here (`portal: 'teacher'`). Teachers no longer
  * sign themselves up — the admin creates their accounts.
  */
+import BackToHome from '@/components/auth/BackToHome'
 import LoginForm from '@/components/auth/LoginForm'
 import type { Metadata } from 'next'
 
@@ -13,7 +14,8 @@ export const metadata: Metadata = { title: 'Teacher Sign In' }
 
 export default function PortalLoginPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#22326f] via-[#3459C7] to-[#6255E8] flex items-center justify-center p-4">
+    <main className="relative min-h-screen bg-gradient-to-br from-[#22326f] via-[#3459C7] to-[#6255E8] flex items-center justify-center px-4 py-16">
+      <BackToHome />
       <div className="relative z-10 w-full max-w-md space-y-6">
         <div className="text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}

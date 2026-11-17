@@ -8,6 +8,7 @@
  * (adviser, Nov 2026); the badge and shield mark it as the admin page.
  */
 import { ShieldCheck } from 'lucide-react'
+import BackToHome from '@/components/auth/BackToHome'
 import LoginForm from '@/components/auth/LoginForm'
 import type { Metadata } from 'next'
 
@@ -15,7 +16,8 @@ export const metadata: Metadata = { title: 'Administrator Sign In' }
 
 export default function AdminLoginPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#22326f] via-[#3459C7] to-[#6255E8] flex items-center justify-center p-4">
+    <main className="relative min-h-screen bg-gradient-to-br from-[#22326f] via-[#3459C7] to-[#6255E8] flex items-center justify-center px-4 py-16">
+      <BackToHome />
       <div className="relative z-10 w-full max-w-md space-y-6">
         <div className="text-center">
           <span className="mx-auto flex h-24 w-24 items-center justify-center rounded-[26px] bg-gradient-to-br from-[#7c5cf0] to-[#5a3fd4] shadow-2xl shadow-[#22326f]/50 ring-1 ring-white/20">
