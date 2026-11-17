@@ -9,7 +9,7 @@
  */
 import Image from 'next/image'
 import Link from 'next/link'
-import { BookOpen, GraduationCap, Trophy, Swords, Zap } from 'lucide-react'
+import { BookOpen, GraduationCap, ShieldCheck, Trophy, Swords, Zap } from 'lucide-react'
 import StudentAppRedirect from '@/components/auth/StudentAppRedirect'
 import type { Metadata } from 'next'
 
@@ -74,14 +74,21 @@ export default function HomePage() {
               Learn fractions, solid figures, surface area, and volume — through exciting quiz adventures!
             </p>
 
-            <div className="pt-2">
-              <Link
-                href="/teacher-login"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#6255E8] px-8 py-4 text-base font-black text-white shadow-lg shadow-[#6255E8]/40 transition-all hover:scale-105 hover:bg-[#9B83F5]"
-              >
-                <GraduationCap className="w-5 h-5" />
-                Teacher Login
-              </Link>
+            {/* Separate sign-in links for teachers and the admin (adviser, Nov 2026) */}
+            <div className="flex flex-wrap gap-3 pt-2">
+              {[
+                { href: '/teacher-login', label: 'Teacher Login', Icon: GraduationCap },
+                { href: '/admin-login', label: 'Admin Login', Icon: ShieldCheck },
+              ].map(({ href, label, Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#6255E8] px-8 py-4 text-base font-black text-white shadow-lg shadow-[#6255E8]/40 transition-all hover:scale-105 hover:bg-[#9B83F5]"
+                >
+                  <Icon className="w-5 h-5" />
+                  {label}
+                </Link>
+              ))}
             </div>
 
             <p className="text-sm text-[#F4F2FF]/70">
