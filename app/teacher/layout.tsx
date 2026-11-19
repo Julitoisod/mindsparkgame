@@ -22,7 +22,7 @@ import AccountMenu from '@/components/account/AccountMenu'
 // Order follows the evaluators' suggested navigation (2026-10b revision, item 2)
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/teacher/dashboard' },
-  { id: 'classrooms', label: 'Section', icon: School, href: '/teacher/classrooms' },
+  { id: 'classrooms', label: 'Classroom', icon: School, href: '/teacher/classrooms' },
   { id: 'enrollment', label: 'Enrollment', icon: UserPlus, href: '/teacher/enrollment' },
   { id: 'students', label: 'Students', icon: Users, href: '/teacher/students' },
   { id: 'questions', label: 'Question Bank', icon: FileQuestion, href: '/teacher/questions' },
@@ -181,7 +181,7 @@ function SidebarContent({ activeItem, username, onLogout }: { activeItem: string
         </span>
         <div>
           <h1 className="text-base font-black leading-tight text-[#1f2430]">MindSpark Math</h1>
-          <p className="text-[10px] text-[#8f88a1]">{username}&apos;s sections</p>
+          <p className="text-[10px] text-[#8f88a1]">{username}&apos;s classroom</p>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import {
   History,
   LogOut,
   Map,
-  Store,
+  Shield,
   Trophy,
   User,
 } from 'lucide-react'
@@ -18,7 +18,8 @@ import { useAuth } from '@/hooks/useAuth'
 const navItems = [
   { id: 'map', label: 'Map', icon: Map, href: '/dashboard/map' },
   { id: 'profile', label: 'Profile', icon: User, href: '/dashboard/profile' },
-  { id: 'store', label: 'Store', icon: Store, href: '/dashboard/store' },
+  // "Store" is now "Avatar" (panel revision, Nov 2026b) — same page
+  { id: 'store', label: 'Avatar', icon: Shield, href: '/dashboard/store' },
   { id: 'leaderboard', label: 'Ranks', icon: Trophy, href: '/dashboard/leaderboard' },
   { id: 'attempts', label: 'Attempts', icon: History, href: '/dashboard/attempts' },
 ]

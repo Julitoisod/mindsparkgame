@@ -647,3 +647,11 @@ body:has(.student-app-shell) {
 .teacher-theme .text-yellow-200 { color: #713f12 !important; }
 .teacher-theme .text-yellow-300 { color: #713f12 !important; }
 .teacher-theme .text-yellow-400 { color: #854d0e !important; }
+
+/* Landing + sign-in pages: floating math symbols (Nov 2026b) */
+@keyframes authFloat {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-14px) rotate(6deg); }
+}
+.auth-float { animation: authFloat 4.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .auth-float { animation: none; } }

@@ -24,3 +24,4 @@ android/.gradle/
 
 # Nov 2026 panel proof screenshots — regenerate with node scripts/check-panel-revision.mjs
 proof-screenshots/panel-2026-11/
+proof-screenshots/revision-2026-11b/

@@ -56,6 +56,7 @@ module.exports = {
       },
       fontFamily: {
         game: ['var(--font-orbitron)', 'monospace'],
+        display: ['var(--font-display)', 'var(--font-inter)', 'sans-serif'],
         body: ['var(--font-inter)', 'sans-serif'],
       },
       animation: {

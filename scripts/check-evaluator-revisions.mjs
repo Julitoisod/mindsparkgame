@@ -204,7 +204,8 @@ await waitForUrl('/teacher/dashboard')
 await wait(2000)
 const navLabels = await page.evaluate(() =>
   [...document.querySelectorAll('nav a, aside a')].map(a => a.textContent?.trim()).filter(Boolean))
-for (const label of ['Dashboard', 'Section', 'Enrollment', 'Students', 'Question Bank', 'Reports']) {
+// "Section" became "Classroom" in the Nov 2026b revision
+for (const label of ['Dashboard', 'Classroom', 'Enrollment', 'Students', 'Question Bank', 'Reports']) {
   if (!navLabels.some(l => l.includes(label))) throw new Error(`nav is missing "${label}" (saw ${navLabels.join(' | ')})`)
 }
 ok('item 2 — teacher navigation reads Dashboard · Section · Enrollment · Students · Question Bank · Reports')
@@ -251,7 +252,8 @@ for (let i = 0; i < 30; i++) {
   if (/Class Record/i.test(reportText)) break
 }
 if (!/Class Record/i.test(reportText)) throw new Error('class record is not on the reports page')
-if (!/Download \(CSV/i.test(reportText)) throw new Error('class record has no download button')
+// Nov 2026b: the class record's own button is gone; "Download Report" exports every module
+if (!/Download Report/i.test(reportText)) throw new Error('reports page has no Download Report')
 // scroll the record into view before the screenshot
 await page.evaluate(() => {
   const heading = [...document.querySelectorAll('h3')].find(h => /Class Record/i.test(h.textContent ?? ''))
@@ -292,6 +294,9 @@ ok('item 7 — leaderboard screen highlights the current student')
 // Into a level for the timer + boss transition
 await appPage.goto(`${BASE}/game`, { waitUntil: 'networkidle2' })
 await wait(3500)
+// the opening cinematic (Nov 2026b) covers the map until skipped
+await appPage.evaluate(() => [...document.querySelectorAll('button')].find(b => /^Skip/.test(b.textContent?.trim() ?? ''))?.click())
+await wait(1200)
 await appPage.evaluate(() => {
   const nodes = [...document.querySelectorAll('button:not([disabled])')].filter(b => b.querySelector('img'))
   nodes[0]?.click()
@@ -323,14 +328,16 @@ for (let q = 0; q < 6 && !sawTransition; q++) {
       .find(b => (b.textContent ?? '').replace(/^[A-D]\.\s*/, '').trim() === ans)
     btn?.click()
   }, answerOf.get(prompt))
-  // the overlay only lives for ~2.2s, so poll hard right after each answer
+  // the warning + boss battle mechanics wait for "Start Boss Battle" (Nov 2026b)
   for (let poll = 0; poll < 24 && !sawTransition; poll++) {
     await wait(250)
-    sawTransition = await appPage.evaluate(() => /boss battle phase/i.test(document.body.innerText))
+    sawTransition = await appPage.evaluate(() => /how the boss battle works/i.test(document.body.innerText))
   }
   if (sawTransition) {
+    await wait(1200)
     await appPage.screenshot({ path: `${OUT}/eval-07-boss-transition.png` })
     console.log('  shot eval-07-boss-transition')
+    await appPage.evaluate(() => [...document.querySelectorAll('button')].find(b => /Start Boss Battle/i.test(b.textContent ?? ''))?.click())
   }
   await wait(1200)
 }

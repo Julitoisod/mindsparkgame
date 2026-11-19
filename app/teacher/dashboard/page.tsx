@@ -1,10 +1,10 @@
 'use client'
 /**
- * Teacher Dashboard — laid out after the panel's mockup (Nov 2026): welcome
- * banner with the chosen section, four stat cards, the class performance chart
- * (average best-run score per level, out of 10), recent student activity,
- * students who need attention, and a way into Reports. Sections are created on
- * the Section page and students enrolled on the Enrollment page.
+ * Teacher Dashboard — welcome banner with the chosen section, four stat cards,
+ * the shared learning analytics (panel's suggested analytics, Nov 2026b:
+ * proficiency distribution, Level Performance, Student Performance, learning
+ * gaps, recent student activity), students who need attention, and a way into
+ * Reports. Sections live on the Classroom page, students on Enrollment.
  */
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -14,24 +14,22 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
-  CheckCircle2,
-  Clock,
   FileText,
-  Medal,
   School,
   Trophy,
   Users,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { currentSchoolYear, formatSchoolYear } from '@/lib/enrollment'
-import { timeAgo } from '@/lib/utils'
+import type { Analytics } from '@/lib/analytics'
+import LearningAnalytics, { type Activity } from '@/components/analytics/LearningAnalytics'
 
 type Classroom = { id: number; name: string; schoolYear: string | null; studentCount: number }
 type Overview = {
   stats: { totalStudents: number; sections: number; classAverage: number | null; finishedAll: number }
-  levelAverages: { level: number; average: number | null; students: number }[]
+  analytics: Analytics
   needsAttention: { studentId: number; name: string; level: number | null; score: number | null; status: string }[]
-  recent: { kind: 'completed' | 'badge'; studentId: number; text: string; detail: string; at: string }[]
+  recent: Activity[]
 }
 
 const statusTone: Record<string, string> = {
@@ -46,6 +44,7 @@ export default function TeacherDashboardPage() {
   const [classroomId, setClassroomId] = useState<number | ''>('')
   const [overview, setOverview] = useState<Overview | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
+  const [room, setRoom] = useState<{ name: string; schoolYear: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -56,6 +55,10 @@ export default function TeacherDashboardPage() {
     fetch('/api/account', { credentials: 'include' })
       .then(r => r.json())
       .then(json => { if (json.success) setFullName(json.data.fullName) })
+      .catch(() => {})
+    fetch('/api/teacher/classroom', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => { if (json.success) setRoom(json.data.classroom) })
       .catch(() => {})
   }, [])
 
@@ -99,8 +102,8 @@ export default function TeacherDashboardPage() {
           <div className="min-w-0">
             <h2 className="text-2xl font-black text-[#fff]">Welcome back, {fullName || user?.username || 'Teacher'}!</h2>
             <p className="mt-0.5 text-sm font-medium text-[#fff]/90">
-              Grade 5 Mathematics <span className="mx-1.5 opacity-60">|</span>
-              {formatSchoolYear(section?.schoolYear ?? currentSchoolYear())} <span className="mx-1.5 opacity-60">|</span>
+              {room?.name ?? 'Grade 5 Mathematics'} <span className="mx-1.5 opacity-60">|</span>
+              {formatSchoolYear(section?.schoolYear ?? room?.schoolYear ?? currentSchoolYear())} <span className="mx-1.5 opacity-60">|</span>
               {section ? `${section.name} Section` : 'All Sections'}
             </p>
           </div>
@@ -147,45 +150,8 @@ export default function TeacherDashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        {/* Class Performance Overview */}
-        <section className="rounded-2xl border border-[#ece8f5] bg-white p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 font-bold text-[#1f2430]">
-            <BarChart3 className="h-4 w-4 text-[#6255E8]" /> Class Performance Overview
-          </h3>
-          <p className="text-xs text-[#8f88a1]">Average score per level (out of 10) — each student&apos;s best run, students who played that level</p>
-          <LevelChart data={overview?.levelAverages ?? []} />
-        </section>
-
-        {/* Recent Student Activity */}
-        <section className="rounded-2xl border border-[#ece8f5] bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 font-bold text-[#1f2430]"><Clock className="h-4 w-4 text-[#6255E8]" /> Recent Student Activity</h3>
-            <Link href="/teacher/reports" className="text-xs font-bold text-[#6255E8] hover:underline">View All</Link>
-          </div>
-          {!overview ? (
-            <p className="text-sm text-[#8f88a1]">Loading…</p>
-          ) : overview.recent.length === 0 ? (
-            <p className="py-6 text-center text-sm text-[#8f88a1]">No activity yet — it appears as students play.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {overview.recent.map((item, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.kind === 'completed' ? 'bg-[#dcf5e6] text-[#178a4c]' : 'bg-[#fdecc8] text-[#c27803]'}`}>
-                    {item.kind === 'completed' ? <CheckCircle2 className="h-4 w-4" /> : <Medal className="h-4 w-4" />}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#1f2430]">
-                      {item.text}{item.detail && <span className="ml-1.5 text-xs font-bold text-[#6f7187]">({item.detail})</span>}
-                    </p>
-                    <p className="text-[11px] text-[#9aa0b2]">{timeAgo(item.at)}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      {/* Learning analytics — the same block the admin Dashboard shows (Nov 2026b) */}
+      <LearningAnalytics analytics={overview?.analytics ?? null} recent={overview?.recent ?? null} viewAllHref="/teacher/reports" />
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         {/* Students Who Need Attention */}
@@ -252,48 +218,5 @@ export default function TeacherDashboardPage() {
         </section>
       </div>
     </div>
-  )
-}
-
-/** Average best-run score per level — one series, one hue, labelled bars. */
-function LevelChart({ data }: { data: Overview['levelAverages'] }) {
-  const ticks = [10, 8, 6, 4, 2, 0]
-  return (
-    <figure
-      className="mt-8"
-      aria-label={`Average score per level out of 10: ${data.map(d => `Level ${d.level} ${d.average ?? 'not played'}`).join(', ')}`}
-    >
-      <div className="relative flex h-52">
-        {/* y-axis + recessive grid */}
-        <div className="flex w-7 flex-col justify-between pb-6 text-right text-[10px] text-[#9aa0b2]">
-          {ticks.map(t => <span key={t} className="-translate-y-1.5 leading-none">{t}</span>)}
-        </div>
-        <div className="relative flex-1">
-          <div className="absolute inset-x-0 bottom-6 top-0 flex flex-col justify-between">
-            {ticks.map(t => <span key={t} className={`border-t ${t === 0 ? 'border-[#c9c3da]' : 'border-dashed border-[#efedf5]'}`} />)}
-          </div>
-          <div className="absolute inset-x-0 bottom-0 top-0 flex items-end justify-around pl-2">
-            {(data.length ? data : [1, 2, 3, 4, 5].map(level => ({ level, average: null, students: 0 }))).map(d => (
-              <div key={d.level} className="group flex h-full w-12 flex-col items-center justify-end">
-                <div className="relative flex w-full flex-1 items-end justify-center pb-px">
-                  {d.average != null ? (
-                    <div
-                      title={`Level ${d.level}: ${d.average} / 10 average (${d.students} student${d.students === 1 ? '' : 's'})`}
-                      className="relative w-9 rounded-t-[4px] bg-[#6255E8] transition group-hover:bg-[#4b3fc4]"
-                      style={{ height: `${(d.average / 10) * 100}%` }}
-                    >
-                      <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-black text-[#1f2430]">{d.average}</span>
-                    </div>
-                  ) : (
-                    <span title={`Level ${d.level}: not played yet`} className="mb-1 text-xs font-bold text-[#c0bccd]">—</span>
-                  )}
-                </div>
-                <span className="mt-1.5 h-4 text-xs font-bold text-[#6f7187]">L{d.level}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </figure>
   )
 }

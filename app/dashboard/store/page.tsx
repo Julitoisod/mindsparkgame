@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Star, ShoppingCart, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, Unlock, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { useAuth } from '@/hooks/useAuth'
@@ -90,7 +90,7 @@ export default function DashboardStorePage() {
         setCharacter(json.data)
         toast.success(json.message === 'Character selected' ? `${option.label} is now your hero!` : `Unlocked ${option.label}!`)
       } else {
-        toast.error(json.message || 'Purchase failed')
+        toast.error(json.message || 'Unlock failed')
       }
     } catch {
       toast.error('Something went wrong')
@@ -121,7 +121,7 @@ export default function DashboardStorePage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-sm font-game text-purple-300">Loading store...</div>
+        <div className="text-sm font-game text-purple-300">Loading avatars...</div>
       </div>
     )
   }
@@ -131,8 +131,8 @@ export default function DashboardStorePage() {
       {/* Header */}
       <div className="student-page-head flex items-center justify-between gap-3 px-4 pt-1 shrink-0">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-wide text-purple-300">Store</p>
-          <h2 className="font-game text-lg font-black">Unlocks</h2>
+          {/* "Store" label removed, title renamed (panel revision, Nov 2026b) */}
+          <h2 className="font-game text-lg font-black">Unlock Avatar</h2>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-purple-900/40 backdrop-blur-md px-3 py-1.5">
           <Star className="h-4 w-4 fill-current text-purple-300" />
@@ -222,11 +222,11 @@ export default function DashboardStorePage() {
                   style={{ borderColor: theme.accent }}
                 >
                   {purchasing === currentOption.class ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Buying...</>
+                    <><Loader2 className="h-4 w-4 animate-spin" />Unlocking...</>
                   ) : access.starBalance < price ? (
                     <><Star className="h-4 w-4" />Need {price} stars</>
                   ) : (
-                    <><ShoppingCart className="h-4 w-4" />Buy for {price} stars</>
+                    <><Unlock className="h-4 w-4" />Unlock for {price} stars</>
                   )}
                 </button>
               )}

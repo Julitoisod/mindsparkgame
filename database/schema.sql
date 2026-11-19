@@ -61,6 +61,20 @@ CREATE TABLE IF NOT EXISTS classrooms (
 ALTER TABLE users
   ADD CONSTRAINT fk_users_classroom FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL;
 
+-- A teacher's Classroom ("Grade 5 Mathematics", SY 2026-2027) that holds their
+-- sections (panel revision, Nov 2026b). lib/classroomInfo.ts also creates it on
+-- first use, so a live server without this file still works.
+CREATE TABLE IF NOT EXISTS teacher_classrooms (
+  teacher_id  INT UNSIGNED NOT NULL,
+  name        VARCHAR(80)  NOT NULL,
+  grade_level VARCHAR(20)  NOT NULL DEFAULT 'Grade 5',
+  school_year VARCHAR(9)   DEFAULT NULL,
+  is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+  updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (teacher_id),
+  CONSTRAINT fk_teacher_classrooms_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- First administrator (same row as migrations/2026-10b-revision.sql), so a fresh
 -- install can sign in at /admin-login. Password: Admin@12345 — change it after the
 -- first login. INSERT IGNORE never clobbers a changed password.

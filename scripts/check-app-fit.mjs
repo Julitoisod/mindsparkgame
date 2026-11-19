@@ -92,6 +92,10 @@ await measure('character-select')
 await clickText('Enter Dashboard')
 await wait(3000)
 await page.goto(`${BASE}/game`, { waitUntil: 'networkidle2' })
+// The opening cinematic (Nov 2026b) covers the map first; its zoomed backdrop is
+// clipped on purpose, and its controls' fit is asserted in check-revision-2026-11b.
+await wait(2000)
+await clickText('Skip')
 await measure('game-map')
 
 for (const screen of ['profile', 'store', 'attempts']) {

@@ -130,6 +130,9 @@ async function answer(correct, afterClick) {
 
 async function playRun(quiz, boss, { onLastQuizClick } = {}) {
   for (const [i, c] of quiz.entries()) await answer(c, i === quiz.length - 1 ? onLastQuizClick : undefined)
+  // Boss battle mechanics screen waits for the student (Nov 2026b)
+  await waitFor(() => page.$('[data-testid="boss-mechanics"]'), 20000)
+  await clickText('Start Boss Battle')
   await waitFor(async () => /challenges you!/i.test(await text()), 20000)
   for (const c of boss) await answer(c)
   check(await waitFor(() => page.$('[data-testid="level-result"]'), 20000), `level result appears after quiz ${quiz.filter(Boolean).length}/5 + boss ${boss.filter(Boolean).length}/5`)
@@ -169,7 +172,10 @@ await waitFor(async () => /Enter Dashboard/.test(await text()), 15000)
 await wait(800)
 await clickText('Enter Dashboard')
 
-// 1. Deadline reminder after sign-in
+// 1. Opening cinematic first (Nov 2026b), then the deadline reminder
+check(await waitFor(() => page.$('[data-testid="opening-cinematic"]'), 25000), 'opening cinematic plays after the student signs in')
+await clickText('Skip')
+await wait(900)
 check(await waitFor(() => page.$('[data-testid="deadline-reminder"]'), 25000), 'deadline reminder pops up after the student signs in')
 await wait(900)
 const reminderText = await text()
@@ -223,11 +229,11 @@ let streakBeforeBoss = false
 await playRun([true, true, true, true, true], [true, true, true, true, true], {
   onLastQuizClick: async () => {
     const popped = await waitFor(() => page.$('[data-testid="badge-popup"]'), 2500, 100)
-    const bossYet = /Boss Battle Phase/.test(await text())
+    const bossYet = /How the boss battle works/.test(await text())
     streakBeforeBoss = popped && !bossYet
     if (popped) await shot('s06-math-streak-midgame')
     // and the boss animation follows once the badge is done
-    streakBeforeBoss = streakBeforeBoss && await waitFor(async () => /Boss Battle Phase/.test(await text()), 6000, 150)
+    streakBeforeBoss = streakBeforeBoss && await waitFor(async () => /How the boss battle works/.test(await text()), 6000, 150)
   },
 })
 check(streakBeforeBoss, 'Math Streak pops up mid-game, then the boss animation follows')
@@ -276,7 +282,7 @@ const fits = await page.evaluate(() => {
 })
 check(fits, 'finale fits a landscape phone without scrolling')
 const finaleText = await text()
-check(/CONGRATULATIONS, HERO!/.test(finaleText) && /THE KINGDOM IS SAVED!/.test(finaleText) && /Play Again/.test(finaleText), 'finale wording + Map / Play Again')
+check(/CONGRATULATIONS, HERO!/.test(finaleText) && /MATHORIA IS SAVED!/.test(finaleText) && /Play Again/.test(finaleText), 'finale wording + Map / Play Again')
 await shot('s10-finale')
 await clickText('Play Again')
 await wait(2000)
@@ -356,7 +362,7 @@ await shot('t01-sign-in')
 await page.type('input[placeholder="hero123"]', teacher)
 await page.type('input[type="password"]', TEACHER_PASS)
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), clickText('Sign In')])
-check(await waitFor(async () => /Class Performance Overview/.test(await text()), 20000), 'teacher lands on the new dashboard')
+check(await waitFor(async () => /Level Performance/.test(await text()), 20000), 'teacher lands on the new dashboard')
 await wait(1500)
 const dash = await text()
 check(/Students Who Need Attention/.test(dash) && /Recent Student Activity/.test(dash) && /completed Level/.test(dash) && /Go to Reports/.test(dash), 'dashboard: chart, attention table, activity feed, reports link')

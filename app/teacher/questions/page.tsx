@@ -18,6 +18,9 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import type { QuizPhase, QuizQuestionDTO } from '@/types/quiz'
 
+// "Normal" reads as "Normal Quiz" (panel revision, Nov 2026b)
+const PHASE_LABEL: Record<QuizPhase, string> = { normal: 'Normal Quiz', boss: 'Boss' }
+
 const LEVELS = [1, 2, 3, 4, 5]
 const EMPTY_FORM = {
   levelNumber: 1,
@@ -223,11 +226,11 @@ export default function TeacherQuestionsPage() {
               key={p}
               onClick={() => setFilterPhase(p)}
               className={[
-                'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold capitalize transition',
+                'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold transition',
                 filterPhase === p ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
               ].join(' ')}
             >
-              {p === 'boss' && <Swords className="h-3.5 w-3.5" />} {p}
+              {p === 'boss' && <Swords className="h-3.5 w-3.5" />} {PHASE_LABEL[p]}
             </button>
           ))}
         </div>
@@ -264,7 +267,7 @@ export default function TeacherQuestionsPage() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Level {filterLevel} · {filterPhase} phase
+        Level {filterLevel} · {PHASE_LABEL[filterPhase]}
         {filterCategory !== 'all' && <> · {filterCategory}</>}
         {search && <> · matching &quot;{search}&quot;</>}
         {' '}— {visibleQuestions.length} of {questions.length} questions ({activeCount} active) across {categories.length} categories
@@ -362,7 +365,7 @@ export default function TeacherQuestionsPage() {
                   <label className="block">
                     <span className="text-[11px] font-bold text-gray-500 uppercase">Phase</span>
                     <select value={form.phase} onChange={e => setForm(f => ({ ...f, phase: e.target.value as QuizPhase }))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
-                      <option value="normal">Normal</option>
+                      <option value="normal">Normal Quiz</option>
                       <option value="boss">Boss</option>
                     </select>
                   </label>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Orbitron } from 'next/font/google'
+import { Fredoka, Inter, Orbitron } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import './globals.css'
 
@@ -15,6 +15,14 @@ const orbitron = Orbitron({
   weight: ['400', '600', '700', '900'],
   display: 'swap',
   variable: '--font-orbitron',
+})
+
+// Rounded display face for the landing / sign-in titles (panel's web design, Nov 2026b)
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  display: 'swap',
+  variable: '--font-display',
 })
 
 export const metadata: Metadata = {
@@ -58,7 +66,7 @@ const APP_REDIRECT = `try{
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${orbitron.variable}`}>
+    <html lang="en" className={`dark ${inter.variable} ${orbitron.variable} ${fredoka.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: APP_REDIRECT }} />
       </head>

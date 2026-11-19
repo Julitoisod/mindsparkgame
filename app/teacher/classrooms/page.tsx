@@ -1,17 +1,24 @@
 'use client'
 /**
- * Teacher — Sections. Layout follows the panel's mockup (Nov 2026): banner,
- * a one-line create bar, and a card per section with "View Students", which
- * opens the Students page already filtered to that section.
+ * Teacher — Classroom (panel revision, Nov 2026b: "change Section to Classroom;
+ * the teacher can update the classroom information"). Layout follows the
+ * panel's suggested output: a classroom banner with "Update Classroom", tabs
+ * for Sections and Class Details, a card per section ("View Students" opens
+ * only that section's students) and an "Add Section" card.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { CalendarDays, Pencil, PlusCircle, School, Users } from 'lucide-react'
-import PageHeader from '@/components/teacher/PageHeader'
+import {
+  CalendarDays, GraduationCap, Info, Layers, MoreVertical, Pencil, Plus, Save, School, UserRound, Users, X,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 import { currentSchoolYear, formatSchoolYear } from '@/lib/enrollment'
 
-type Classroom = { id: number; name: string; schoolYear: string | null; studentCount: number; createdAt: string }
+type Section = { id: number; name: string; schoolYear: string | null; studentCount: number; createdAt: string }
+type ClassroomInfo = { name: string; gradeLevel: string; schoolYear: string; isActive: boolean }
+
+const GRADE_LEVELS = ['Grade 4', 'Grade 5', 'Grade 6']
 
 /** The current school year with one either side, plus any year already in use. */
 function schoolYearOptions(existing: (string | null)[]): string[] {
@@ -21,187 +28,326 @@ function schoolYearOptions(existing: (string | null)[]): string[] {
   return Array.from(years).sort()
 }
 
-export default function TeacherClassroomsPage() {
-  const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [loading, setLoading] = useState(true)
-  const [classroomName, setClassroomName] = useState('')
-  const [schoolYear, setSchoolYear] = useState(currentSchoolYear())
-  const [creating, setCreating] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editSchoolYear, setEditSchoolYear] = useState('')
-  const [savingEdit, setSavingEdit] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+const field = 'w-full rounded-xl border border-[#ddd5f0] bg-white px-3 py-2.5 text-sm text-[#1f2430] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#9B83F5] disabled:bg-[#f6f4fb] disabled:text-[#6f7187]'
+const label = 'mb-1 block text-xs font-bold text-[#374151]'
 
-  const loadClassrooms = useCallback(async () => {
+export default function TeacherClassroomPage() {
+  const [sections, setSections] = useState<Section[]>([])
+  const [room, setRoom] = useState<ClassroomInfo | null>(null)
+  const [teacherName, setTeacherName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'sections' | 'details'>('sections')
+  const [yearFilter, setYearFilter] = useState<string>('all')
+  const [menuId, setMenuId] = useState<number | null>(null)
+  // Section create / edit
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({ name: '', schoolYear: currentSchoolYear() })
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  // Update Classroom modal
+  const [modalOpen, setModalOpen] = useState(false)
+  const [roomDraft, setRoomDraft] = useState<ClassroomInfo | null>(null)
+
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/teacher/classrooms', { credentials: 'include' })
-      const json = await res.json()
-      if (json.success) setClassrooms(json.data)
-      else setError(json.message ?? 'Failed to load sections')
+      const [secRes, roomRes] = await Promise.all([
+        fetch('/api/teacher/classrooms', { credentials: 'include' }).then(r => r.json()),
+        fetch('/api/teacher/classroom', { credentials: 'include' }).then(r => r.json()),
+      ])
+      if (secRes.success) setSections(secRes.data)
+      else setError(secRes.message ?? 'Failed to load sections')
+      if (roomRes.success) { setRoom(roomRes.data.classroom); setTeacherName(roomRes.data.teacherName) }
+      else setError(roomRes.message ?? 'Failed to load the classroom')
     } catch {
-      setError('Failed to load sections')
+      setError('Failed to load the classroom')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { loadClassrooms() }, [loadClassrooms])
+  useEffect(() => { load() }, [load])
 
-  const yearOptions = useMemo(() => schoolYearOptions(classrooms.map(c => c.schoolYear)), [classrooms])
+  const yearOptions = useMemo(() => schoolYearOptions([...sections.map(s => s.schoolYear), room?.schoolYear ?? null]), [sections, room])
+  const visible = yearFilter === 'all' ? sections : sections.filter(s => s.schoolYear === yearFilter)
 
-  async function createClassroom(e: React.FormEvent) {
+  async function saveSection(e: React.FormEvent) {
     e.preventDefault()
-    if (!classroomName.trim()) return
-    setCreating(true)
-    setError(null)
+    if (!draft.name.trim()) return
+    setSaving(true)
     try {
       const res = await fetch('/api/teacher/classrooms', {
-        method: 'POST',
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: classroomName.trim(), schoolYear }),
+        body: JSON.stringify({ id: editingId ?? undefined, name: draft.name.trim(), schoolYear: draft.schoolYear }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
-      setClassrooms(prev => [json.data, ...prev])
-      setClassroomName('')
+      setSections(prev => (editingId ? prev.map(s => (s.id === editingId ? json.data : s)) : [json.data, ...prev]))
+      toast.success(editingId ? 'Section updated' : 'Section added')
+      closeSectionForm()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
+      toast.error(err instanceof Error ? err.message : 'Could not save the section')
     } finally {
-      setCreating(false)
+      setSaving(false)
     }
   }
 
-  async function saveEdit() {
-    if (!editingId || !editName.trim()) return
-    setSavingEdit(true)
-    setError(null)
+  function closeSectionForm() {
+    setAdding(false)
+    setEditingId(null)
+    setDraft({ name: '', schoolYear: currentSchoolYear() })
+  }
+
+  async function saveClassroom(e: React.FormEvent) {
+    e.preventDefault()
+    if (!roomDraft) return
+    setSaving(true)
     try {
-      const res = await fetch('/api/teacher/classrooms', {
+      const res = await fetch('/api/teacher/classroom', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ id: editingId, name: editName.trim(), schoolYear: editSchoolYear.trim() }),
+        body: JSON.stringify(roomDraft),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
-      setClassrooms(prev => prev.map(c => (c.id === editingId ? json.data : c)))
-      setEditingId(null)
+      setRoom(json.data.classroom)
+      setModalOpen(false)
+      toast.success('Classroom updated')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
+      toast.error(err instanceof Error ? err.message : 'Could not update the classroom')
     } finally {
-      setSavingEdit(false)
+      setSaving(false)
     }
   }
 
-  const field = 'rounded-xl border px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#9B83F5]'
+  if (loading) return <p className="text-sm text-[#8f88a1]">Loading…</p>
 
   return (
-    <div className="space-y-5">
-      <PageHeader icon={Users} title="Sections" subtitle="Manage your class sections here." />
+    <div className="space-y-5" data-page="teacher-classroom">
+      {/* Classroom banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#6a4fe0] via-[#7458e6] to-[#8c74f0] px-6 py-5 shadow-lg shadow-[#6255E8]/20"
+      >
+        <span className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
+        <div className="relative flex flex-wrap items-center gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/90 text-[#6255E8] shadow"><School className="h-7 w-7" /></span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-black text-[#fff]">{room?.name ?? 'Grade 5 Mathematics'}</h2>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm font-medium text-[#fff]/90">
+              <span className="inline-flex items-center gap-1"><CalendarDays className="h-4 w-4" /> Academic Year: {formatSchoolYear(room?.schoolYear)}</span>
+              <span className="inline-flex items-center gap-1"><UserRound className="h-4 w-4" /> Teacher: {teacherName}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setRoomDraft(room); setModalOpen(true) }}
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#5a3fd4] shadow hover:bg-[#f4efff]"
+          >
+            <Pencil className="h-4 w-4" /> Update Classroom
+          </button>
+        </div>
+      </motion.div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
 
-      {/* Create */}
-      <form onSubmit={createClassroom} className="flex flex-wrap gap-3">
-        <label className="relative">
-          <span className="sr-only">School year</span>
-          <CalendarDays className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c58d8]" />
-          <select value={schoolYear} onChange={e => setSchoolYear(e.target.value)} className={`${field} w-[190px] pl-10 font-semibold`}>
-            {yearOptions.map(sy => <option key={sy} value={sy}>{sy.replace('-', '–')}</option>)}
-          </select>
-        </label>
-        <label className="relative min-w-[220px] flex-1">
-          <span className="sr-only">Section name</span>
-          <Pencil className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0b2]" />
-          <input
-            placeholder="Section name (Grade 5 - Gals)"
-            value={classroomName}
-            onChange={e => setClassroomName(e.target.value)}
-            className={`${field} w-full pl-10`}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={creating || !classroomName.trim()}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7c5cf0] to-[#5a3fd4] px-6 py-3 text-sm font-bold text-[#fff] shadow-lg shadow-[#6255E8]/25 transition hover:brightness-110 disabled:opacity-50"
-        >
-          <PlusCircle className="h-4 w-4" /> {creating ? 'Creating…' : 'Create'}
-        </button>
-      </form>
-
-      {/* List */}
-      {loading ? (
-        <p className="text-sm text-[#8f88a1]">Loading…</p>
-      ) : classrooms.length === 0 ? (
-        <div className="rounded-2xl border border-[#ece8f5] bg-white p-8 text-center">
-          <School className="mx-auto h-10 w-10 text-[#9B83F5]" />
-          <p className="mt-3 font-bold text-[#1f2430]">No sections yet</p>
-          <p className="text-sm text-[#8f88a1]">Create your first section above</p>
+      {/* Tabs + year filter */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ece8f5]">
+        <div className="flex gap-1">
+          {([
+            { id: 'sections', label: `Sections (${sections.length})`, icon: Users },
+            { id: 'details', label: 'Class Details', icon: Info },
+          ] as const).map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab === t.id ? 'border-[#6f54ba] text-[#6f54ba]' : 'border-transparent text-[#6f7187] hover:text-[#6f54ba]'}`}
+            >
+              <t.icon className="h-4 w-4" /> {t.label}
+            </button>
+          ))}
         </div>
-      ) : (
+        {tab === 'sections' && (
+          <select aria-label="School year" value={yearFilter} onChange={e => setYearFilter(e.target.value)} className="mb-1.5 rounded-xl border border-[#ddd5f0] bg-white px-3 py-2 text-sm font-semibold text-[#1f2430] shadow-sm">
+            <option value="all">All school years</option>
+            {yearOptions.map(sy => <option key={sy} value={sy}>{formatSchoolYear(sy)}</option>)}
+          </select>
+        )}
+      </div>
+
+      {tab === 'sections' ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {classrooms.map((classroom, idx) => (
+          {visible.map((section, idx) => (
             <motion.div
-              key={classroom.id}
+              key={section.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className="rounded-2xl border border-[#ece8f5] border-l-4 border-l-[#7c5cf0] bg-white p-5 shadow-sm"
+              transition={{ delay: idx * 0.04 }}
+              className="relative rounded-2xl border border-[#ece8f5] border-l-4 border-l-[#7c5cf0] bg-white p-5 shadow-sm"
+              data-testid="section-card"
             >
-              {editingId === classroom.id ? (
-                <div className="space-y-2">
-                  <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus className={`${field} w-full py-2`} aria-label="Section name" />
-                  <select value={editSchoolYear} onChange={e => setEditSchoolYear(e.target.value)} className={`${field} w-full py-2`} aria-label="School year">
-                    {yearOptions.map(sy => <option key={sy} value={sy}>{sy.replace('-', '–')}</option>)}
-                  </select>
-                  <div className="flex gap-2">
-                    <button onClick={saveEdit} disabled={savingEdit} className="rounded-lg bg-[#6f54ba] px-4 py-2 text-xs font-bold text-[#fff] disabled:opacity-60">
-                      {savingEdit ? 'Saving…' : 'Save'}
-                    </button>
-                    <button onClick={() => setEditingId(null)} className="rounded-lg border px-4 py-2 text-xs font-bold text-[#5f5677]">Cancel</button>
-                  </div>
+              <div className="flex items-start gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#f0eaff] text-[#6f54ba]"><Users className="h-7 w-7" /></span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-lg font-black text-[#1f2430]">{section.name}</h3>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[#5f5677]"><Users className="h-3.5 w-3.5" /> {section.studentCount} Student{section.studentCount === 1 ? '' : 's'}</p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[#5f5677]"><GraduationCap className="h-3.5 w-3.5" /> Teacher: {teacherName}</p>
+                  {section.schoolYear && <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[#8f88a1]"><CalendarDays className="h-3.5 w-3.5" /> {formatSchoolYear(section.schoolYear)}</p>}
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-start gap-4">
-                    <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#f0eaff] text-[#6f54ba]">
-                      <Users className="h-8 w-8" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-lg font-black text-[#1f2430]">{classroom.name}</h3>
-                      <p className="mt-1 flex items-center gap-1.5 text-sm text-[#5f5677]">
-                        <Users className="h-3.5 w-3.5" /> {classroom.studentCount} Student{classroom.studentCount === 1 ? '' : 's'}
-                      </p>
-                      {classroom.schoolYear && (
-                        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[#5f5677]">
-                          <CalendarDays className="h-3.5 w-3.5" /> {formatSchoolYear(classroom.schoolYear)}
-                        </p>
-                      )}
-                      <p className="mt-0.5 text-sm text-[#8f88a1]">
-                        Created {new Date(classroom.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => setMenuId(menuId === section.id ? null : section.id)}
+                  aria-label={`Options for ${section.name}`}
+                  className="rounded-lg p-1.5 text-[#6f54ba] transition hover:bg-[#f4efff]"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                {menuId === section.id && (
+                  <div className="absolute right-4 top-12 z-10 w-40 overflow-hidden rounded-xl border border-[#ece8f5] bg-white text-sm shadow-lg">
                     <button
-                      onClick={() => { setEditingId(classroom.id); setEditName(classroom.name); setEditSchoolYear(classroom.schoolYear ?? currentSchoolYear()) }}
-                      aria-label={`Edit ${classroom.name}`}
-                      className="rounded-xl border border-[#ece8f5] p-2.5 text-[#6f54ba] transition hover:bg-[#f4efff]"
+                      type="button"
+                      onClick={() => { setEditingId(section.id); setAdding(true); setDraft({ name: section.name, schoolYear: section.schoolYear ?? currentSchoolYear() }); setMenuId(null) }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold text-[#374151] hover:bg-[#faf8ff]"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" /> Edit section
                     </button>
+                    <Link href={`/teacher/students?section=${section.id}`} className="flex items-center gap-2 px-3 py-2 font-semibold text-[#374151] hover:bg-[#faf8ff]">
+                      <Users className="h-3.5 w-3.5" /> View students
+                    </Link>
                   </div>
-                  <Link
-                    href={`/teacher/students?section=${classroom.id}`}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#cfc2ea] py-2.5 text-sm font-bold text-[#6f54ba] transition hover:bg-[#f4efff]"
-                  >
-                    <Users className="h-4 w-4" /> View Students
-                  </Link>
-                </>
-              )}
+                )}
+              </div>
+              <Link
+                href={`/teacher/students?section=${section.id}`}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#cfc2ea] py-2.5 text-sm font-bold text-[#6f54ba] transition hover:bg-[#f4efff]"
+              >
+                <Users className="h-4 w-4" /> View Students
+              </Link>
             </motion.div>
           ))}
+
+          {/* Add / edit section */}
+          {adding ? (
+            <form onSubmit={saveSection} className="space-y-3 rounded-2xl border-2 border-dashed border-[#cfc2ea] bg-[#faf8ff] p-5">
+              <p className="font-bold text-[#1f2430]">{editingId ? 'Edit section' : 'Add Section'}</p>
+              <div>
+                <label className={label} htmlFor="section-name">Section name *</label>
+                <input id="section-name" autoFocus placeholder="e.g. Rizal" value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} className={field} />
+              </div>
+              <div>
+                <label className={label} htmlFor="section-sy">School year *</label>
+                <select id="section-sy" value={draft.schoolYear} onChange={e => setDraft(d => ({ ...d, schoolYear: e.target.value }))} className={field}>
+                  {yearOptions.map(sy => <option key={sy} value={sy}>{formatSchoolYear(sy)}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={saving || !draft.name.trim()} className="rounded-xl bg-[#6f54ba] px-4 py-2 text-sm font-bold text-[#fff] disabled:opacity-50">{saving ? 'Saving…' : editingId ? 'Save' : 'Add Section'}</button>
+                <button type="button" onClick={closeSectionForm} className="rounded-xl border border-[#ddd5f0] px-4 py-2 text-sm font-bold text-[#5f5677]">Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="flex min-h-[180px] flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-[#cfc2ea] bg-white p-5 text-[#6f54ba] transition hover:bg-[#faf8ff]"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f0eaff]"><Plus className="h-5 w-5" /></span>
+              <span className="font-bold">Add Section</span>
+              <span className="text-xs text-[#8f88a1]">Create a new section for this classroom</span>
+            </button>
+          )}
+          {visible.length === 0 && sections.length > 0 && (
+            <p className="text-sm text-[#8f88a1] md:col-span-2">No sections in {formatSchoolYear(yearFilter)}.</p>
+          )}
+        </div>
+      ) : (
+        <section className="rounded-2xl border border-[#ece8f5] bg-white p-5 shadow-sm" data-testid="class-details">
+          <div className="flex items-center justify-between">
+            <h3 className="flex items-center gap-2 font-bold text-[#1f2430]"><Layers className="h-4 w-4 text-[#6255E8]" /> Classroom Information</h3>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${room?.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>● {room?.isActive ? 'Active' : 'Inactive'}</span>
+          </div>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { icon: School, k: 'Classroom Name', v: room?.name },
+              { icon: GraduationCap, k: 'Grade Level', v: room?.gradeLevel },
+              { icon: CalendarDays, k: 'Academic Year', v: formatSchoolYear(room?.schoolYear) },
+              { icon: UserRound, k: 'Assigned Teacher', v: teacherName },
+            ].map(item => (
+              <div key={item.k} className="flex items-center gap-3 rounded-xl bg-[#faf8ff] p-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f0eaff] text-[#6f54ba]"><item.icon className="h-5 w-5" /></span>
+                <div className="min-w-0">
+                  <dt className="text-[11px] font-semibold text-[#8f88a1]">{item.k}</dt>
+                  <dd className="truncate text-sm font-bold text-[#1f2430]">{item.v || '—'}</dd>
+                </div>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+
+      {/* Update Classroom modal */}
+      {modalOpen && roomDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d133d]/40 p-4" role="dialog" aria-modal="true" aria-label="Update Classroom">
+          <form onSubmit={saveClassroom} className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl" data-testid="update-classroom">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-lg font-black text-[#1f2430]"><School className="h-5 w-5 text-[#6f54ba]" /> Update Classroom</h3>
+              <button type="button" onClick={() => setModalOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-[#8f88a1] hover:bg-[#f4efff]"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className={label} htmlFor="room-name">Classroom Name *</label>
+                <input id="room-name" value={roomDraft.name} onChange={e => setRoomDraft({ ...roomDraft, name: e.target.value })} className={field} />
+              </div>
+              <div>
+                <label className={label} htmlFor="room-sy">Academic Year *</label>
+                <select id="room-sy" value={roomDraft.schoolYear} onChange={e => setRoomDraft({ ...roomDraft, schoolYear: e.target.value })} className={field}>
+                  {yearOptions.map(sy => <option key={sy} value={sy}>{formatSchoolYear(sy)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={label} htmlFor="room-teacher">Assigned Teacher *</label>
+                {/* The admin assigns teachers; a teacher's classroom is always their own */}
+                <select id="room-teacher" disabled value="me" className={field}><option value="me">{teacherName}</option></select>
+              </div>
+              <div>
+                <label className={label} htmlFor="room-grade">Grade Level *</label>
+                <select id="room-grade" value={roomDraft.gradeLevel} onChange={e => setRoomDraft({ ...roomDraft, gradeLevel: e.target.value })} className={field}>
+                  {GRADE_LEVELS.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <span className={label}>Sections</span>
+                <p className="rounded-xl border border-[#ece8f5] bg-[#f6f4fb] px-3 py-2.5 text-sm text-[#6f7187]">{sections.length ? sections.map(s => s.name).join(', ') : 'None yet'}</p>
+              </div>
+              <div>
+                <span className={label}>Status</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={roomDraft.isActive}
+                  onClick={() => setRoomDraft({ ...roomDraft, isActive: !roomDraft.isActive })}
+                  className="flex items-center gap-2 py-2 text-sm font-semibold text-[#374151]"
+                >
+                  <span className={`relative h-6 w-11 rounded-full transition ${roomDraft.isActive ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${roomDraft.isActive ? 'left-[22px]' : 'left-0.5'}`} />
+                  </span>
+                  {roomDraft.isActive ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-[#ddd5f0] px-4 py-2.5 text-sm font-bold text-[#5f5677]">Cancel</button>
+              <button type="submit" disabled={saving || roomDraft.name.trim().length < 2} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7c5cf0] to-[#5a3fd4] px-5 py-2.5 text-sm font-bold text-[#fff] shadow disabled:opacity-50">
+                <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

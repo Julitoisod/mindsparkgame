@@ -21,6 +21,7 @@ import {
 import {
   Award,
   BellRing,
+  BookOpen,
   CalendarClock,
   Clock,
   CheckCircle2,
@@ -35,7 +36,6 @@ import {
   Sparkles,
   Star,
   Swords,
-  TreePine,
   Trophy,
   Volume2,
   VolumeX,
@@ -44,7 +44,8 @@ import {
 
 import * as quizContent from '@/lib/quizContent'
 import { BADGES } from '@/lib/badges'
-import { getLevelStory, levelStories, overallStory } from '@/lib/storyContent'
+import { NARRATOR, getLevelStory, levelStories } from '@/lib/storyContent'
+import OpeningCinematic, { Gem, SparkMascot } from '@/components/game/OpeningCinematic'
 import {
   BOSS_POINTS,
   MAX_LEVELS,
@@ -133,7 +134,8 @@ const REMINDER_FLAG = 'mindspark-show-reminder'
 // Gameplay timer (2026-10b revision, item 5). Running out never ends the game:
 // it only asks whether the student is still there.
 const QUESTION_SECONDS = 60
-const BOSS_TRANSITION_MS = 2200
+// Set by LoginForm on a student sign-in: the opening cinematic plays (Nov 2026b)
+const CINEMATIC_FLAG = 'mindspark-play-intro'
 // The result screen waits for the death animation to play on screen first
 // (panel revision: "the enemy must clearly be seen dying before the result").
 // The Level Up celebration runs over the dying boss, and the single Level
@@ -192,11 +194,11 @@ const FALLBACK_LEVELS: QuizLevel[] = Array.from({ length: MAX_LEVELS }, (_, inde
     id: `level-${levelNumber}`,
     number: levelNumber,
     title: `MindSpark Trial ${levelNumber}`,
-    environment: ['Forest Gate', 'Crystal Bridge', 'Elven Ruins', 'Moonlit Keep', 'Oracle Tower'][index],
+    environment: levelStories[index]?.place ?? `Kingdom ${levelNumber}`,
     backgroundImage: FALLBACK_BACKGROUNDS[index],
     characterImage: FALLBACK_CHARACTER,
     bossImage: FALLBACK_BOSS,
-    bossName: ['Golem', 'Minotaur', 'Wraith', 'Necromancer', 'Dark Oracle'][index],
+    bossName: levelStories[index]?.enemy ?? 'Guardian',
     normalQuestions: Array.from({ length: QUESTIONS_PER_PHASE }, (_, questionIndex) => ({
       id: `fallback-${levelNumber}-normal-${questionIndex}`,
       prompt: `Practice question ${questionIndex + 1} for level ${levelNumber}`,
@@ -565,16 +567,34 @@ export default function QuizAdventure({
   const [idleCheck, setIdleCheck] = useState(false)
   // Item 6 — animated hand-off from the quiz into the boss battle
   const [bossTransition, setBossTransition] = useState(false)
+  // Opening cinematic (Nov 2026b): after every student sign-in, and the first
+  // time this character plays; the map's Story button replays it.
+  const introKey = `mindspark-intro-${characterId ?? 'guest'}`
+  const [cinematicOpen, setCinematicOpen] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(CINEMATIC_FLAG) === '1' || window.localStorage.getItem(introKey) !== '1'
+    } catch {
+      return false
+    }
+  })
+
+  function closeCinematic() {
+    try {
+      window.sessionStorage.removeItem(CINEMATIC_FLAG)
+      window.localStorage.setItem(introKey, '1')
+    } catch { /* private mode — it plays again next time */ }
+    setCinematicOpen(false)
+  }
 
   // Hide dashboard header when in battle/game screens
   useEffect(() => {
-    if (screen !== 'map') {
+    if (screen !== 'map' || cinematicOpen) {
       document.body.classList.add('game-battle-active')
     } else {
       document.body.classList.remove('game-battle-active')
     }
     return () => document.body.classList.remove('game-battle-active')
-  }, [screen])
+  }, [screen, cinematicOpen])
   const [normalCorrectCount, setNormalCorrectCount] = useState(0)
   const [bossCorrectCount, setBossCorrectCount] = useState(0)
   const [resultInfo, setResultInfo] = useState<LevelResult | null>(null)
@@ -612,23 +632,6 @@ export default function QuizAdventure({
   const [deadlines, setDeadlines] = useState<Record<number, string>>({})
   // Music + voice mute toggle, persisted per device
   const [soundMuted, setSoundMutedState] = useState(() => loadMutedPreference())
-  // Overall story shows once — the first time this character starts Level 1
-  const [introSeen, setIntroSeen] = useState(() => {
-    try {
-      return window.localStorage.getItem(`mindspark-forest-intro-${characterId ?? 'guest'}`) === '1'
-    } catch {
-      return true
-    }
-  })
-
-  function dismissIntro() {
-    playClickSound()
-    try {
-      window.localStorage.setItem(`mindspark-forest-intro-${characterId ?? 'guest'}`, '1')
-    } catch { /* private mode — show it again next time */ }
-    setIntroSeen(true)
-  }
-
   function toggleSound() {
     playClickSound()
     setSoundMutedState(current => !current)
@@ -731,34 +734,41 @@ export default function QuizAdventure({
     return () => window.clearInterval(tick)
   }, [screen, phase, isResolving, idleCheck, bossTransition, question?.id])
 
-  // Voice-over: read each question aloud
+  // Voice-over: read each question aloud (the boss mechanics screen speaks first)
   useEffect(() => {
-    if (soundMuted || screen !== 'battle') return
+    if (soundMuted || screen !== 'battle' || bossTransition) return
     if (phase !== 'normal' && phase !== 'boss') return
     if (!question?.prompt) return
     speak(question.prompt.replace(/_{2,}/g, ' blank '))
     return () => stopSpeaking()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [question?.id, screen, phase, soundMuted])
+  }, [question?.id, screen, phase, soundMuted, bossTransition])
 
-  // Voice-over: Forest Guardian narrates the story screen
+  // Voice-over: Spark narrates the kingdom's story screen
   useEffect(() => {
     if (soundMuted || screen !== 'story') return
-    const story = getLevelStory(level.number)
-    speak(level.number === 1 && !introSeen ? overallStory.text : story.intro)
+    speak(getLevelStory(level.number).intro)
     return () => stopSpeaking()
-  }, [screen, level.number, introSeen, soundMuted])
+  }, [screen, level.number, soundMuted])
+
+  // Voice-over: Spark explains the boss battle before it starts (Nov 2026b)
+  useEffect(() => {
+    if (soundMuted || !bossTransition) return
+    const story = getLevelStory(level.number)
+    speak(`Boss battle! ${story.enemy} has five questions for you. Every correct answer hits ${story.enemy} for twenty damage. A wrong answer costs one heart. Hit ${story.enemy} at least once to recover the ${story.crystal}!`)
+    return () => stopSpeaking()
+  }, [bossTransition, level.number, soundMuted])
 
   // Voice-over: announce the level result once the popup appears
   useEffect(() => {
     if (soundMuted || !resultShown) return
     if (phase === 'levelComplete' && resultInfo) {
       const story = getLevelStory(level.number)
-      if (!resultInfo.bossDefeated) speak(`Level ${level.number} complete. The ${story.enemy} is still undefeated. Don't give up, hero!`)
-      else if (resultInfo.hadTrophy) speak(`Level ${level.number} complete! Well done, hero!`)
-      else speak(`Level ${level.number} complete! You earned the ${story.trophyName}!`)
+      if (!resultInfo.bossDefeated) speak(`Level ${level.number} complete. ${story.enemy} still holds the ${story.crystal}. Don't give up, hero!`)
+      else if (resultInfo.hadTrophy) speak(`Level ${level.number} complete! You recovered the ${story.crystal} again. Well done, hero!`)
+      else speak(`Level ${level.number} complete! You recovered the ${story.crystal} and earned the ${story.trophyName}!`)
     } else if (phase === 'gameComplete') {
-      speak("Congratulations, hero! You've completed all five levels. The kingdom is saved!")
+      speak('Congratulations, hero! You recovered all five Math Crystals. Mathoria is saved!')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultShown, phase, soundMuted])
@@ -792,13 +802,13 @@ export default function QuizAdventure({
   }, [deadlines, completedLevels])
 
   useEffect(() => {
-    if (!progressLoaded || screen !== 'map') return
+    if (!progressLoaded || screen !== 'map' || cinematicOpen) return
     let flagged = false
     try { flagged = window.sessionStorage.getItem(REMINDER_FLAG) === '1' } catch { /* storage blocked */ }
     if (!flagged) return
     if (pendingDeadline) setReminderOpen(true)
     else dismissReminder()
-  }, [progressLoaded, screen, pendingDeadline])
+  }, [progressLoaded, screen, pendingDeadline, cinematicOpen])
 
   function dismissReminder() {
     try { window.sessionStorage.removeItem(REMINDER_FLAG) } catch { /* storage blocked */ }
@@ -974,6 +984,7 @@ export default function QuizAdventure({
     setFeedback(null)
     setNewBadgesThisLevel([])
     setResultInfo(null)
+    setBossTransition(false)
   }
 
   // Finale "Play Again" (panel revision, Nov 2026): back to Level 1 with
@@ -1006,9 +1017,9 @@ export default function QuizAdventure({
 
   function startBossPhase() {
     playBossWarningSound()
-    // Item 6: hold on an animated warning before the first boss question
+    // Item 6 + Nov 2026b: a warning, then the boss battle mechanics — the
+    // battle starts when the student taps "Start Boss Battle"
     setBossTransition(true)
-    window.setTimeout(() => setBossTransition(false), BOSS_TRANSITION_MS)
     setPhase('boss')
     setQuestionIndex(0)
     setBossHp(MAX_BOSS_HP)
@@ -1222,13 +1233,8 @@ export default function QuizAdventure({
   }
 
   if (screen === 'map') {
-    const levelMeta = [
-      { env: 'Forest Gate', subtitle: 'Fraction, Decimal & Solid Quest' },
-      { env: 'Crystal Bridge', subtitle: 'Prisms, Pyramids & Nets' },
-      { env: 'Elven Ruins', subtitle: 'Surface Area Builders' },
-      { env: 'Moonlit Keep', subtitle: 'Surface Area Problem Solvers' },
-      { env: 'Oracle Tower', subtitle: 'Volume Estimation Challenge' },
-    ]
+    // Each stop is a kingdom of Mathoria; the subtitle is the level's lesson
+    const levelMeta = levels.map((lvl, i) => ({ env: levelStories[i]?.place ?? lvl.environment, subtitle: lvl.title }))
 
     function getLevelStatus(lvlNum: number): 'cleared' | 'open' | 'locked' {
       if (runLevels.includes(lvlNum)) return 'cleared'
@@ -1293,6 +1299,17 @@ export default function QuizAdventure({
             title={soundMuted ? 'Sound off' : 'Sound on'}
           >
             {soundMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
+          {/* Replay the opening cinematic (Nov 2026b) */}
+          <button
+            type="button"
+            onClick={() => { playClickSound(); setCinematicOpen(true) }}
+            className="absolute left-2 top-14 z-20 flex h-10 w-10 flex-col items-center justify-center rounded-xl border-2 border-amber-400/60 bg-[#2a1a0a]/85 text-amber-200 shadow-lg backdrop-blur-sm hover:brightness-110"
+            aria-label="Watch the story"
+            title="Story"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span className="text-[7px] font-black uppercase leading-none">Story</span>
           </button>
           {/* Horizontal S-curve map - fits viewport on all screens */}
           <div className="absolute inset-0 z-[5] flex items-center justify-center px-2 sm:px-6">
@@ -1546,6 +1563,20 @@ export default function QuizAdventure({
             )
           })()}
         </AnimatePresence>
+
+        {/* "The Legend of the Five Math Crystals" — after sign-in (Nov 2026b) */}
+        <AnimatePresence>
+          {cinematicOpen && (
+            <OpeningCinematic
+              heroImage={levels[0]?.characterImage ?? FALLBACK_CHARACTER}
+              kingdoms={levels.map(l => ({ background: l.backgroundImage, guardian: l.bossImage }))}
+              villainImage={FALLBACK_BOSS}
+              muted={soundMuted}
+              onToggleSound={toggleSound}
+              onClose={closeCinematic}
+            />
+          )}
+        </AnimatePresence>
       </section>
     )
   }
@@ -1566,34 +1597,6 @@ export default function QuizAdventure({
         />
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-[#1a1233]/80 via-[#1a1233]/70 to-[#1a1233]/90" />
 
-        {/* Overall story — shown once, the first time Level 1 is started */}
-        {level.number === 1 && !introSeen ? (
-          <div className="ui-layer flex overflow-y-auto p-3">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="relative m-auto w-full max-w-2xl rounded-2xl border-2 border-emerald-500/50 bg-gradient-to-b from-[#052e16] via-[#14432d] to-[#1e1b4b] p-4 sm:p-5 text-center shadow-[0_0_30px_rgba(52,211,153,0.35)]"
-            >
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-200">
-                <TreePine className="h-3 w-3" /> {overallStory.speaker}
-              </span>
-              <h2 className="mt-1.5 text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-yellow-200 to-emerald-300">
-                The Enchanted Forest
-              </h2>
-              <p className="mt-2 text-[13px] sm:text-sm leading-relaxed text-emerald-50/90">
-                &ldquo;{overallStory.text}&rdquo;
-              </p>
-              <button
-                type="button"
-                onClick={dismissIntro}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-base font-black text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition"
-              >
-                <Sparkles className="h-5 w-5" /> Start the Adventure
-              </button>
-            </motion.div>
-          </div>
-        ) : (
         <div className="ui-layer flex overflow-y-auto p-3">
           <motion.div
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -1653,12 +1656,15 @@ export default function QuizAdventure({
                   {level.title}
                 </h2>
 
-                <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300"><TreePine className="h-3 w-3" /> Forest Guardian</p>
+                <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-300"><SparkMascot className="h-5 w-5" /> {NARRATOR}</p>
                 <p className="mt-0.5 text-[13px] sm:text-sm leading-relaxed text-purple-100/90">&ldquo;{story.intro}&rdquo;</p>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                   <span className="flex items-center gap-1.5 rounded-lg bg-red-500/15 border border-red-400/30 px-2.5 py-1 font-bold text-red-200">
                     <Swords className="h-3.5 w-3.5" /> Enemy: {story.enemy}
+                  </span>
+                  <span className="flex items-center gap-2 rounded-lg bg-white/10 border border-white/25 px-2.5 py-1 font-bold text-white">
+                    <Gem color={story.crystalColor} className="h-2.5 w-2.5" /> Recover the {story.crystal}
                   </span>
                   <span className="flex items-center gap-1.5 rounded-lg bg-yellow-500/15 border border-yellow-400/30 px-2.5 py-1 font-bold text-yellow-200">
                     <Trophy className="h-3.5 w-3.5" /> Earn the {story.trophyName}
@@ -1676,7 +1682,6 @@ export default function QuizAdventure({
             </button>
           </motion.div>
         </div>
-        )}
       </section>
     )
   }
@@ -2191,7 +2196,7 @@ export default function QuizAdventure({
                         <p className="text-[10px] leading-snug text-white/55">
                           {resultInfo.bossDefeated
                             ? `The ${story.trophyName} is already in your collection.`
-                            : `Defeat the ${story.enemy} to earn the ${story.trophyName}.`}
+                            : `Defeat ${story.enemy} to recover the ${story.crystal} and earn the ${story.trophyName}.`}
                         </p>
                       </div>
                     )}
@@ -2240,7 +2245,7 @@ export default function QuizAdventure({
                 {/* Guardian line (boss defeated) or encouragement, with the Level 1 unlock note */}
                 <div className="mt-2 [@media(max-height:560px)]:mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
                   <p data-testid="result-message" className="max-w-[640px] text-[11px] [@media(max-height:560px)]:text-[10px] text-purple-100/85">
-                    {message ?? <>&ldquo;{story.afterBoss}&rdquo; <span className="text-purple-300">— Forest Guardian</span></>}
+                    {message ?? <>&ldquo;{story.afterBoss}&rdquo; <span className="text-purple-300">— {NARRATOR}</span></>}
                   </p>
                   {/* The first Level 1 clear opens every remaining level (panel revision) */}
                   {level.number === 1 && resultInfo.firstClear && (
@@ -2320,7 +2325,7 @@ export default function QuizAdventure({
               </motion.h2>
               <p className="mt-0.5 text-sm font-black text-white">You&apos;ve Completed All 5 Levels!</p>
               <p className="mt-1 text-xs leading-relaxed text-purple-100/85">
-                Through courage, knowledge, and determination, you have defeated every challenge and restored peace to the Enchanted Forest!
+                You defeated all five guardians and brought the Five Magic Math Crystals home. Lord Numerox&apos;s darkness is gone!
               </p>
               {/* The five Forest Trophies — a missing one stays grey */}
               <div className="mt-2 flex items-end justify-center gap-2">
@@ -2343,7 +2348,10 @@ export default function QuizAdventure({
                   </motion.div>
                 ))}
               </div>
-              <p className="mt-2 font-game text-lg font-black tracking-wide text-yellow-300">THE KINGDOM IS SAVED!</p>
+              <div className="mt-1.5 flex justify-center gap-2">
+                {levelStories.map(t => <Gem key={t.level} color={t.crystalColor} className="h-3 w-3" />)}
+              </div>
+              <p className="mt-1.5 font-game text-lg font-black tracking-wide text-yellow-300">MATHORIA IS SAVED!</p>
               <p className="text-[11px] text-purple-200/75">Your adventure may end, but your journey of learning continues!</p>
               <div className="mt-3 flex justify-center gap-2">
                 <button type="button" onClick={backToMap} className="inline-flex items-center gap-1.5 rounded-xl border border-purple-400/40 bg-purple-900/60 px-5 py-2 text-sm font-black text-purple-100 hover:bg-purple-800/70">
@@ -2433,56 +2441,87 @@ export default function QuizAdventure({
         )}
       </AnimatePresence>
 
-      {/* Item 6 — Quiz → Boss Battle transition */}
+      {/* Item 6 + Nov 2026b — warning, then the boss battle MECHANICS ("before
+          the boss battle quiz provide the mechanics"). Waits for the student. */}
       <AnimatePresence>
-        {bossTransition && (
-          <motion.div
-            key="boss-transition"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.45 }}
-            className="absolute inset-0 z-[60] flex items-center justify-center bg-gradient-to-b from-[#1b0b0b]/95 via-[#3b0d0d]/90 to-[#1b0b0b]/95"
-          >
-            {/* sweeping bands give the backdrop a sense of movement */}
-            {[0, 1, 2].map(i => (
-              <motion.span
-                key={i}
-                className="absolute h-[3px] w-full bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"
-                style={{ top: `${30 + i * 20}%` }}
-                initial={{ x: '-100%' }}
-                animate={{ x: '100%' }}
-                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: 'linear' }}
-              />
-            ))}
+        {bossTransition && (() => {
+          const story = getLevelStory(level.number)
+          const rules = [
+            { icon: <Swords className="h-5 w-5 text-amber-300" />, title: '5 Boss Questions', text: `Each correct answer hits ${level.bossName} for ${BOSS_DAMAGE} HP.` },
+            { icon: <Heart className="h-5 w-5 fill-red-500 text-red-500" />, title: `${MAX_HEARTS} Hearts`, text: 'A wrong answer costs 1 heart. You still answer all 5.' },
+            { icon: <Clock className="h-5 w-5 text-cyan-300" />, title: `${QUESTION_SECONDS} Seconds`, text: 'per question. Running out only pauses the battle.' },
+            { icon: <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />, title: `+${BOSS_POINTS} Points`, text: 'and 1 star for every correct boss answer.' },
+            { icon: <Trophy className="h-5 w-5 text-yellow-300" />, title: 'Win the Crystal', text: `Hit ${level.bossName} at least once to recover the ${story.crystal} and earn the trophy.` },
+          ]
+          return (
             <motion.div
-              initial={{ scale: 0.7, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 14 }}
-              className="relative flex flex-col items-center gap-2 text-center"
+              key="boss-transition"
+              data-testid="boss-mechanics"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.45 }}
+              className="absolute inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-gradient-to-b from-[#1b0b0b]/95 via-[#3b0d0d]/92 to-[#1b0b0b]/95 p-2"
             >
-              <motion.div
-                animate={{ scale: [1, 1.08, 1] }}
-                transition={{ duration: 0.9, repeat: Infinity }}
-                className="relative h-24 w-24"
-              >
-                <Image
-                  src={level.bossImage}
-                  alt={level.bossName}
-                  width={96}
-                  height={96}
-                  unoptimized
-                  className="badge-pop-art h-24 w-24 object-contain drop-shadow-[0_0_18px_rgba(255,120,60,0.65)]"
+              {/* sweeping bands give the backdrop a sense of movement */}
+              {[0, 1, 2].map(i => (
+                <motion.span
+                  key={i}
+                  className="pointer-events-none absolute h-[3px] w-full bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"
+                  style={{ top: `${20 + i * 30}%` }}
+                  initial={{ x: '-100%' }}
+                  animate={{ x: '100%' }}
+                  transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: 'linear' }}
                 />
+              ))}
+              <motion.div
+                initial={{ scale: 0.7, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 14 }}
+                className="relative m-auto w-full max-w-3xl text-center"
+              >
+                <div className="flex items-center justify-center gap-3">
+                  <motion.div animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 0.9, repeat: Infinity }} className="relative h-16 w-16 shrink-0">
+                    <Image
+                      src={level.bossImage}
+                      alt={level.bossName}
+                      width={64}
+                      height={64}
+                      unoptimized
+                      className="badge-pop-art h-16 w-16 object-contain drop-shadow-[0_0_18px_rgba(255,120,60,0.65)]"
+                    />
+                  </motion.div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">Warning · Boss Battle</p>
+                    <p className="font-game text-xl font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">{level.bossName} blocks your path!</p>
+                    <p className="text-[11px] font-bold text-amber-100/80">How the boss battle works:</p>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+                  {rules.map((rule, i) => (
+                    <motion.div
+                      key={rule.title}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25 + i * 0.12 }}
+                      className={`rounded-xl border border-amber-400/30 bg-black/40 px-2 py-1.5 ${i === rules.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}
+                    >
+                      <div className="flex items-center justify-center gap-1.5">{rule.icon}<p className="text-xs font-black text-white">{rule.title}</p></div>
+                      <p className="mt-0.5 text-[10px] leading-snug text-amber-50/80">{rule.text}</p>
+                    </motion.div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { playClickSound(); setBossTransition(false) }}
+                  className="mt-2.5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 px-6 py-2 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-red-500/40 hover:brightness-110 active:scale-95"
+                >
+                  <Swords className="h-4 w-4" /> Start Boss Battle
+                </button>
               </motion.div>
-              <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">Warning</p>
-              <p className="font-game text-2xl font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
-                Boss Battle Phase
-              </p>
-              <p className="text-xs font-bold text-amber-100/80">{level.bossName} blocks your path!</p>
             </motion.div>
-          </motion.div>
-        )}
+          )
+        })()}
       </AnimatePresence>
 
       {/* Item 5 — "Are you still there?" instead of closing the game */}

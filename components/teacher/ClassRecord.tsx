@@ -3,11 +3,12 @@
  * Electronic class record (2026-10b revision, item 4).
  *
  * One row per enrolled student with their score for every level, the category
- * breakdown, and a total — then a download so the teacher can keep it in Excel.
+ * breakdown, and a total. Its own download button was removed (Nov 2026b): the
+ * Reports page's "Download Report" carries the class record with every module.
  * A level's score is the student's best single run, so retries don't inflate it.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, FileSpreadsheet, RefreshCw } from 'lucide-react'
+import { FileSpreadsheet, RefreshCw } from 'lucide-react'
 
 const LEVELS = [1, 2, 3, 4, 5]
 
@@ -70,39 +71,6 @@ export default function ClassRecord() {
     return Math.round((played.reduce((sum, r) => sum + r.total, 0) / played.length) * 10) / 10
   }, [rows])
 
-  /** CSV — opens directly in Excel, and carries names, levels, categories and scores. */
-  function downloadCSV() {
-    const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
-    const header = [
-      'Student Name', 'Username', 'Section',
-      ...LEVELS.map(l => `L${l} (/10)`),
-      'Total (/50)',
-      ...categories.map(c => `${c} (correct/total, best runs)`),
-    ]
-    const lines = rows.map(r => [
-      r.name, r.username, r.section ?? '',
-      ...LEVELS.map(l => (r.levels[l]?.attempts ? r.levels[l].score : '—')),
-      r.total,
-      ...categories.map(c => {
-        const cell = r.categories[c]
-        return cell ? `${cell.correct}/${cell.asked}` : '—'
-      }),
-    ])
-    const csv = [header, ...lines].map(cols => cols.map(escape).join(',')).join('\n')
-    const stamp = new Date().toISOString().slice(0, 10)
-    const section = classroomId === 'all'
-      ? 'all-sections'
-      : (classrooms.find(c => String(c.id) === classroomId)?.name ?? 'section').replace(/\W+/g, '-').toLowerCase()
-
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `mindspark-class-record_${section}_${stamp}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 p-5 backdrop-blur-md">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -128,13 +96,6 @@ export default function ClassRecord() {
             className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
           >
             {showCategories ? 'Hide categories' : 'Show categories'}
-          </button>
-          <button
-            onClick={downloadCSV}
-            disabled={rows.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-xs font-black text-white shadow hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50"
-          >
-            <Download className="h-3.5 w-3.5" /> Download (CSV / Excel)
           </button>
         </div>
       </div>

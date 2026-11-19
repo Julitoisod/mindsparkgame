@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { Gift } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { characterOptions } from '@/lib/characterOptions'
 import { BADGES } from '@/lib/badges'
@@ -186,43 +187,52 @@ export default function DashboardProfilePage() {
             username and password only, and the email here is a generated
             placeholder (name@student.mindspark) that only confused them. */}
 
-        {/* Trophies — one per boss defeated (Nov 2026); shown before badges */}
-        <div className="rounded-lg border border-amber-400/20 bg-[#22326f]/55 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-white/80">Trophies</p>
-            <span className="text-[10px] font-bold text-amber-300">{progress?.trophies.length ?? 0}/{levelStories.length}</span>
+        {/* Rewards — trophies and badges grouped under one heading (panel revision, Nov 2026b) */}
+        <section className="rounded-lg border border-amber-400/25 bg-[#22326f]/55 p-3" data-testid="profile-rewards">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Gift className="h-4 w-4 text-amber-300" />
+            <h3 className="font-game text-sm font-black text-white">Rewards</h3>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {levelStories.map(t => {
-              const earned = (progress?.trophies ?? []).includes(t.level)
-              return (
-                <div key={t.level} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-amber-400/40 bg-[#3459C7]/35' : 'border-[#9B83F5]/10 bg-[#3459C7]/35/50 opacity-50 grayscale'}`}>
-                  <Image src={t.trophyImage} alt={t.trophyName} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
-                  <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#F4F2FF]' : 'text-[#F4F2FF]/50'}`}>{t.trophyName.replace(/ Trophy$/, '')}</p>
-                </div>
-              )
-            })}
+          <div className="space-y-2">
+          {/* Trophies — one per boss defeated (Nov 2026); shown before badges */}
+          <div className="rounded-lg bg-black/15 p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-white/80">Trophies</p>
+              <span className="text-[10px] font-bold text-amber-300">{progress?.trophies.length ?? 0}/{levelStories.length}</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {levelStories.map(t => {
+                const earned = (progress?.trophies ?? []).includes(t.level)
+                return (
+                  <div key={t.level} className={`shrink-0 w-16 rounded-lg border px-2 py-1.5 text-center ${earned ? 'border-amber-400/40 bg-[#3459C7]/35' : 'border-[#9B83F5]/10 bg-[#3459C7]/35/50 opacity-50 grayscale'}`}>
+                    <Image src={t.trophyImage} alt={t.trophyName} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
+                    <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#F4F2FF]' : 'text-[#F4F2FF]/50'}`}>{t.trophyName.replace(/ Trophy$/, '')}</p>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Badges — centered, no per-badge card, wraps instead of scrolling */}
-        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-white/80">Badges</p>
-            <span className="text-[10px] font-bold text-[#9B83F5]">{BADGES.filter(b => earnedBadges.includes(b.id)).length}/{BADGES.length}</span>
+          {/* Badges — centered, no per-badge card, wraps instead of scrolling */}
+          <div className="rounded-lg bg-black/15 p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-white/80">Badges</p>
+              <span className="text-[10px] font-bold text-[#9B83F5]">{BADGES.filter(b => earnedBadges.includes(b.id)).length}/{BADGES.length}</span>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              {BADGES.map(b => {
+                const earned = earnedBadges.includes(b.id)
+                return (
+                  <div key={b.id} className={`w-16 text-center ${earned ? '' : 'opacity-50 grayscale'}`}>
+                    <Image src={b.image} alt={b.name} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
+                    <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#F4F2FF]' : 'text-[#F4F2FF]/50'}`}>{b.name}</p>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          <div className="flex flex-wrap justify-center gap-3">
-            {BADGES.map(b => {
-              const earned = earnedBadges.includes(b.id)
-              return (
-                <div key={b.id} className={`w-16 text-center ${earned ? '' : 'opacity-50 grayscale'}`}>
-                  <Image src={b.image} alt={b.name} width={40} height={40} unoptimized className="mx-auto mb-0.5 h-9 w-9 object-contain" />
-                  <p className={`text-[8px] leading-tight font-bold ${earned ? 'text-[#F4F2FF]' : 'text-[#F4F2FF]/50'}`}>{b.name}</p>
-                </div>
-              )
-            })}
           </div>
-        </div>
+        </section>
 
         {/* Change Password — students manage their own password (Nov 2026) */}
         <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3" data-testid="student-change-password">

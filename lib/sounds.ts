@@ -385,8 +385,12 @@ function whenVoicesReady(synth: SpeechSynthesis): Promise<void> {
   })
 }
 
-/** Speaks text aloud, cancelling anything already being spoken. */
-export function speak(text: string) {
+/**
+ * Speaks text aloud, cancelling anything already being spoken. `onDone` fires
+ * once the last piece finishes — never for speech that was cut off or muted,
+ * so callers (the opening cinematic) keep their own fallback timer.
+ */
+export function speak(text: string, onDone?: () => void) {
   if (muted || !text) return
   const token = ++speechToken
   try {
@@ -401,12 +405,15 @@ export function speak(text: string) {
       const voice = synth.getVoices().find(v => v.lang?.startsWith('en')) ?? null
       const pieces = chunkForSpeech(text)
 
-      pieces.forEach(piece => {
+      pieces.forEach((piece, i) => {
         const utterance = new SpeechSynthesisUtterance(piece)
         utterance.lang = 'en-US'
         utterance.rate = 0.95
         utterance.pitch = 1.05
         if (voice) utterance.voice = voice
+        if (onDone && i === pieces.length - 1) {
+          utterance.onend = () => { if (token === speechToken) onDone() }
+        }
         synth.speak(utterance)
       })
 

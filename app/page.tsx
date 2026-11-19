@@ -1,16 +1,17 @@
 /**
- * app/page.tsx — Landing / Home page
+ * app/page.tsx — Landing / Home page (the teachers' and admin's web entry;
+ * students go straight to their app).
  *
- * 2026-10 revision (items 1-5): this page is the TEACHER's web entry only —
- * students never land here, they go straight to /login (their own page), so
- * the "Student Sign In" button is gone. Layout follows the panel's mockup:
- * the school photo fills the hero, cards sit in a row underneath, and every
- * colour comes from the MindSpark Math palette in globals.css.
+ * Nov 2026b: rebuilt after the panel's suggested web design — the illustrated
+ * kingdom with floating math symbols, a hero on the left, the MindSpark title
+ * with a ribbon and description in the middle, the partner school on the
+ * right, Teacher / Admin Login in the nav and the hero, and four colourful
+ * feature cards along the bottom.
  */
-import Image from 'next/image'
 import Link from 'next/link'
-import { BookOpen, GraduationCap, ShieldCheck, Trophy, Swords, Zap } from 'lucide-react'
+import { ArrowRight, BookOpen, Gamepad2, GraduationCap, ShieldCheck, Sparkles, Swords, Trophy, Zap } from 'lucide-react'
 import StudentAppRedirect from '@/components/auth/StudentAppRedirect'
+import { AuthScene, SchoolPolaroid } from '@/components/auth/AuthScene'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -18,107 +19,99 @@ export const metadata: Metadata = {
   description: 'An immersive RPG math game for Grade 5 students. Battle enemies by solving math problems!',
 }
 
+const logins = [
+  { href: '/teacher-login', label: 'Teacher Login', Icon: GraduationCap },
+  { href: '/admin-login', label: 'Admin Login', Icon: ShieldCheck },
+]
+
 const features = [
-  { icon: Swords,        color: 'text-[#D9B8FF]', bar: 'bg-[#9B83F5]', title: 'Boss Battle Quizzes', desc: 'Answer math questions to attack bosses and progress through levels.' },
-  { icon: BookOpen,      color: 'text-[#9B83F5]', bar: 'bg-[#6255E8]', title: 'Grade 5 Math',        desc: 'Fractions, decimals, solid figures, surface area, and volume — aligned to curriculum.' },
-  { icon: Trophy,        color: 'text-[#D9B8FF]', bar: 'bg-[#9B83F5]', title: 'Stars & Rewards',     desc: 'Earn stars, unlock badges, and climb the leaderboard as you learn.' },
-  { icon: GraduationCap, color: 'text-[#9B83F5]', bar: 'bg-[#6255E8]', title: 'Teacher Dashboard',   desc: 'Track student progress, quiz scores, and unlock levels in real time.' },
+  { icon: Swords, title: 'Boss Battle Quizzes', desc: 'Answer math questions to attack bosses and progress through levels!', tone: 'from-[#3b82f6] to-[#1d4ed8]', href: '/teacher-login' },
+  { icon: BookOpen, title: 'Grade 5 Math', desc: 'Fractions, decimals, solid figures, surface area, and volume!', tone: 'from-[#22c55e] to-[#15803d]', href: '/teacher-login' },
+  { icon: Trophy, title: 'Stars & Rewards', desc: 'Earn stars, unlock badges and avatars, and climb the leaderboard!', tone: 'from-[#a855f7] to-[#7e22ce]', href: '/teacher-login' },
+  { icon: GraduationCap, title: 'Teacher Dashboard', desc: 'Track student progress, quiz scores, and unlock levels in real time.', tone: 'from-[#f59e0b] to-[#ea580c]', href: '/teacher-login' },
 ]
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[#22326f] flex flex-col text-[#F4F2FF]">
+    <AuthScene className="flex flex-col text-white">
       <StudentAppRedirect />
-      {/* ── Nav ── */}
-      <nav className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-[#9B83F5]/25 bg-[#22326f]/80 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <Zap className="h-6 w-6 text-[#D9B8FF] fill-[#D9B8FF]" />
-          <span className="text-xl font-black text-[#F4F2FF]">MindSpark</span>
-        </div>
-        {/* Teacher accounts are created by the admin now — no self sign-up (Nov 2026) */}
-        <Link
-          href="/teacher-login"
-          className="text-sm font-bold bg-[#6255E8] text-white px-4 py-2 rounded-lg hover:bg-[#9B83F5] transition-colors shadow-lg shadow-[#6255E8]/40"
-        >
-          Sign In
-        </Link>
-      </nav>
+      <div className="flex min-h-screen flex-col">
+        {/* ── Nav ── */}
+        <nav className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#1e1b6b]/80 px-4 py-2.5 shadow-xl backdrop-blur-md sm:mx-6">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <Zap className="h-6 w-6 fill-[#facc15] text-[#facc15]" />
+              <span className="font-display text-2xl font-bold">Mind<span className="text-[#facc15]">Spark</span></span>
+            </span>
+            <span className="hidden items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-bold md:inline-flex">
+              <Gamepad2 className="h-3.5 w-3.5" /> Math RPG Adventure · Grade 5
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {logins.map(({ href, label, Icon }) => (
+              <Link key={href} href={href} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#7c5cf0] to-[#5a3fd4] px-3.5 py-2 text-sm font-bold shadow-md ring-1 ring-white/25 transition hover:brightness-110">
+                <Icon className="h-4 w-4" /> {label}
+              </Link>
+            ))}
+          </div>
+        </nav>
 
-      {/* ── Hero over the school photo ── */}
-      <section className="relative flex-1 overflow-hidden">
-        <Image
-          src="/revision/school-landing.jpg"
-          alt="Francisco Adlaon Learning Institute"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover"
-        />
-        {/* Royal-blue wash keeps the copy readable over the photo */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#22326f]/95 via-[#22326f]/60 to-transparent" />
+        {/* ── Hero ── */}
+        <section className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-6 px-4 py-8 lg:grid-cols-[1fr_1.35fr_1fr] lg:py-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/hero-knight.png" alt="MindSpark hero knight" className="mx-auto hidden w-full max-w-[340px] drop-shadow-[0_18px_20px_rgba(0,0,0,0.35)] lg:block" />
 
-        <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-8 px-6 py-16 lg:grid-cols-2">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#9B83F5]/50 bg-[#3459C7]/40 px-4 py-1.5 text-sm text-[#F4F2FF]">
-              <Zap className="w-3.5 h-3.5 text-[#D9B8FF]" />
-              Math RPG Adventure · Grade 5
-            </div>
-
-            <h1 className="text-5xl md:text-7xl font-black leading-tight">
-              <span className="text-[#F4F2FF]">Mind</span>
-              <span className="text-[#D9B8FF]">Spark</span>
+          <div className="text-center">
+            <p className="flex justify-center gap-1 text-2xl text-[#fde047] drop-shadow">★ <span className="-mt-1 text-3xl">★</span> ★</p>
+            <h1 className="font-display text-[clamp(56px,10vw,112px)] font-bold leading-none" style={{ WebkitTextStroke: '3px #1e1b6b', paintOrder: 'stroke fill' }}>
+              <span className="text-white drop-shadow-[0_6px_0_#1e1b6b]">Mind</span>
+              <span className="text-[#facc15] drop-shadow-[0_6px_0_#1e1b6b]">Spark</span>
             </h1>
-
-            <p className="text-lg text-[#F4F2FF]/85 leading-relaxed max-w-xl">
-              An immersive math RPG where kids battle powerful enemies by solving math challenges.
-              Learn fractions, solid figures, surface area, and volume — through exciting quiz adventures!
+            <p className="mx-auto mt-2 inline-block -rotate-1 rounded-xl bg-gradient-to-r from-[#f59e0b] to-[#ea580c] px-6 py-1.5 font-display text-xl font-bold shadow-[0_5px_0_#9a3412] sm:text-2xl">
+              Math Adventure for Grade 5
             </p>
-
+            <p className="mx-auto mt-4 max-w-lg rounded-2xl bg-white/90 px-5 py-3 text-sm font-semibold leading-relaxed text-[#22326f] shadow-xl sm:text-base">
+              An immersive math RPG where kids battle powerful enemies by solving math challenges.
+              Learn <b>fractions, decimals, solid figures, surface area, and volume</b> — through exciting quizzes!
+            </p>
             {/* Separate sign-in links for teachers and the admin (adviser, Nov 2026) */}
-            <div className="flex flex-wrap gap-3 pt-2">
-              {[
-                { href: '/teacher-login', label: 'Teacher Login', Icon: GraduationCap },
-                { href: '/admin-login', label: 'Admin Login', Icon: ShieldCheck },
-              ].map(({ href, label, Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#6255E8] px-8 py-4 text-base font-black text-white shadow-lg shadow-[#6255E8]/40 transition-all hover:scale-105 hover:bg-[#9B83F5]"
-                >
-                  <Icon className="w-5 h-5" />
-                  {label}
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              {logins.map(({ href, label, Icon }) => (
+                <Link key={href} href={href} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-b from-[#7c5cf0] to-[#5a3fd4] px-7 py-3.5 text-base font-black shadow-[0_5px_0_#3b2a99] ring-2 ring-white/40 transition hover:-translate-y-0.5 hover:brightness-110">
+                  <Icon className="h-5 w-5" /> {label}
                 </Link>
               ))}
             </div>
-
-            <p className="text-sm text-[#F4F2FF]/70">
-              New teacher? Your MindSpark administrator creates your account.
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-black/25 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+              <Sparkles className="h-3.5 w-3.5 text-[#fde047]" /> Students play on the MindSpark app · teacher accounts come from the administrator
             </p>
           </div>
-        </div>
-      </section>
 
-      {/* ── Features ── */}
-      <section className="bg-[#22326f] px-6 py-10">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map(({ icon: Icon, color, bar, title, desc }) => (
-            <div
+          <SchoolPolaroid className="mx-auto hidden w-full max-w-[320px] lg:block" />
+        </section>
+
+        {/* ── Features ── */}
+        <section className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 pb-6 sm:grid-cols-2 lg:grid-cols-4">
+          {features.map(({ icon: Icon, title, desc, tone, href }) => (
+            <Link
               key={title}
-              className="space-y-3 rounded-2xl border border-[#9B83F5]/30 bg-[#3459C7]/35 p-5 backdrop-blur-md transition-colors hover:border-[#9B83F5]/60"
+              href={href}
+              className={`group flex items-center gap-3 rounded-2xl bg-gradient-to-br ${tone} p-4 shadow-xl ring-2 ring-white/40 transition hover:-translate-y-1`}
             >
-              <Icon className={`w-7 h-7 ${color}`} />
-              <h3 className="font-bold text-[#F4F2FF]">{title}</h3>
-              <span className={`block h-1 w-8 rounded-full ${bar}`} />
-              <p className="text-sm leading-relaxed text-[#F4F2FF]/70">{desc}</p>
-            </div>
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 shadow-inner"><Icon className="h-8 w-8" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-lg font-bold leading-tight">{title}</span>
+                <span className="mt-0.5 block text-xs leading-snug text-white/90">{desc}</span>
+              </span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#22326f] shadow transition group-hover:translate-x-0.5"><ArrowRight className="h-4 w-4" /></span>
+            </Link>
           ))}
-        </div>
-      </section>
+        </section>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-[#9B83F5]/20 py-6 text-center text-xs text-[#F4F2FF]/50">
-        MindSpark Game · Math Adventure for Grade 5 · Built with Next.js &amp; MySQL
-      </footer>
-    </main>
+        <footer className="bg-[#1e1b4b]/70 py-3 text-center text-xs text-white/70 backdrop-blur-sm">
+          MindSpark Game · Math Adventure for Grade 5 · Built with Next.js &amp; MySQL
+        </footer>
+      </div>
+    </AuthScene>
   )
 }

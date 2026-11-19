@@ -1,9 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart3,
+  ArrowLeft,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -19,6 +22,7 @@ import {
   Trash2,
   Unlock,
   UserPlus,
+  UserRound,
   Users,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -88,8 +92,24 @@ const perfConfig: Record<string, { dot: string; bg: string; label: string; text:
   red: { dot: 'bg-red-500', bg: 'bg-red-500/10 border-red-400/30', label: 'Needs Help', text: 'text-red-300' },
 }
 
-export default function TeacherStudentsPage() {
-  useAuth()
+// useSearchParams needs a Suspense boundary for the static build
+export default function TeacherStudentsRoute() {
+  return (
+    <Suspense fallback={null}>
+      <TeacherStudentsPage />
+    </Suspense>
+  )
+}
+
+function TeacherStudentsPage() {
+  const { user } = useAuth()
+  const searchParams = useSearchParams()
+  // ?section= — "View Students" on a Classroom section card (Nov 2026b): only
+  // that section's students, under its own header. Read reactively so the
+  // sidebar's plain "Students" link goes back to every student.
+  const sectionParam = Number(searchParams.get('section')) || null
+  const [room, setRoom] = useState<{ name: string } | null>(null)
+  const [teacherName, setTeacherName] = useState<string | null>(null)
   const [students, setStudents] = useState<Student[]>([])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [loading, setLoading] = useState(true)
@@ -219,15 +239,19 @@ export default function TeacherStudentsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Deep links: Sections → "View Students" (?section=) and the dashboard's
+  // Deep links: Classroom → "View Students" (?section=) and the dashboard's
   // "Students Who Need Attention" → View (?student=)
   const [focusStudentId, setFocusStudentId] = useState<number | null>(null)
+  useEffect(() => { setFilterClassroom(sectionParam ?? '') }, [sectionParam])
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const section = Number(params.get('section'))
-    if (section > 0) setFilterClassroom(section)
-    const student = Number(params.get('student'))
+    const student = Number(searchParams.get('student'))
     if (student > 0) setFocusStudentId(student)
+  }, [searchParams])
+  useEffect(() => {
+    fetch('/api/teacher/classroom', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => { if (json.success) { setRoom(json.data.classroom); setTeacherName(json.data.teacherName) } })
+      .catch(() => {})
   }, [])
   useEffect(() => {
     if (!focusStudentId || students.length === 0) return
@@ -259,10 +283,12 @@ export default function TeacherStudentsPage() {
   // Reset page when filters change
   useEffect(() => { setPage(1) }, [search, filterClassroom, filterPerformance, filterStatus])
 
-  // Stats
-  const totalStudents = students.length
-  const activeStudents = students.filter(s => s.progress.performanceColor !== 'none').length
-  const greenCount = students.filter(s => s.progress.performanceColor === 'green').length
+  // Stats — over the one section in section view
+  const section = sectionParam ? classrooms.find(c => c.id === sectionParam) ?? null : null
+  const scope = sectionParam ? students.filter(s => s.classroomId === sectionParam) : students
+  const totalStudents = scope.length
+  const activeStudents = scope.filter(s => s.progress.performanceColor !== 'none').length
+  const greenCount = scope.filter(s => s.progress.performanceColor === 'green').length
 
   // Actions
   async function updateStudent(studentId: number, changes: Record<string, string | undefined>, showSuccess = true) {
@@ -377,31 +403,61 @@ export default function TeacherStudentsPage() {
     )
   }
 
+  const headerActions = (
+    <>
+      <button
+        onClick={openLevelOneForAll}
+        disabled={openingAll}
+        title="Opens Level 1 for every student in the current filter. Levels 2–5 open automatically once a student passes Level 1."
+        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-emerald-700 transition disabled:opacity-50"
+      >
+        <Unlock className="h-4 w-4" />
+        {openingAll ? 'Opening…' : 'Open Level 1 for All'}
+      </button>
+      <a
+        href="/teacher/enrollment"
+        className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
+      >
+        <UserPlus className="h-4 w-4" />
+        Add Student
+      </a>
+    </>
+  )
+
   return (
     <div data-page="teacher-students" className="space-y-5">
-      <PageHeader
-        icon={Users}
-        title="All Students"
-        subtitle="Manage and monitor student accounts."
-        actions={<>
-          <button
-            onClick={openLevelOneForAll}
-            disabled={openingAll}
-            title="Opens Level 1 for every student in the current filter. Levels 2–5 open automatically once a student passes Level 1."
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-emerald-700 transition disabled:opacity-50"
-          >
-            <Unlock className="h-4 w-4" />
-            {openingAll ? 'Opening…' : 'Open Level 1 for All'}
-          </button>
-          <a
-            href="/teacher/enrollment"
-            className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-purple-700 transition"
-          >
-            <UserPlus className="h-4 w-4" />
-            Add Student
-          </a>
-        </>}
-      />
+      {section ? (
+        <>
+          {/* Section view (panel's suggested output, Nov 2026b) */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#6a4fe0] via-[#7458e6] to-[#8c74f0] px-6 py-5 shadow-lg shadow-[#6255E8]/20" data-testid="section-view">
+            <span className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
+            <div className="relative flex flex-wrap items-center gap-4">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/90 text-[#6255E8] shadow"><Users className="h-7 w-7" /></span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-2xl font-black text-[#fff]">Hi, {teacherName ?? user?.username ?? 'Teacher'}!</h2>
+                <p className="text-sm font-medium text-[#fff]/90">Manage your students in {room?.name ?? 'Grade 5 Mathematics'}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">{headerActions}</div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ece8f5] bg-white px-4 py-3 shadow-sm">
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <span className="inline-flex items-center gap-1.5 font-bold text-[#1f2430]"><Users className="h-4 w-4 text-[#6f54ba]" /> Section: {section.name}</span>
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#5f5677]"><UserRound className="h-4 w-4 text-[#6f54ba]" /> Teacher: {teacherName ?? user?.username}</span>
+            </p>
+            <Link href="/teacher/classrooms" className="inline-flex items-center gap-1.5 rounded-xl border border-[#ddd5f0] px-3 py-1.5 text-xs font-bold text-[#6f54ba] hover:bg-[#f4efff]">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Classroom
+            </Link>
+          </div>
+        </>
+      ) : (
+        <PageHeader
+          icon={Users}
+          title="All Students"
+          subtitle="Manage and monitor student accounts."
+          actions={headerActions}
+        />
+      )}
 
       {error && <div className="rounded-lg bg-red-100 border border-red-300 px-4 py-2.5 text-sm text-red-800 font-medium">{error}</div>}
       {success && (
@@ -446,10 +502,12 @@ export default function TeacherStudentsPage() {
               className="w-full rounded-lg bg-gray-50 border border-gray-300 text-gray-900 pl-10 pr-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
           </div>
-          <select value={filterClassroom} onChange={e => setFilterClassroom(Number(e.target.value) || '')} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
-            <option value="">All Sections</option>
-            {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          {!section && (
+            <select value={filterClassroom} onChange={e => setFilterClassroom(Number(e.target.value) || '')} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+              <option value="">All Sections</option>
+              {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
           <select value={filterPerformance} onChange={e => setFilterPerformance(e.target.value)} className="rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
             <option value="">All Performance</option>
             <option value="green">Good</option>
@@ -472,7 +530,7 @@ export default function TeacherStudentsPage() {
       {/* Students Table */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200">
-          <h3 className="font-bold text-gray-900">Students List</h3>
+          <h3 className="font-bold text-gray-900">{section ? `Student List — ${section.name}` : 'Students List'}</h3>
         </div>
 
         {/* Table Header (desktop) */}

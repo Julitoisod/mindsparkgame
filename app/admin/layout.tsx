@@ -2,18 +2,21 @@
 /**
  * Administrator panel shell. Guards the whole /admin tree: only a signed-in
  * admin gets through. Navigation follows the panel's structure (Nov 2026):
- * Dashboard · Teacher Management · Admin Profile · Logout.
+ * Dashboard · Teacher Management · Classrooms & Students · About · Admin
+ * Profile · Logout (Classrooms + About added Nov 2026b).
  */
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, LogOut, ShieldCheck, UserRound, Users } from 'lucide-react'
+import { Info, LayoutDashboard, LogOut, School, ShieldCheck, UserRound, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import AccountMenu from '@/components/account/AccountMenu'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', sub: 'Account statistics and recent activities', icon: LayoutDashboard, href: '/admin/dashboard' },
   { id: 'teachers', label: 'Teacher Management', sub: 'Add, view, edit, reset, activate and deactivate accounts', icon: Users, href: '/admin/teachers' },
+  { id: 'classrooms', label: 'Classrooms & Students', sub: "Each teacher's sections, students and reports", icon: School, href: '/admin/classrooms' },
+  { id: 'about', label: 'About', sub: 'What MindSpark is and the proficiency levels', icon: Info, href: '/admin/about' },
   { id: 'profile', label: 'Admin Profile', sub: 'Account information and password settings', icon: UserRound, href: '/admin/profile' },
 ]
 

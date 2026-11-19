@@ -4,8 +4,9 @@ import ClassRecord from '@/components/teacher/ClassRecord'
 import PageHeader from '@/components/teacher/PageHeader'
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, BarChart3, CheckCircle2, FileText, Star, TrendingUp, Users } from 'lucide-react'
-import { buildRecommendation, proficiencyFromAccuracy } from '@/lib/proficiency'
+import { AlertTriangle, BarChart3, CheckCircle2, Download, FileSpreadsheet, FileText, Star, TrendingUp, Users } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { buildFullReportCsv, reportSummary, studentPerformance } from '@/lib/reportExport'
 
 const bandTone: Record<string, string> = {
   gray: 'text-gray-400', red: 'text-red-400', orange: 'text-orange-400', yellow: 'text-yellow-400', blue: 'text-blue-400', green: 'text-emerald-400',
@@ -33,6 +34,7 @@ type QuizSession = {
 type Student = {
   id: number
   username: string
+  classroomId: number | null
   classroomName: string | null
   progress: {
     levelsCompleted: number
@@ -66,20 +68,8 @@ export default function TeacherReportsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const total = students.length
-  const green = students.filter(s => s.progress.performanceColor === 'green').length
-  const yellow = students.filter(s => s.progress.performanceColor === 'yellow').length
-  const red = students.filter(s => s.progress.performanceColor === 'red').length
-  const none = students.filter(s => s.progress.performanceColor === 'none').length
-  const completionRate = total > 0 ? Math.round((green / total) * 100) : 0
-  const activeRate = total > 0 ? Math.round(((total - none) / total) * 100) : 0
-  const needsAttention = red + yellow
-
-  // Level completion data
-  const levelData = [1, 2, 3, 4, 5].map(lvl => {
-    const completed = students.filter(s => s.progress.levelsCompleted >= lvl).length
-    return { level: lvl, completed, pct: total > 0 ? Math.round((completed / total) * 100) : 0 }
-  })
+  // Same numbers the downloaded report carries (lib/reportExport.ts)
+  const { total, green, yellow, red, none, completionRate, activeRate, needsAttention, levelCompletion: levelData } = reportSummary(students)
 
   if (loading) {
     return <p className="text-purple-300 text-sm animate-pulse">Loading reports...</p>
@@ -196,16 +186,11 @@ export default function TeacherReportsPage() {
             </thead>
             <tbody className="divide-y divide-purple-400/10">
               {students.map(student => {
-                const totalCorrect = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.correctAttempts, 0)
-                const totalAttempts = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.totalAttempts, 0)
-                const accuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0
-                const totalScoreEarned = (student.quizScores ?? []).reduce((sum, qs) => sum + qs.totalScore, 0)
-                const accColor = accuracy >= 70 ? 'text-emerald-400' : accuracy >= 40 ? 'text-yellow-400' : totalAttempts > 0 ? 'text-red-400' : 'text-gray-400'
                 // Proficiency band from quiz accuracy (req #13) + recommendation (req #14)
-                const prof = proficiencyFromAccuracy(totalCorrect, totalAttempts)
+                const { correct: totalCorrect, attempts: totalAttempts, accuracy, points: totalScoreEarned, proficiency: prof, recommendation: intervention } = studentPerformance(student)
+                const accColor = accuracy >= 70 ? 'text-emerald-400' : accuracy >= 40 ? 'text-yellow-400' : totalAttempts > 0 ? 'text-red-400' : 'text-gray-400'
                 const statusLabel = prof.band
                 const statusColor = bandTone[prof.tone] ?? 'text-gray-400'
-                const intervention = buildRecommendation(prof, [])
                 return (
                   <tr key={student.id} className="text-purple-100">
                     <td className="py-3 pr-4">
@@ -374,25 +359,94 @@ export default function TeacherReportsPage() {
         )}
       </div>
 
-      {/* Key Insights */}
-      {total > 0 && (
-        <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 backdrop-blur-md p-5">
-          <h3 className="font-bold text-white mb-3">Key Insights</h3>
-          <div className="grid gap-2 sm:grid-cols-2 text-sm text-purple-200">
-            {green > 0 && <p>Quiz performance is strong with {total > 0 ? Math.round((green / total) * 100) : 0}% of students in the green zone.</p>}
-            {red > 0 && <p>Focus on targeted interventions for the {red} student{red > 1 ? 's' : ''} in red.</p>}
-            {none > 0 && <p>{none} student{none > 1 ? 's' : ''} haven&apos;t started — consider unlocking Level 1.</p>}
-            {yellow > 0 && <p>Consistent practice can help improve outcomes for {yellow} average student{yellow > 1 ? 's' : ''}.</p>}
-            {completionRate >= 50 && <p>Over half your students have completed all levels!</p>}
-            {activeRate < 50 && total > 2 && <p>Encourage inactive students to start playing.</p>}
-          </div>
-        </div>
-      )}
+      {/* Download Report — replaces Key Insights (panel revision, Nov 2026b) */}
+      <DownloadReport students={students} sessions={sessions} />
     </div>
   )
 }
 
 // ─── Components ───────────────────────────────────────────────────────────────
+
+const MODULES = [
+  'Summary', 'Performance Distribution', 'Level Completion', 'Intervention Summary',
+  'Student Performance', 'Class Record', 'Scores Per Level', 'Quiz Attempts',
+]
+
+/**
+ * "Download Report": every module on this page in one Excel-ready CSV — not
+ * just the class record — for all sections or one (Nov 2026b).
+ */
+function DownloadReport({ students, sessions }: { students: Student[]; sessions: QuizSession[] }) {
+  const [sectionId, setSectionId] = useState<number | 'all'>('all')
+  const [busy, setBusy] = useState(false)
+  const sections = Array.from(new Map(students.filter(s => s.classroomId).map(s => [s.classroomId!, s.classroomName ?? 'Section'])).entries())
+
+  async function download() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/teacher/class-record${sectionId === 'all' ? '' : `?classroomId=${sectionId}`}`, { credentials: 'include' })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.message)
+      const scoped = sectionId === 'all' ? students : students.filter(s => s.classroomId === sectionId)
+      const ids = new Set(scoped.map(s => s.id))
+      const scopeLabel = sectionId === 'all' ? 'All sections' : (sections.find(([id]) => id === sectionId)?.[1] ?? 'Section')
+      const csv = buildFullReportCsv({
+        students: scoped,
+        sessions: sessions.filter(a => ids.has(a.user_id)),
+        record: json.data,
+        scopeLabel,
+        generatedAt: new Date(),
+      })
+      // BOM so Excel reads the UTF-8 (ñ, –) correctly
+      const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mindspark-report_${scopeLabel.replace(/\W+/g, '-').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Report downloaded')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not build the report')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-purple-400/25 bg-purple-950/40 p-5 backdrop-blur-md" data-testid="download-report">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="icon-circle flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#d9f3df] text-[#16A34A]"><FileSpreadsheet className="h-5 w-5" /></span>
+          <div>
+            <h3 className="font-bold text-white">Download Report</h3>
+            <p className="text-xs text-purple-300">One Excel-ready file with every report module on this page:</p>
+            <p className="mt-1.5 flex flex-wrap gap-1.5">
+              {MODULES.map(m => <span key={m} className="rounded-md bg-[#f4efff] px-2 py-0.5 text-[10px] font-bold text-[#6f54ba]">{m}</span>)}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Report scope"
+            value={sectionId}
+            onChange={e => setSectionId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
+            <option value="all">All sections</option>
+            {sections.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+          <button
+            onClick={download}
+            disabled={busy || students.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#7c5cf0] to-[#5a3fd4] px-4 py-2.5 text-sm font-black text-[#fff] shadow hover:brightness-110 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" /> {busy ? 'Building…' : 'Download Report (CSV / Excel)'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string; sub: string; color: string }) {
   const statStyles: Record<string, { card: string; border: string; iconWrap: string; iconColor: string }> = {
