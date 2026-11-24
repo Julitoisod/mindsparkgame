@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Gift } from 'lucide-react'
+import { BarChart3, CalendarDays, Crown, Gift, Lock, MapPin, Shield, Star, Trophy, Zap } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { characterOptions } from '@/lib/characterOptions'
 import { BADGES } from '@/lib/badges'
@@ -96,90 +96,99 @@ export default function DashboardProfilePage() {
   const remainingLevels = Math.max(0, 5 - completedCount)
 
   const charOption = characterOptions.find(c => c.class === character.class)
+  // Suggested design (Nov 24): every tile carries an icon badge
+  const tiles = [
+    { label: 'Class', value: character.class.charAt(0).toUpperCase() + character.class.slice(1), icon: Shield, badge: 'game-badge-gold' },
+    { label: 'Level', value: String(stats.level), icon: Star, badge: 'game-badge-blue' },
+    { label: 'Zone', value: String(progress?.currentZone ?? 1), icon: MapPin, badge: 'game-badge-green' },
+    { label: 'Member', value: new Date(user.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }), icon: CalendarDays, badge: 'game-badge-red' },
+    { label: 'Left', value: `${remainingLevels} lvls`, icon: Zap, badge: 'game-badge-gold' },
+  ]
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Scrollable content */}
       <div className="student-scroll-area px-3 py-4 space-y-4">
-        {/* Profile Header — keeps clear of the nav tray */}
-        <div className="student-page-head -mt-2 flex items-center gap-3">
-          <div className="relative shrink-0 h-14 w-14 rounded-xl overflow-hidden border-2 border-purple-400/30">
-            <Image
-              src={charOption?.imagePath ?? '/AVATAR CHARACTERS/3 AVATAR/2D-KNIGHT BOY CHARACTER/_PNG/1_KNIGHT_ AVATAR/Knight_01__IDLE_000.png'}
-              alt={character.class}
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-white font-game truncate">{character.name}</h2>
-            <p className="text-xs text-white/65 capitalize">{character.class} · Lvl {stats.level} · {completionPercent}%</p>
-            <div className="flex gap-3 mt-0.5">
-              <span className="text-[10px] text-white/50">{access.starBalance} stars</span>
-              <span className="text-[10px] text-white/50">{completedCount}/5 done</span>
+        {/* Hero header (suggested design, Nov 24): gold-framed portrait under a
+            crown, the name on a banner. Keeps clear of the nav tray. */}
+        <div className="student-page-head -mt-1 flex items-center">
+          <div className="relative z-10 shrink-0">
+            <Crown className="absolute -top-3.5 left-1/2 z-10 h-5 w-5 -translate-x-1/2 fill-[var(--ms-gold)] text-[color:var(--ms-gold-deep)]" />
+            <div className="game-panel game-panel-gold relative h-14 w-14 overflow-hidden rounded-xl">
+              <Image
+                src={charOption?.imagePath ?? '/AVATAR CHARACTERS/3 AVATAR/2D-KNIGHT BOY CHARACTER/_PNG/1_KNIGHT_ AVATAR/Knight_01__IDLE_000.png'}
+                alt={character.class}
+                fill
+                className="scale-[1.9] object-contain"
+                unoptimized
+              />
             </div>
+          </div>
+          <div className="game-panel -ml-2.5 min-w-0 rounded-l-none rounded-r-2xl py-1 pl-5 pr-4">
+            <h2 className="game-title truncate text-lg">{character.name}</h2>
+            <p className="flex items-center gap-1 text-[11px] font-bold capitalize text-[#ffe08a]">
+              <Crown className="h-3 w-3" /> {character.class} · Lvl {stats.level} · {completionPercent}%
+            </p>
+            <p className="flex items-center gap-1 text-[10px] font-semibold text-white/75">
+              <Star className="h-3 w-3 fill-[var(--ms-gold)] text-[color:var(--ms-gold)]" /> {access.starBalance} stars
+              <span className="text-white/35">|</span> {completedCount}/5 done
+            </p>
           </div>
         </div>
 
-        {/* Compact Stats Grid */}
+        {/* Stat tiles */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Class</p>
-            <p className="text-xs font-bold text-[#F4F2FF] capitalize mt-0.5">{character.class}</p>
-          </div>
-          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Level</p>
-            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{stats.level}</p>
-          </div>
-          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Zone</p>
-            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{progress?.currentZone ?? 1}</p>
-          </div>
-          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Member</p>
-            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{new Date(user.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-          </div>
-          <div className="rounded-lg border border-[#9B83F5]/15 bg-[#3459C7]/35 px-2 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-[#9B83F5]/70">Left</p>
-            <p className="text-xs font-bold text-[#F4F2FF] mt-0.5">{remainingLevels} lvls</p>
-          </div>
+          {tiles.map(({ label, value, icon: Icon, badge }) => (
+            <div key={label} className="game-panel flex min-w-0 items-center gap-2 px-2.5 py-1.5">
+              <span className={`game-badge ${badge} h-8 w-8`}><Icon className="h-4 w-4" /></span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-wider text-[#ffd76a]">{label}</p>
+                <p className="truncate text-sm font-black text-white">{value}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Progress */}
-        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-white font-game">Progress</span>
-            <span className="text-xs font-bold text-[#9B83F5]">{completedCount}/5</span>
+        {/* Progress: gold tab, gold bar, stars + completion */}
+        <div className="game-panel px-3 pb-2.5 pt-4">
+          <span className="game-pill-gold absolute -top-2.5 left-3 text-[11px]"><BarChart3 className="h-3.5 w-3.5" /> Progress</span>
+          <span className="game-pill-gold absolute -top-2.5 right-3 text-[11px]">{completedCount}/5</span>
+          <div className="h-2.5 overflow-hidden rounded-full border border-black/30 bg-[#081648]">
+            <div className="h-full rounded-full bg-gradient-to-r from-[var(--ms-gold-deep)] via-[var(--ms-gold)] to-[var(--ms-gold-light)] transition-all" style={{ width: `${completionPercent}%` }} />
           </div>
-          <div className="h-2 rounded-full bg-[#3459C7]/35 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#6255E8] to-[#9B83F5] transition-all" style={{ width: `${completionPercent}%` }} />
-          </div>
-          <div className="mt-3 grid grid-cols-2 divide-x divide-white/10">
-            <div className="text-center">
-              <p className="text-lg font-black text-white">{access.starBalance}</p>
-              <p className="text-[10px] text-white/50 uppercase">Stars</p>
+          <div className="mt-2 grid grid-cols-2 divide-x divide-white/15">
+            <div className="flex items-center justify-center gap-2">
+              <Star className="h-6 w-6 fill-[var(--ms-gold)] text-[color:var(--ms-gold-deep)]" />
+              <div className="leading-none">
+                <p className="game-title text-xl">{access.starBalance}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-[#ffd76a]">Stars</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-black text-white">{completionPercent}%</p>
-              <p className="text-[10px] text-white/50 uppercase">Complete</p>
+            <div className="flex items-center justify-center gap-2">
+              <Trophy className="h-6 w-6 fill-[var(--ms-gold)] text-[color:var(--ms-gold-deep)]" />
+              <div className="leading-none">
+                <p className="game-title text-xl">{completionPercent}%</p>
+                <p className="text-[9px] font-black uppercase tracking-wider text-[#ffd76a]">Complete</p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Owned classes */}
-        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3">
-          <p className="text-xs font-bold text-white/80 mb-2">Unlocked Classes</p>
+        <div className="game-panel game-panel-purple px-3 py-2">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-black text-white">
+            <span className="game-badge game-badge-gold h-5 w-5"><Lock className="h-3 w-3" /></span> Unlocked Classes
+          </p>
           {access.ownedClasses.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {access.ownedClasses.map(c => (
-                <span key={c} className="rounded-full border border-[#9B83F5]/20 bg-[#3459C7]/35 px-2.5 py-0.5 text-[10px] font-medium capitalize text-[#F4F2FF]">
+                <span key={c} className="rounded-full border border-[#93c5fd]/60 bg-gradient-to-b from-[#3b82f6] to-[#1d4ed8] px-2.5 py-0.5 text-[10px] font-black capitalize text-white">
                   {c}
                 </span>
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-white/40">No unlocked classes yet</p>
+            <p className="text-[10px] text-white/60">No unlocked classes yet</p>
           )}
         </div>
 
@@ -188,10 +197,10 @@ export default function DashboardProfilePage() {
             placeholder (name@student.mindspark) that only confused them. */}
 
         {/* Rewards — trophies and badges grouped under one heading (panel revision, Nov 2026b) */}
-        <section className="rounded-lg border border-amber-400/25 bg-[#22326f]/55 p-3" data-testid="profile-rewards">
+        <section className="game-panel p-3" data-testid="profile-rewards">
           <div className="mb-2 flex items-center gap-1.5">
             <Gift className="h-4 w-4 text-amber-300" />
-            <h3 className="font-game text-sm font-black text-white">Rewards</h3>
+            <h3 className="game-title text-base">Rewards</h3>
           </div>
           <div className="space-y-2">
           {/* Trophies — one per boss defeated (Nov 2026); shown before badges */}
@@ -235,7 +244,7 @@ export default function DashboardProfilePage() {
         </section>
 
         {/* Change Password — students manage their own password (Nov 2026) */}
-        <div className="rounded-lg border border-[#9B83F5]/15 bg-[#22326f]/55 p-3" data-testid="student-change-password">
+        <div className="game-panel p-3" data-testid="student-change-password">
           <p className="text-xs font-bold text-white/80">Change Password</p>
           <p className="mb-2 text-[10px] text-white/50">Pick a password only you know.</p>
           <ChangePasswordForm tone="dark" />

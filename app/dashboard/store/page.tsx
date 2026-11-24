@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Star, Unlock, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, Unlock, Loader2, Check, ChevronLeft, ChevronRight, Heart, Sword, Swords, Wind } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { useAuth } from '@/hooks/useAuth'
+import ScreenTitle from '@/components/game/ScreenTitle'
 import { characterOptions, getCharacterOption } from '@/lib/characterOptions'
 
 import type { CharacterClass, CharacterData } from '@/types/character'
@@ -126,140 +127,132 @@ export default function DashboardStorePage() {
     )
   }
 
+  const statRows = [
+    { label: 'HP', icon: Heart, value: currentOption.stats.maxHp, pct: hpPct, bar: 'from-[#86efac] to-[#16a34a]', iconClass: 'fill-[#f87171] text-[#dc2626]' },
+    { label: 'ATK', icon: Swords, value: currentOption.stats.attack, pct: atkPct, bar: 'from-[#a5f3fc] to-[#0ea5e9]', iconClass: 'text-[#67e8f9]' },
+    { label: 'SPD', icon: Wind, value: currentOption.stats.speed, pct: spdPct, bar: 'from-[#ddd6fe] to-[#7c3aed]', iconClass: 'text-[#c4b5fd]' },
+  ]
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="student-page-head flex items-center justify-between gap-3 px-4 pt-1 shrink-0">
-        <div>
-          {/* "Store" label removed, title renamed (panel revision, Nov 2026b) */}
-          <h2 className="font-game text-lg font-black">Unlock Avatar</h2>
+      {/* Header (suggested design, Nov 24): back, star badge, title, star count.
+          "Store" label removed, title renamed (panel revision, Nov 2026b) */}
+      <div className="shrink-0 px-3 pt-1">
+        <ScreenTitle title="Unlock Avatar" icon={Star}>
+          <span data-testid="star-balance" className="flex shrink-0 items-center gap-1.5 rounded-full border-2 border-[#a78bfa]/70 bg-[#2a1466]/85 px-2.5 py-0.5 shadow-md">
+            <Star className="h-4 w-4 fill-[var(--ms-gold)] text-[color:var(--ms-gold-deep)]" />
+            <span className="text-sm font-black text-white">{access.starBalance}</span>
+          </span>
+        </ScreenTitle>
+      </div>
+
+      {/* Info card + the hero on a pedestal over the kingdom art */}
+      <div className="flex min-h-0 flex-1 gap-2 px-3 pb-1 pt-1.5">
+        <div
+          className="game-panel flex w-[54%] min-w-0 flex-col justify-between gap-1.5 px-3 py-2"
+          style={{
+            borderColor: theme.accent,
+            boxShadow: current ? `0 0 18px ${theme.accent}66, inset 0 1px 0 rgba(255,255,255,0.22)` : undefined,
+          }}
+        >
+          <div>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/40 px-2.5 py-0.5 text-[11px] font-black tracking-widest text-white shadow"
+              style={{ background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent}99)` }}
+            >
+              <Sword className="h-3.5 w-3.5" /> {theme.label}
+            </span>
+            <h3 className="game-title mt-1 text-2xl">{currentOption.label}</h3>
+            <div className="mt-0.5 flex items-center gap-0.5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-4 w-4 ${i < theme.rarity ? 'fill-[var(--ms-gold)] text-[color:var(--ms-gold-deep)]' : 'text-white/25'}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Stats: icon, coloured bar, value */}
+          <div className="space-y-1">
+            {statRows.map(({ label, icon: Icon, value, pct, bar, iconClass }) => (
+              <div key={label} className="flex items-center gap-2">
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
+                <span className="w-7 text-[10px] font-black text-white/80">{label}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full border border-black/30 bg-[#081648]">
+                  <div className={`h-full rounded-full bg-gradient-to-r ${bar}`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="w-7 text-right text-[11px] font-black text-white">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="line-clamp-2 text-center text-[11px] italic leading-snug text-white/80">{currentOption.description}</p>
+
+          {/* Action: the gold-framed button */}
+          <div className="px-3">
+            {owned ? (
+              current ? (
+                <div role="status" className="game-btn-gold w-full py-1 text-base">
+                  <Check className="h-5 w-5 text-[#4ade80]" strokeWidth={3} /> Equipped
+                </div>
+              ) : (
+                // Owned characters switch for free — a full-size button, like Unlock
+                <button
+                  onClick={() => handlePurchase(currentOption.class)}
+                  disabled={purchasing === currentOption.class}
+                  className="game-btn-gold w-full py-1 text-sm"
+                >
+                  {purchasing === currentOption.class
+                    ? <><Loader2 className="h-4 w-4 animate-spin" />Switching...</>
+                    : <><Check className="h-4 w-4" />Owned — Use this hero</>}
+                </button>
+              )
+            ) : (
+              <button
+                onClick={() => handlePurchase(currentOption.class)}
+                disabled={purchasing === currentOption.class || access.starBalance < price}
+                className="game-btn-gold w-full py-1 text-sm"
+              >
+                {purchasing === currentOption.class ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Unlocking...</>
+                ) : access.starBalance < price ? (
+                  <><Star className="h-4 w-4" />Need {price} stars</>
+                ) : (
+                  <><Unlock className="h-4 w-4" />Unlock for {price} stars</>
+                )}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-purple-900/40 backdrop-blur-md px-3 py-1.5">
-          <Star className="h-4 w-4 fill-current text-purple-300" />
-          <span className="text-sm font-black text-purple-300">{access.starBalance}</span>
+
+        {/* Showcase */}
+        <div className="character-showcase" style={{ color: theme.accent }}>
+          <span className="game-pedestal" aria-hidden />
+          <Image
+            src={currentOption.imagePath}
+            alt={currentOption.label}
+            width={220}
+            height={220}
+            className="character-sprite"
+            unoptimized
+          />
         </div>
       </div>
 
-      {/* Carousel */}
-      <div className="flex-1 flex flex-col min-h-0 px-4 pb-2">
-        <div
-          className="flex-1 min-h-0 rounded-xl border-2 overflow-hidden relative flex"
-          style={{
-            borderColor: current ? theme.accent : `${theme.accent}88`,
-            background: theme.bgColor,
-            boxShadow: current ? `0 0 24px ${theme.accent}44, inset 0 0 24px ${theme.accent}22` : 'none',
-          }}
-        >
-          {/* Left: Info */}
-          <div className="flex-1 flex flex-col p-3 min-w-0 gap-2 justify-between">
-            <div>
-              <p className={`text-[9px] font-black uppercase tracking-widest ${theme.labelColor}`}>{theme.label}</p>
-              <h3 className="text-lg font-black text-white leading-tight mt-0.5">{currentOption.label}</h3>
-              <div className="flex items-center gap-0.5 mt-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-3 w-3 ${i < theme.rarity ? 'fill-yellow-400 text-yellow-400' : 'text-white/20'}`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="w-6 text-[9px] font-black text-white/50">HP</span>
-                <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${hpPct}%`, background: theme.accent }} />
-                </div>
-                <span className="text-[10px] font-black text-white w-5 text-right">{currentOption.stats.maxHp}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-6 text-[9px] font-black text-white/50">ATK</span>
-                <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${atkPct}%`, background: theme.accent }} />
-                </div>
-                <span className="text-[10px] font-black text-white w-5 text-right">{currentOption.stats.attack}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-6 text-[9px] font-black text-white/50">SPD</span>
-                <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${spdPct}%`, background: theme.accent }} />
-                </div>
-                <span className="text-[10px] font-black text-white w-5 text-right">{currentOption.stats.speed}</span>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[11px] text-white/70 leading-snug line-clamp-3">{currentOption.description}</p>
-            </div>
-
-            {/* Action */}
-            <div className="mt-1">
-              {owned ? (
-                current ? (
-                  <div className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-[#9B83F5]/60 bg-white/10 py-2 text-sm font-black text-[#D9B8FF]">
-                    <Check className="h-4 w-4" /> Equipped
-                  </div>
-                ) : (
-                  // Owned characters switch for free — a full-size button, like Buy
-                  <button
-                    onClick={() => handlePurchase(currentOption.class)}
-                    disabled={purchasing === currentOption.class}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 py-2 text-sm font-black text-white transition hover:bg-white/10 disabled:opacity-50"
-                    style={{ borderColor: theme.accent }}
-                  >
-                    {purchasing === currentOption.class
-                      ? <><Loader2 className="h-4 w-4 animate-spin" />Switching...</>
-                      : <><Check className="h-4 w-4" />Owned — Use this hero</>}
-                  </button>
-                )
-              ) : (
-                <button
-                  onClick={() => handlePurchase(currentOption.class)}
-                  disabled={purchasing === currentOption.class || access.starBalance < price}
-                  className="w-full rounded-lg border-2 py-2 text-sm font-black text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center gap-2"
-                  style={{ borderColor: theme.accent }}
-                >
-                  {purchasing === currentOption.class ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Unlocking...</>
-                  ) : access.starBalance < price ? (
-                    <><Star className="h-4 w-4" />Need {price} stars</>
-                  ) : (
-                    <><Unlock className="h-4 w-4" />Unlock for {price} stars</>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Sprite */}
-          <div className="character-showcase" style={{ color: theme.accent }}>
-            <Image
-              src={currentOption.imagePath}
-              alt={currentOption.label}
-              width={220}
-              height={220}
-              className="character-sprite"
-              unoptimized
-            />
-          </div>
+      {/* Navigation dots + arrows */}
+      <div className="shrink-0 flex items-center justify-between px-3 pb-1.5">
+        <button onClick={() => setCurrentIndex(i => i - 1)} disabled={!canPrev} aria-label="Previous avatar" className="game-badge game-badge-blue h-8 w-8 disabled:opacity-30">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <div className="flex gap-1.5">
+          {characterOptions.map((option, i) => (
+            <button key={i} onClick={() => setCurrentIndex(i)} aria-label={`Show ${option.label}`} className={`h-2 rounded-full transition-all ${i === currentIndex ? 'w-5 bg-white' : 'w-2 bg-white/40'}`} />
+          ))}
         </div>
-
-        {/* Navigation dots + arrows */}
-        <div className="shrink-0 flex items-center justify-between py-2">
-          <button onClick={() => setCurrentIndex(i => i - 1)} disabled={!canPrev} className="h-9 w-9 rounded-full bg-white/10 flex items-center justify-center disabled:opacity-30 text-white">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <div className="flex gap-1.5">
-            {characterOptions.map((_, i) => (
-              <button key={i} onClick={() => setCurrentIndex(i)} className={`h-2 rounded-full transition-all ${i === currentIndex ? 'w-5 bg-white' : 'w-2 bg-white/30'}`} />
-            ))}
-          </div>
-          <button onClick={() => setCurrentIndex(i => i + 1)} disabled={!canNext} className="h-9 w-9 rounded-full bg-white/10 flex items-center justify-center disabled:opacity-30 text-white">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
+        <button onClick={() => setCurrentIndex(i => i + 1)} disabled={!canNext} aria-label="Next avatar" className="game-badge game-badge-blue h-8 w-8 disabled:opacity-30">
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
     </div>
   )

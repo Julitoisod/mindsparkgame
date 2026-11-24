@@ -7,7 +7,7 @@
  *   1. npm run dev
  *   2. node scripts/check-app-fit.mjs
  *
- * List screens (profile, store, attempts) scroll on purpose — their content
+ * List screens (profile, store, leaderboard, attempts) scroll on purpose — their content
  * grows with the student's progress — so they are measured but not enforced.
  */
 import puppeteer from 'puppeteer-core'
@@ -98,7 +98,7 @@ await wait(2000)
 await clickText('Skip')
 await measure('game-map')
 
-for (const screen of ['profile', 'store', 'attempts']) {
+for (const screen of ['profile', 'store', 'leaderboard', 'attempts']) {
   await page.goto(`${BASE}/dashboard/${screen}`, { waitUntil: 'networkidle2' })
   await measure(screen, { enforce: false }) // long lists scroll by design
 }

@@ -65,10 +65,10 @@ check(dl.status === 200, 'teacher sets a Level 1 deadline (level + date + time)'
 // ════ Account APIs ════
 const sBox = { v: '' }
 await api(sBox, '/api/auth/login', { identifier: student, password: STUDENT_PASS })
-check((await api(sBox, '/api/account', { fullName: 'Hacker' }, 'PATCH')).status === 403, 'a student cannot edit account details')
+check((await api(sBox, '/api/account', { lastName: 'Hacker', firstName: 'X' }, 'PATCH')).status === 403, 'a student cannot edit account details')
 check((await api(sBox, '/api/account/password', { currentPassword: 'wrong-pass1', newPassword: 'hero54321x' })).status === 403,
   'password change refuses a wrong current password')
-check((await api(tBox, '/api/account', { fullName: 'Flora Teacher' }, 'PATCH')).json.data?.fullName === 'Flora Teacher', 'teacher edits own account information')
+check((await api(tBox, '/api/account', { lastName: 'Teacher', firstName: 'Flora' }, 'PATCH')).json.data?.fullName === 'Flora Teacher', 'teacher edits own account information')
 
 const aBox = { v: '' }
 await api(aBox, '/api/auth/login', { identifier: process.env.ADMIN_USER ?? 'admin', password: process.env.ADMIN_PASS ?? 'Admin@12345' })
@@ -303,11 +303,8 @@ check(states[0] === true && states.slice(1).every(s => s === false), 'the Play A
 await db.query('INSERT IGNORE INTO character_unlocks (user_id, class, cost_stars) VALUES (?, ?, 10)', [enrolled.id, 'mage'])
 await page.goto(`${BASE}/dashboard/store`, { waitUntil: 'networkidle2' })
 await wait(1800)
-const starPill = await page.evaluate(() => {
-  const el = [...document.querySelectorAll('span')].find(s => /^\d+$/.test(s.textContent?.trim() ?? '') && s.parentElement?.querySelector('svg'))?.parentElement
-  const r = el?.getBoundingClientRect()
-  return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null
-})
+// a test id, not a span/div guess: the Nov 24 reskin made the pill itself a <span>
+const starPill = await rect('[data-testid="star-balance"]')
 check(starPill && !overlaps(starPill, await rect('.student-nav-rail')), 'store star balance is visible (not under the nav)')
 await page.evaluate(() => document.querySelectorAll('button')[0] && [...document.querySelectorAll('button')].filter(b => b.querySelector('svg.lucide-chevron-right'))[0]?.click())
 await wait(700)
@@ -359,7 +356,7 @@ await wait(800)
 const loginText = await text()
 check(!/Create teacher account/i.test(loginText) && !/Student sign in/i.test(loginText), 'sign-in page: no teacher sign-up, no student link')
 await shot('t01-sign-in')
-await page.type('input[placeholder="hero123"]', teacher)
+await page.type('#portal-email', `${teacher}@mindspark.test`)
 await page.type('input[type="password"]', TEACHER_PASS)
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), clickText('Sign In')])
 check(await waitFor(async () => /Level Performance/.test(await text()), 20000), 'teacher lands on the new dashboard')
@@ -425,7 +422,7 @@ await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 })
 page.on('dialog', d => d.accept())
 // Nov 2026 adviser request: the admin has its own link, separate from teachers
 await page.goto(`${BASE}/admin-login`, { waitUntil: 'networkidle2' })
-await page.type('input[placeholder="hero123"]', process.env.ADMIN_USER ?? 'admin')
+await page.type('#portal-email', process.env.ADMIN_EMAIL ?? 'admin@mindspark.local')
 await page.type('input[type="password"]', process.env.ADMIN_PASS ?? 'Admin@12345')
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), clickText('Sign In')])
 check(await waitFor(async () => page.url().includes('/admin/dashboard') && /Recent Activities/.test(await text()), 15000), 'admin signs in on its own /admin-login link and lands on the admin dashboard')

@@ -1,18 +1,21 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Filter, History, Search, XCircle } from 'lucide-react'
+import { Castle, Check, Clock, Gem, Landmark, Lock, MoonStar, Play, Search, Target, Trees, X } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useGame } from '@/hooks/useGame'
+import ScreenTitle from '@/components/game/ScreenTitle'
 import type { CharacterData } from '@/types/character'
 
+// Suggested design (Nov 24): each level has its own hexagon colour and a
+// faint silhouette of its place
 const levelNodes = [
-  { id: 1, title: 'Forest Gate', topic: 'Fraction, Decimal & Solid Quest' },
-  { id: 2, title: 'Crystal Bridge', topic: 'Prisms, Pyramids & Nets' },
-  { id: 3, title: 'Elven Ruins', topic: 'Surface Area Builders' },
-  { id: 4, title: 'Moonlit Keep', topic: 'Surface Area Problem Solvers' },
-  { id: 5, title: 'Oracle Tower', topic: 'Volume Estimation Challenge' },
+  { id: 1, title: 'Forest Gate', topic: 'Fraction, Decimal & Solid Quest', badge: 'game-badge-blue', scene: Trees },
+  { id: 2, title: 'Crystal Bridge', topic: 'Prisms, Pyramids & Nets', badge: 'game-badge-purple', scene: Gem },
+  { id: 3, title: 'Elven Ruins', topic: 'Surface Area Builders', badge: 'game-badge-orange', scene: Landmark },
+  { id: 4, title: 'Moonlit Keep', topic: 'Surface Area Problem Solvers', badge: 'game-badge-purple', scene: MoonStar },
+  { id: 5, title: 'Oracle Tower', topic: 'Volume Estimation Challenge', badge: 'game-badge-teal', scene: Castle },
 ]
 
 type Attempt = {
@@ -104,56 +107,73 @@ export default function DashboardAttemptsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Fixed Header */}
-      <div className="shrink-0 px-3 pt-2 pb-1">
-        <div className="student-page-head flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-purple-300" />
-            <h2 className="font-game text-base font-black">Attempts</h2>
+      {/* Header: back, target badge, title, search (and the level filter, when one is on) */}
+      <div className="shrink-0 px-3 pb-1 pt-1.5">
+        <ScreenTitle title="Attempts" icon={Target} badge="game-badge-red">
+          <div className="ml-auto flex min-w-0 items-center gap-1.5 rounded-full border-2 border-[color:var(--ms-edge)] bg-[#0c1f63]/85 px-2.5 py-1">
+            <Search className="h-3.5 w-3.5 shrink-0 text-[#93c5fd]" />
+            <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="w-24 min-w-0 bg-transparent text-xs text-white placeholder-[#93c5fd]/70 focus:outline-none" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => setFilterLevel(null)} className="rounded-md bg-purple-700/40 p-1.5 transition hover:bg-purple-700/60">
-              <Filter className="h-3.5 w-3.5 text-fuchsia-400" />
+          {filterLevel && (
+            <button type="button" onClick={() => setFilterLevel(null)} aria-label="Show every level" className="game-pill-gold shrink-0 text-[10px]">
+              Lv.{filterLevel} <X className="h-3 w-3" />
             </button>
-            <div className="flex items-center gap-1.5 rounded-md bg-[#3459C7]/45 px-2.5 py-1">
-              <Search className="h-3.5 w-3.5 text-purple-400" />
-              <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="w-20 bg-transparent text-xs text-white placeholder-purple-400/60 focus:outline-none" />
-            </div>
-          </div>
-        </div>
+          )}
+        </ScreenTitle>
       </div>
 
       {/* Scrollable Content */}
       <div className="student-scroll-area px-3 pb-2">
-        {/* Level Overview */}
-        <div className="grid gap-1.5 mb-3">
+        {/* Level Overview: a row filters the history to that level */}
+        <div className="mb-2.5 grid gap-1.5">
           {levelNodes.map(level => {
             const complete = completedLevels.includes(level.id)
-            // Completing Level 1 opens Levels 2–5 (same rule as the map)
+            // Completing Level 1 opens Levels 2-5 (same rule as the map)
             const open = !complete && (level.id === 1 || completedLevels.includes(1))
+            const selected = filterLevel === level.id
+            const Scene = level.scene
             return (
-              <div key={level.id} onClick={() => setFilterLevel(filterLevel === level.id ? null : level.id)} className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer transition ${filterLevel === level.id ? 'border-purple-400/40 bg-purple-800/40' : 'border-purple-400/15 bg-purple-950/30'}`}>
-                <div className="min-w-0">
-                  <p className="text-xs font-black truncate">Lvl {level.id}: {level.title}</p>
-                  <p className="text-[10px] text-purple-200 truncate">{level.topic}</p>
-                </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${complete ? 'bg-[#6255E8] text-[#faf5ff]' : open ? 'bg-purple-800/40 text-purple-100' : 'bg-purple-900/40 text-purple-300'}`}>
-                  {complete ? 'Done' : open ? 'Ready' : 'Lock'}
+              <button
+                type="button"
+                key={level.id}
+                onClick={() => setFilterLevel(selected ? null : level.id)}
+                aria-pressed={selected}
+                className={`game-panel flex w-full items-center gap-3 overflow-hidden px-2.5 py-1.5 text-left transition hover:brightness-110 ${selected ? 'game-panel-gold' : ''}`}
+              >
+                <span className={`game-hex ${level.badge} h-9 w-11 text-[11px]`}>Lv.{level.id}</span>
+                <span className="h-7 w-px shrink-0 bg-white/25" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-black text-white">{level.title}</span>
+                  <span className="block truncate text-[10px] italic text-[#bfdbfe]">{level.topic}</span>
                 </span>
-              </div>
+                <Scene className="pointer-events-none absolute right-24 top-1/2 h-12 w-12 -translate-y-1/2 text-white/15" aria-hidden />
+                {complete ? (
+                  <span className="relative flex shrink-0 items-center gap-1 rounded-full border border-[#bbf7d0]/70 bg-gradient-to-b from-[#4ade80] to-[#15803d] px-2.5 py-0.5 text-[10px] font-black uppercase text-white shadow">
+                    <Check className="h-3 w-3" strokeWidth={3} /> Done
+                  </span>
+                ) : open ? (
+                  <span className="game-pill-gold relative shrink-0 text-[10px] uppercase">
+                    <Play className="h-3 w-3 fill-current" /> Ready
+                  </span>
+                ) : (
+                  <span className="relative flex shrink-0 items-center gap-1 rounded-full border border-white/20 bg-[#334155]/85 px-2.5 py-0.5 text-[10px] font-black uppercase text-white/75">
+                    <Lock className="h-3 w-3" /> Lock
+                  </span>
+                )}
+              </button>
             )
           })}
         </div>
 
         {/* History */}
         {attemptsLoading ? (
-          <div className="py-6 text-center text-xs text-purple-300/60">Loading attempts...</div>
+          <div className="py-6 text-center text-xs text-white/80">Loading attempts...</div>
         ) : attempts.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-purple-400/30 p-6 text-center text-xs text-purple-100/50">
+          <div className="game-panel border-dashed p-5 text-center text-xs text-white/80">
             No attempts yet. Play the quiz to see history.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {attempts
               .filter(a =>
                 !search ||
@@ -163,21 +183,21 @@ export default function DashboardAttemptsPage() {
               .map(attempt => {
                 const correct = Boolean(attempt.isCorrect)
                 return (
-                  <div key={attempt.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${correct ? 'border-green-200/60 bg-green-50/10' : 'border-red-200/60 bg-red-50/5'}`}>
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow-md ${correct ? 'bg-green-500' : 'bg-red-500'}`}>
-                      {correct ? <CheckCircle2 className="h-5 w-5 text-white" /> : <XCircle className="h-5 w-5 text-white" />}
-                    </div>
+                  <div key={attempt.id} className="game-panel flex items-center gap-3 px-3 py-1.5">
+                    <span className={`game-badge ${correct ? 'game-badge-green' : 'game-badge-red'} h-9 w-9`}>
+                      {correct ? <Check className="h-5 w-5" strokeWidth={3} /> : <X className="h-5 w-5" strokeWidth={3} />}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-black ${correct ? 'text-green-400' : 'text-red-400'}`}>{correct ? 'Correct' : 'Wrong'}</span>
-                        <span className="rounded-full bg-white/10 px-1.5 text-[9px] font-bold uppercase text-white/60">{attempt.phase === 'boss' ? 'Boss' : 'Quiz'}</span>
-                        <span className="text-[10px] text-white/40">{formatDate(attempt.attemptedAt)}</span>
+                        <span className={`text-sm font-black ${correct ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>{correct ? 'Correct' : 'Wrong'}</span>
+                        <span className={`rounded-full px-1.5 py-px text-[9px] font-black uppercase text-white ${attempt.phase === 'boss' ? 'bg-[#7c3aed]' : 'bg-[#1d4ed8]'}`}>{attempt.phase === 'boss' ? 'Boss' : 'Quiz'}</span>
+                        <span className="text-[10px] text-white/70">{formatDate(attempt.attemptedAt)}</span>
                       </div>
-                      <p className="text-[10px] text-white/50 truncate">{getLevelTitle(attempt.levelNumber)}</p>
+                      <p className="truncate text-[10px] text-white/70">{getLevelTitle(attempt.levelNumber)}</p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-base font-black leading-none ${correct ? 'text-green-400' : 'text-red-400'}`}>{attempt.scoreEarned > 0 ? `+${attempt.scoreEarned}` : '0'}</p>
-                      <p className="text-[10px] text-white/40">{formatTime(attempt.attemptedAt)}</p>
+                    <div className="shrink-0 text-right">
+                      <p className={`text-lg font-black leading-none ${correct ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>{attempt.scoreEarned > 0 ? `+${attempt.scoreEarned}` : '0'}</p>
+                      <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-white/70"><Clock className="h-3 w-3" /> {formatTime(attempt.attemptedAt)}</p>
                     </div>
                   </div>
                 )
