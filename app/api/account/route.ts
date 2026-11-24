@@ -2,8 +2,10 @@
  * The signed-in user's own account (panel revision, Nov 2026).
  *
  * GET   /api/account   profile for "My Profile" (any role)
- * PATCH /api/account   { fullName?, username?, email? } — "Edit Account
- *                      Information". Teachers and admins only: a student's
+ * PATCH /api/account   { lastName?, firstName?, middleName?, username?, email? }
+ *                      — "Edit Account Information" (names as Last / First /
+ *                      Middle since the Nov 24 pahabol; full_name is composed
+ *                      from them). Teachers and admins only: a student's
  *                      details come from the Registrar list and stay with the
  *                      teacher; a student can only change their password.
  */
@@ -11,11 +13,16 @@ import { NextResponse } from 'next/server'
 import { describeDbError, execute, query } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { emailError, usernameError } from '@/lib/validations'
+import { composeFullName } from '@/lib/enrollment'
+import { namePartsOf, readNameParts } from '@/lib/classList'
 
 type AccountRow = {
   id: number
   username: string
   fullName: string | null
+  lastName: string | null
+  firstName: string | null
+  middleName: string | null
   email: string
   role: 'admin' | 'teacher' | 'student'
   createdAt: string
@@ -27,6 +34,7 @@ type AccountRow = {
 async function readAccount(userId: number) {
   const rows = await query<AccountRow>(
     `SELECT u.id, u.username, u.full_name AS fullName, u.email, u.role,
+            u.last_name AS lastName, u.first_name AS firstName, u.middle_name AS middleName,
             u.created_at AS createdAt, u.updated_at AS updatedAt,
             (SELECT COUNT(*) FROM classrooms c WHERE c.teacher_id = u.id) AS sectionCount,
             (SELECT COUNT(*) FROM users s WHERE s.enrolled_by = u.id AND s.role = 'student') AS studentCount
@@ -35,7 +43,7 @@ async function readAccount(userId: number) {
   )
   if (!rows.length) return null
   const row = rows[0]
-  return { ...row, sectionCount: Number(row.sectionCount), studentCount: Number(row.studentCount) }
+  return { ...row, ...namePartsOf(row), sectionCount: Number(row.sectionCount), studentCount: Number(row.studentCount) }
 }
 
 export async function GET() {
@@ -69,10 +77,12 @@ export async function PATCH(request: Request) {
   const updates: string[] = []
   const params: (string | number | null)[] = []
 
-  if (typeof body.fullName === 'string') {
-    const fullName = body.fullName.trim().slice(0, 120)
-    updates.push('full_name = ?')
-    params.push(fullName || null)
+  const names = readNameParts(body, { required: true })
+  if (names && 'error' in names) return NextResponse.json({ success: false, message: names.error }, { status: 400 })
+  if (names) {
+    const { lastName, firstName, middleName } = names.parts
+    updates.push('last_name = ?', 'first_name = ?', 'middle_name = ?', 'full_name = ?')
+    params.push(lastName, firstName, middleName || null, composeFullName(firstName, middleName, lastName))
   }
   if (typeof body.username === 'string' && body.username.trim() !== current.username) {
     const username = body.username.trim()

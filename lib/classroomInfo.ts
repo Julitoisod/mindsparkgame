@@ -4,6 +4,10 @@
  * classroom per teacher — e.g. "Grade 5 Mathematics", SY 2026-2027 — holding
  * their sections.
  *
+ * Pahabol (Nov 24): "Classroom Name" gave way to the section (the teacher
+ * edits section names in Update Classroom), so the classroom's title is no
+ * longer typed in: it is the grade level's subject, e.g. "Grade 5 Mathematics".
+ *
  * The table creates itself on first use (CREATE TABLE IF NOT EXISTS), so a
  * deploy can never outrun a hand-applied migration — schema drift is this
  * project's #1 failure mode. database/schema.sql carries the same table.
@@ -12,6 +16,7 @@ import { execute, query } from '@/lib/db'
 import { currentSchoolYear } from '@/lib/enrollment'
 
 export interface ClassroomInfo {
+  /** Derived from gradeLevel by classroomTitle(), never typed in */
   name: string
   gradeLevel: string
   schoolYear: string
@@ -21,8 +26,10 @@ export interface ClassroomInfo {
 export const GRADE_LEVELS = ['Grade 4', 'Grade 5', 'Grade 6'] as const
 const SCHOOL_YEAR_PATTERN = /^(\d{4})-(\d{4})$/
 
+export const classroomTitle = (gradeLevel: string) => `${gradeLevel} Mathematics`
+
 export const defaultClassroom = (): ClassroomInfo => ({
-  name: 'Grade 5 Mathematics',
+  name: classroomTitle('Grade 5'),
   gradeLevel: 'Grade 5',
   schoolYear: currentSchoolYear(),
   isActive: true,
@@ -48,7 +55,7 @@ function ensureTable(): Promise<void> {
   return ensured
 }
 
-type Row = { teacherId: number; name: string; gradeLevel: string; schoolYear: string | null; isActive: number }
+type Row = { teacherId: number; gradeLevel: string; schoolYear: string | null; isActive: number }
 
 /** Classroom info per teacher id; teachers who never saved one get the default. */
 export async function getClassroomInfo(teacherIds: readonly number[]): Promise<Map<number, ClassroomInfo>> {
@@ -56,13 +63,13 @@ export async function getClassroomInfo(teacherIds: readonly number[]): Promise<M
   if (teacherIds.length === 0) return result
   await ensureTable()
   const rows = await query<Row>(
-    `SELECT teacher_id AS teacherId, name, grade_level AS gradeLevel, school_year AS schoolYear, is_active AS isActive
+    `SELECT teacher_id AS teacherId, grade_level AS gradeLevel, school_year AS schoolYear, is_active AS isActive
        FROM teacher_classrooms WHERE teacher_id IN (${teacherIds.map(() => '?').join(',')})`,
     [...teacherIds],
   )
   for (const row of rows) {
     result.set(row.teacherId, {
-      name: row.name,
+      name: classroomTitle(row.gradeLevel),
       gradeLevel: row.gradeLevel,
       schoolYear: row.schoolYear ?? currentSchoolYear(),
       isActive: Boolean(row.isActive),
@@ -74,9 +81,6 @@ export async function getClassroomInfo(teacherIds: readonly number[]): Promise<M
 /** Validates an update; returns the cleaned info or a field → message map. */
 export function validateClassroomInfo(body: Record<string, unknown>): { info: ClassroomInfo } | { errors: Record<string, string> } {
   const errors: Record<string, string> = {}
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
-  if (name.length < 2 || name.length > 80) errors.name = 'Classroom name must be 2-80 characters.'
-
   const gradeLevel = typeof body.gradeLevel === 'string' ? body.gradeLevel : ''
   if (!(GRADE_LEVELS as readonly string[]).includes(gradeLevel)) errors.gradeLevel = 'Choose a grade level.'
 
@@ -87,7 +91,7 @@ export function validateClassroomInfo(body: Record<string, unknown>): { info: Cl
   if (typeof body.isActive !== 'boolean') errors.isActive = 'Status must be active or inactive.'
 
   if (Object.keys(errors).length) return { errors }
-  return { info: { name, gradeLevel, schoolYear, isActive: body.isActive as boolean } }
+  return { info: { name: classroomTitle(gradeLevel), gradeLevel, schoolYear, isActive: body.isActive as boolean } }
 }
 
 export async function saveClassroomInfo(teacherId: number, info: ClassroomInfo): Promise<void> {

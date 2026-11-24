@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { bestRun, runScore, splitRuns, RUN_GAP_MS } from '../lib/runs.ts'
 import { isBossDefeated, levelPoints, levelStarRating, trophyLevels } from '../lib/scoring.ts'
-import { parseClassList } from '../lib/classList.ts'
+import { namePartsOf, parseClassList, readNameParts, splitFullName } from '../lib/classList.ts'
 
 const t0 = Date.UTC(2026, 10, 6, 2, 9, 30) // 10:09:30 PH time — a run that crosses 10:10
 let id = 1
@@ -91,5 +91,23 @@ assert.deepEqual(tabbed.students[1], { lastName: 'Fernandez', firstName: 'Kyle',
 
 // No usable header → a clear error, not a silent empty list
 assert.match(parseClassList('foo,bar\n1,2\n').error ?? '', /Last Name/)
+
+// ── Last / First / Middle for the account forms (pahabol, Nov 24) ─────────────
+// "First M. Last": the initial before the surname is the middle name
+assert.deepEqual(splitFullName('Shea L. Manzano'), { lastName: 'Manzano', firstName: 'Shea', middleName: 'L.' })
+assert.deepEqual(splitFullName('Juan C. Dela Cruz'), { lastName: 'Dela Cruz', firstName: 'Juan', middleName: 'C.' })
+assert.deepEqual(splitFullName('Mary Rose Lopez'), { lastName: 'Lopez', firstName: 'Mary Rose', middleName: '' })
+assert.deepEqual(splitFullName('A Santos'), { lastName: 'Santos', firstName: 'A', middleName: '' })
+assert.deepEqual(splitFullName('Flora'), { lastName: '', firstName: 'Flora', middleName: '' })
+// stored parts win; an older account falls back to its full_name
+assert.deepEqual(namePartsOf({ lastName: 'Lopez', firstName: 'Mary Rose', middleName: null, fullName: 'whatever' }), { lastName: 'Lopez', firstName: 'Mary Rose', middleName: '' })
+assert.deepEqual(namePartsOf({ lastName: null, firstName: null, middleName: null, fullName: 'System Administrator' }), { lastName: 'Administrator', firstName: 'System', middleName: '' })
+assert.deepEqual(namePartsOf({ lastName: null, firstName: null, middleName: null, fullName: null }), { lastName: '', firstName: '', middleName: '' })
+// request bodies
+assert.equal(readNameParts({ email: 'x@y.z' }), null)
+assert.deepEqual(readNameParts({ lastName: '  Dela   Cruz ', firstName: 'Ana', middleName: ' R. ' }), { parts: { lastName: 'Dela Cruz', firstName: 'Ana', middleName: 'R.' } })
+assert.deepEqual(readNameParts({ lastName: 'Cruz', firstName: '' }), { parts: { lastName: 'Cruz', firstName: '', middleName: '' } })
+assert.deepEqual(readNameParts({ lastName: 'Cruz', firstName: ' ' }, { required: true }), { error: 'Last name and first name are required.' })
+assert.deepEqual(readNameParts({ lastName: 'x'.repeat(61), firstName: 'Ana' }), { error: 'Each name part must be 60 characters or fewer.' })
 
 console.log('check-runs: all assertions passed')

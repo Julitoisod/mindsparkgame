@@ -4,6 +4,7 @@
  * add, view, edit, reset password, activate and deactivate teacher accounts.
  * Deactivating keeps their sections, students and questions; it only blocks
  * sign-in. Teachers can no longer sign themselves up — accounts start here.
+ * Names are Last / First / Middle, not one Full name box (pahabol, Nov 24).
  */
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -14,6 +15,9 @@ type Teacher = {
   id: number
   username: string
   fullName: string | null
+  lastName: string
+  firstName: string
+  middleName: string
   email: string
   isActive: boolean
   sectionCount: number
@@ -23,7 +27,10 @@ type Teacher = {
 
 type Panel = { id: number; mode: 'view' | 'edit' | 'reset' } | null
 
-const EMPTY_FORM = { username: '', fullName: '', email: '', password: '' }
+const EMPTY_FORM = { lastName: '', firstName: '', middleName: '', username: '', email: '', password: '' }
+
+// [field, label] for the name parts — shared by the View and Edit panels
+const NAME_FIELDS = [['lastName', 'Last name'], ['firstName', 'First name'], ['middleName', 'Middle name']] as const
 
 /** A readable temporary password: letters + digits, always passes the rules. */
 function temporaryPassword(): string {
@@ -41,7 +48,7 @@ export default function AdminTeachersPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [panel, setPanel] = useState<Panel>(null)
-  const [editForm, setEditForm] = useState({ username: '', fullName: '', email: '' })
+  const [editForm, setEditForm] = useState({ lastName: '', firstName: '', middleName: '', username: '', email: '' })
   const [resetResult, setResetResult] = useState<{ id: number; password: string } | null>(null)
 
   const load = useCallback(async () => {
@@ -106,7 +113,7 @@ export default function AdminTeachersPage() {
 
   function togglePanel(t: Teacher, mode: 'view' | 'edit') {
     if (panel?.id === t.id && panel.mode === mode) { setPanel(null); return }
-    setEditForm({ username: t.username, fullName: t.fullName ?? '', email: t.email })
+    setEditForm({ lastName: t.lastName, firstName: t.firstName, middleName: t.middleName, username: t.username, email: t.email })
     setPanel({ id: t.id, mode })
   }
 
@@ -144,17 +151,21 @@ export default function AdminTeachersPage() {
       {showAdd && (
         <form onSubmit={createTeacher} className="space-y-3 rounded-2xl border border-[#ece8f5] bg-white p-5 shadow-sm">
           <p className="font-bold text-[#1f2430]">New teacher account</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             {([
-              ['fullName', 'Full name', 'Maria Santos', 'text'],
+              ['lastName', 'Last name', 'Santos', 'text'],
+              ['firstName', 'First name', 'Maria', 'text'],
+              ['middleName', 'Middle name', 'Reyes (optional)', 'text'],
               ['username', 'Username', 'msantos', 'text'],
               ['email', 'Email', 'msantos@school.edu.ph', 'email'],
               ['password', 'Password', 'min 8 chars, a letter & a number', 'text'],
             ] as const).map(([field, label, placeholder, type]) => (
               <div key={field}>
-                <label className="mb-1 block text-[11px] font-bold uppercase text-gray-500">{label}</label>
+                <label htmlFor={`new-${field}`} className="mb-1 block text-[11px] font-bold uppercase text-gray-500">{label}</label>
                 <input
+                  id={`new-${field}`}
                   type={type}
+                  required={field !== 'middleName'}
                   placeholder={placeholder}
                   value={form[field]}
                   onChange={e => setForm(prev => ({ ...prev, [field]: e.target.value }))}
@@ -220,7 +231,7 @@ export default function AdminTeachersPage() {
                     {open === 'view' && (
                       <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-[#ece8f5] bg-[#faf8ff] p-3 text-left text-xs">
                         {[
-                          ['Full name', t.fullName ?? '—'],
+                          ...NAME_FIELDS.map(([field, label]) => [label, t[field] || '—']),
                           ['Username', `@${t.username}`],
                           ['Email', t.email],
                           ['Status', t.isActive ? 'Active' : 'Deactivated'],
@@ -238,7 +249,7 @@ export default function AdminTeachersPage() {
 
                     {open === 'edit' && (
                       <div className="mt-3 space-y-2 rounded-xl border border-[#ece8f5] bg-[#faf8ff] p-3 text-left">
-                        {([['fullName', 'Full name'], ['username', 'Username'], ['email', 'Email']] as const).map(([field, label]) => (
+                        {([...NAME_FIELDS, ['username', 'Username'], ['email', 'Email']] as const).map(([field, label]) => (
                           <div key={field}>
                             <label className="mb-1 block text-[10px] font-bold uppercase text-gray-500">{label}</label>
                             <input

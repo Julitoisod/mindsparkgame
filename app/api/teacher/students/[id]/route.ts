@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { execute, hasColumn, query } from '@/lib/db'
 import { getSession, hashPassword } from '@/lib/auth'
 import { composeFullName } from '@/lib/enrollment'
+import { readNameParts } from '@/lib/classList'
 import type { EnrollmentStatus, User } from '@/types/user'
 
 interface RouteContext {
@@ -112,24 +113,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   // Names are edited as Last / First / Middle (panel revision, Aug 2026);
   // `full_name` is recomposed from them. A bare fullName is still accepted so
   // older callers keep working.
-  const namePartsGiven = ['lastName', 'firstName', 'middleName'].some(key => typeof body[key] === 'string')
-  if (namePartsGiven) {
-    const part = (value: unknown) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '')
-    const lastName = part(body.lastName)
-    const firstName = part(body.firstName)
-    const middleName = part(body.middleName)
-    if ([lastName, firstName, middleName].some(p => p.length > 60)) {
-      return NextResponse.json({ success: false, message: 'Each name part must be 60 characters or fewer.' }, { status: 422 })
-    }
-    const fullName = composeFullName(firstName, middleName, lastName)
-    updates.push('last_name = ?', 'first_name = ?', 'middle_name = ?')
-    params.push(lastName || null, firstName || null, middleName || null)
-    if (fullName) {
-      updates.push('full_name = ?')
-      params.push(fullName)
-    } else {
-      updates.push('full_name = NULL')
-    }
+  const names = readNameParts(body)
+  if (names && 'error' in names) {
+    return NextResponse.json({ success: false, message: names.error }, { status: 422 })
+  }
+  if (names) {
+    const { lastName, firstName, middleName } = names.parts
+    updates.push('last_name = ?', 'first_name = ?', 'middle_name = ?', 'full_name = ?')
+    // all blank → full_name NULL, as before
+    params.push(lastName || null, firstName || null, middleName || null, composeFullName(firstName, middleName, lastName))
   } else if (typeof body.fullName === 'string') {
     const fullName = body.fullName.trim().replace(/\s+/g, ' ')
     if (fullName === '') {

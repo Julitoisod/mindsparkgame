@@ -33,7 +33,7 @@ export function validateLogin(body: unknown): ValidationResult {
 
   const identifier = data.identifier ?? data.email
   if (!identifier || typeof identifier !== 'string' || identifier.trim().length === 0) {
-    errors.identifier = 'Username is required.'
+    errors.identifier = 'Email or username is required.'
   }
   if (!data.password || typeof data.password !== 'string') {
     errors.password = 'Password is required.'

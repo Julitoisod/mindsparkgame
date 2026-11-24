@@ -5,6 +5,8 @@
  * panel's suggested output: a classroom banner with "Update Classroom", tabs
  * for Sections and Class Details, a card per section ("View Students" opens
  * only that section's students) and an "Add Section" card.
+ * Pahabol (Nov 24): "Classroom Name" became the Section, shown in Class
+ * Details and editable in Update Classroom, where the old read-only list was.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -28,6 +30,19 @@ function schoolYearOptions(existing: (string | null)[]): string[] {
   return Array.from(years).sort()
 }
 
+/** A JSON request that throws the server's message when it fails. */
+async function sendJson(url: string, method: 'POST' | 'PATCH', body: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  const json = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message)
+  return json
+}
+
 const field = 'w-full rounded-xl border border-[#ddd5f0] bg-white px-3 py-2.5 text-sm text-[#1f2430] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#9B83F5] disabled:bg-[#f6f4fb] disabled:text-[#6f7187]'
 const label = 'mb-1 block text-xs font-bold text-[#374151]'
 
@@ -45,9 +60,10 @@ export default function TeacherClassroomPage() {
   const [draft, setDraft] = useState({ name: '', schoolYear: currentSchoolYear() })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
-  // Update Classroom modal
+  // Update Classroom modal: its Section field edits the section names
   const [modalOpen, setModalOpen] = useState(false)
   const [roomDraft, setRoomDraft] = useState<ClassroomInfo | null>(null)
+  const [sectionDrafts, setSectionDrafts] = useState<{ id: number; name: string }[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,14 +93,9 @@ export default function TeacherClassroomPage() {
     if (!draft.name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch('/api/teacher/classrooms', {
-        method: editingId ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ id: editingId ?? undefined, name: draft.name.trim(), schoolYear: draft.schoolYear }),
+      const json = await sendJson('/api/teacher/classrooms', editingId ? 'PATCH' : 'POST', {
+        id: editingId ?? undefined, name: draft.name.trim(), schoolYear: draft.schoolYear,
       })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.message)
       setSections(prev => (editingId ? prev.map(s => (s.id === editingId ? json.data : s)) : [json.data, ...prev]))
       toast.success(editingId ? 'Section updated' : 'Section added')
       closeSectionForm()
@@ -106,14 +117,16 @@ export default function TeacherClassroomPage() {
     if (!roomDraft) return
     setSaving(true)
     try {
-      const res = await fetch('/api/teacher/classroom', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(roomDraft),
+      // The Section field renames sections (pahabol, Nov 24), through the same
+      // endpoint as "Edit section", so its checks (2-80 chars, no duplicate) hold
+      for (const { id, name } of sectionDrafts) {
+        if (name.trim() === sections.find(s => s.id === id)?.name) continue
+        const renamed = await sendJson('/api/teacher/classrooms', 'PATCH', { id, name: name.trim() })
+        setSections(prev => prev.map(s => (s.id === id ? renamed.data : s)))
+      }
+      const json = await sendJson('/api/teacher/classroom', 'PATCH', {
+        gradeLevel: roomDraft.gradeLevel, schoolYear: roomDraft.schoolYear, isActive: roomDraft.isActive,
       })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.message)
       setRoom(json.data.classroom)
       setModalOpen(false)
       toast.success('Classroom updated')
@@ -146,7 +159,7 @@ export default function TeacherClassroomPage() {
           </div>
           <button
             type="button"
-            onClick={() => { setRoomDraft(room); setModalOpen(true) }}
+            onClick={() => { setRoomDraft(room); setSectionDrafts(sections.map(s => ({ id: s.id, name: s.name }))); setModalOpen(true) }}
             className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#5a3fd4] shadow hover:bg-[#f4efff]"
           >
             <Pencil className="h-4 w-4" /> Update Classroom
@@ -274,7 +287,8 @@ export default function TeacherClassroomPage() {
           </div>
           <dl className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { icon: School, k: 'Classroom Name', v: room?.name },
+              // "Classroom Name" → the section (pahabol, Nov 24)
+              { icon: Users, k: sections.length > 1 ? 'Sections' : 'Section', v: sections.map(s => s.name).join(', ') },
               { icon: GraduationCap, k: 'Grade Level', v: room?.gradeLevel },
               { icon: CalendarDays, k: 'Academic Year', v: formatSchoolYear(room?.schoolYear) },
               { icon: UserRound, k: 'Assigned Teacher', v: teacherName },
@@ -283,7 +297,7 @@ export default function TeacherClassroomPage() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f0eaff] text-[#6f54ba]"><item.icon className="h-5 w-5" /></span>
                 <div className="min-w-0">
                   <dt className="text-[11px] font-semibold text-[#8f88a1]">{item.k}</dt>
-                  <dd className="truncate text-sm font-bold text-[#1f2430]">{item.v || '—'}</dd>
+                  <dd className="truncate text-sm font-bold text-[#1f2430]" title={item.v || undefined}>{item.v || '—'}</dd>
                 </div>
               </div>
             ))}
@@ -300,9 +314,26 @@ export default function TeacherClassroomPage() {
               <button type="button" onClick={() => setModalOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-[#8f88a1] hover:bg-[#f4efff]"><X className="h-5 w-5" /></button>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              {/* Section, editable, where "Classroom Name" was (pahabol, Nov 24) */}
               <div>
-                <label className={label} htmlFor="room-name">Classroom Name *</label>
-                <input id="room-name" value={roomDraft.name} onChange={e => setRoomDraft({ ...roomDraft, name: e.target.value })} className={field} />
+                <label className={label} htmlFor={sectionDrafts[0] ? `room-section-${sectionDrafts[0].id}` : undefined}>Section *</label>
+                {sectionDrafts.length ? (
+                  <div className="space-y-2">
+                    {sectionDrafts.map((d, i) => (
+                      <input
+                        key={d.id}
+                        id={`room-section-${d.id}`}
+                        aria-label={i ? `Section ${i + 1}` : undefined}
+                        value={d.name}
+                        maxLength={80}
+                        onChange={e => setSectionDrafts(prev => prev.map(p => (p.id === d.id ? { ...p, name: e.target.value } : p)))}
+                        className={field}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-[#ece8f5] bg-[#f6f4fb] px-3 py-2.5 text-sm text-[#6f7187]">No section yet: add one under Sections</p>
+                )}
               </div>
               <div>
                 <label className={label} htmlFor="room-sy">Academic Year *</label>
@@ -322,10 +353,6 @@ export default function TeacherClassroomPage() {
                 </select>
               </div>
               <div>
-                <span className={label}>Sections</span>
-                <p className="rounded-xl border border-[#ece8f5] bg-[#f6f4fb] px-3 py-2.5 text-sm text-[#6f7187]">{sections.length ? sections.map(s => s.name).join(', ') : 'None yet'}</p>
-              </div>
-              <div>
                 <span className={label}>Status</span>
                 <button
                   type="button"
@@ -343,7 +370,7 @@ export default function TeacherClassroomPage() {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-[#ddd5f0] px-4 py-2.5 text-sm font-bold text-[#5f5677]">Cancel</button>
-              <button type="submit" disabled={saving || roomDraft.name.trim().length < 2} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7c5cf0] to-[#5a3fd4] px-5 py-2.5 text-sm font-bold text-[#fff] shadow disabled:opacity-50">
+              <button type="submit" disabled={saving || sectionDrafts.some(d => d.name.trim().length < 2)} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7c5cf0] to-[#5a3fd4] px-5 py-2.5 text-sm font-bold text-[#fff] shadow disabled:opacity-50">
                 <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Changes'}
               </button>
             </div>

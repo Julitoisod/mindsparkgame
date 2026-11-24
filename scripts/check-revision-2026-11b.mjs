@@ -44,7 +44,7 @@ const teacher = `rv${stamp}`
 await createTeacher(BASE, { username: teacher, email: `${teacher}@mindspark.test`, password: PASS })
 const tBox = { v: '' }
 await api(tBox, '/api/auth/login', { identifier: teacher, password: PASS })
-await api(tBox, '/api/account', { fullName: 'Raffy Santos' }, 'PATCH')
+await api(tBox, '/api/account', { lastName: 'Santos', firstName: 'Raffy' }, 'PATCH')
 const rizal = (await api(tBox, '/api/teacher/classrooms', { name: `Rizal ${stamp}`, schoolYear: '2026-2027' })).json.data
 const winter = (await api(tBox, '/api/teacher/classrooms', { name: `Winter ${stamp}`, schoolYear: '2026-2027' })).json.data
 const people = [
@@ -167,7 +167,7 @@ await page.close()
 page = await browser.newPage()
 await page.setViewport({ width: 1440, height: 900 })
 await page.goto(`${BASE}/teacher-login`, { waitUntil: 'networkidle2' })
-await page.type('input[placeholder="hero123"]', teacher)
+await page.type('#portal-email', `${teacher}@mindspark.test`)
 await page.type('input[type="password"]', PASS)
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), clickText('Sign In')])
 check(await waitFor(async () => /Level Performance/.test(await text()), 20000), 'teacher dashboard shows Level Performance')
@@ -186,19 +186,19 @@ check(/Grade 5 Mathematics/.test(body) && /Academic Year/.test(body) && /Section
 await shot('t02-classroom-sections')
 await clickText('Update Classroom')
 await waitFor(() => page.$('[data-testid="update-classroom"]'), 5000)
-await page.focus('#room-name')
-await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control')
-await page.keyboard.press('Backspace')
-await page.type('#room-name', 'Grade 5 Math — Mabini')
+// Pahabol (Nov 24): no typed classroom name any more — the Section field
+// (renaming is proven in check-pahabol-2026-11.mjs); here: the update saves
 await wait(300)
+check(await page.evaluate(() => document.querySelectorAll('[id^="room-section-"]').length) === 2, 'Update Classroom lists both sections in its Section field')
 await shot('t03-update-classroom-modal')
 await clickText('Save Changes')
-check(await waitFor(() => page.evaluate(() => document.querySelector('[data-page="teacher-classroom"] h2')?.textContent === 'Grade 5 Math — Mabini'), 6000), 'teacher updates the classroom name')
+check(await waitFor(() => page.evaluate(() => !document.querySelector('[data-testid="update-classroom"]')), 6000), 'teacher saves the classroom update')
 await clickText('Class Details')
 await wait(600)
 check(/Classroom Information/.test(await text()) && /Assigned Teacher/.test(await text()), 'Class Details tab shows the classroom information')
 await shot('t04-class-details')
-check((await api(tBox, '/api/teacher/classroom')).json.data.classroom.name === 'Grade 5 Math — Mabini', 'classroom update is saved in the database')
+const [[savedRoom]] = await db.query('SELECT grade_level FROM teacher_classrooms tc JOIN users u ON u.id = tc.teacher_id WHERE u.username = ?', [teacher])
+check(savedRoom?.grade_level === 'Grade 5' && (await api(tBox, '/api/teacher/classroom')).json.data.classroom.name === 'Grade 5 Mathematics', 'classroom update is saved in the database')
 
 // View Students → only that section
 await clickText('Sections (2)')
@@ -250,7 +250,7 @@ await page.close()
 page = await browser.newPage()
 await page.setViewport({ width: 1440, height: 900 })
 await page.goto(`${BASE}/admin-login`, { waitUntil: 'networkidle2' })
-await page.type('input[placeholder="hero123"]', process.env.ADMIN_USER ?? 'admin')
+await page.type('#portal-email', process.env.ADMIN_EMAIL ?? 'admin@mindspark.local')
 await page.type('input[type="password"]', process.env.ADMIN_PASS ?? 'Admin@12345')
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), clickText('Sign In')])
 check(await waitFor(async () => /Student Enrollment Overview/.test(await text()), 20000), 'admin dashboard: Student Enrollment Overview')

@@ -15,6 +15,10 @@ type Account = {
   id: number
   username: string
   fullName: string | null
+  // stored parts, or a guess from fullName for older accounts (namePartsOf)
+  lastName: string
+  firstName: string
+  middleName: string
   email: string
   role: 'admin' | 'teacher' | 'student'
   createdAt: string
@@ -38,7 +42,7 @@ export default function AccountSettings({ roleLabel }: { roleLabel: string }) {
   const [tab, setTab] = useState<Tab>('profile')
   const [account, setAccount] = useState<Account | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [form, setForm] = useState({ fullName: '', username: '', email: '' })
+  const [form, setForm] = useState({ lastName: '', firstName: '', middleName: '', username: '', email: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -54,7 +58,8 @@ export default function AccountSettings({ roleLabel }: { roleLabel: string }) {
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.message)
       setAccount(json.data)
-      setForm({ fullName: json.data.fullName ?? '', username: json.data.username, email: json.data.email })
+      const { lastName, firstName, middleName, username, email } = json.data as Account
+      setForm({ lastName, firstName, middleName, username, email })
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Could not load your account')
     }
@@ -128,6 +133,9 @@ export default function AccountSettings({ roleLabel }: { roleLabel: string }) {
               </div>
             </div>
             <dl className="mt-6 grid gap-3 sm:grid-cols-2">
+              <ProfileRow icon={UserRound} label="Last name" value={account.lastName || '—'} />
+              <ProfileRow icon={UserRound} label="First name" value={account.firstName || '—'} />
+              <ProfileRow icon={UserRound} label="Middle name" value={account.middleName || '—'} />
               <ProfileRow icon={UserRound} label="Username" value={`@${account.username}`} />
               <ProfileRow icon={Mail} label="Email" value={account.email} />
               <ProfileRow icon={CalendarDays} label="Member since" value={new Date(account.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })} />
@@ -152,15 +160,21 @@ export default function AccountSettings({ roleLabel }: { roleLabel: string }) {
         {tab === 'edit' && (
           <form onSubmit={saveAccount} className="max-w-lg space-y-4" data-testid="account-edit">
             <h3 className="text-lg font-black text-[#1f2430]">Edit Account Information</h3>
+            {/* Last / First / Middle, not one Full name box (pahabol, Nov 24) */}
             {([
-              ['fullName', 'Full name', 'text'],
-              ['username', 'Username', 'text'],
-              ['email', 'Email', 'email'],
-            ] as const).map(([field, label, type]) => (
+              ['lastName', 'Last name', 'text', 'family-name', true],
+              ['firstName', 'First name', 'text', 'given-name', true],
+              ['middleName', 'Middle name', 'text', 'additional-name', false],
+              ['username', 'Username', 'text', 'username', true],
+              ['email', 'Email', 'email', 'email', true],
+            ] as const).map(([field, label, type, autoComplete, required]) => (
               <label key={field} className="block">
                 <span className="mb-1 block text-[11px] font-bold uppercase text-[#6f7187]">{label}</span>
                 <input
                   type={type}
+                  autoComplete={autoComplete}
+                  required={required}
+                  placeholder={required ? undefined : 'Optional'}
                   value={form[field]}
                   onChange={e => setForm(prev => ({ ...prev, [field]: e.target.value }))}
                   className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9B83F5]"

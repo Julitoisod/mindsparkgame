@@ -25,3 +25,7 @@ android/.gradle/
 # Nov 2026 panel proof screenshots — regenerate with node scripts/check-panel-revision.mjs
 proof-screenshots/panel-2026-11/
 proof-screenshots/revision-2026-11b/
+proof-screenshots/pahabol-2026-11/
+
+# Panel note whose screenshot shows teachers' Gmail addresses: keep it off the public repo
+pahabol-minor-revised.docx

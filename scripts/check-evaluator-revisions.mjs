@@ -51,7 +51,7 @@ ok('item 1 — admin can sign in and is routed as an admin')
 
 const newTeacher = `teach${stamp}`
 const created = await api(adminBox, '/api/admin/teachers', {
-  username: newTeacher, fullName: 'Evaluator Demo', email: `${newTeacher}@school.test`, password: TEACHER_PASS,
+  username: newTeacher, lastName: 'Demo', firstName: 'Evaluator', email: `${newTeacher}@school.test`, password: TEACHER_PASS,
 })
 if (created.status !== 201) throw new Error(`admin could not create a teacher: ${created.json.message}`)
 ok('item 1 — admin created a teacher account')
@@ -61,7 +61,7 @@ const listed = await api(adminBox, '/api/admin/teachers', null, 'GET')
 if (!listed.json.data?.some(t => t.id === teacherId)) throw new Error('new teacher missing from the admin list')
 ok('item 1 — admin can view teacher accounts')
 
-await api(adminBox, `/api/admin/teachers/${teacherId}`, { fullName: 'Evaluator Demo (edited)' }, 'PATCH')
+await api(adminBox, `/api/admin/teachers/${teacherId}`, { lastName: 'Demo (edited)', firstName: 'Evaluator' }, 'PATCH')
 const edited = await api(adminBox, '/api/admin/teachers', null, 'GET')
 if (edited.json.data.find(t => t.id === teacherId)?.fullName !== 'Evaluator Demo (edited)') {
   throw new Error('teacher edit did not stick')
@@ -170,7 +170,7 @@ const clickText = text => page.evaluate(t => {
 
 // Separate links: the admin is refused on the teacher page, in the real UI
 await page.goto(`${BASE}/teacher-login`, { waitUntil: 'networkidle2' })
-await typeInto('input[placeholder="hero123"]', 'admin')
+await typeInto('#portal-email', process.env.ADMIN_EMAIL ?? 'admin@mindspark.local')
 await typeInto('input[type="password"]', 'Admin@12345')
 await clickText('Sign In')
 await wait(2500)
@@ -185,7 +185,7 @@ ok('item 1 — the teacher sign-in page tells the admin to use its own link')
 await page.goto(`${BASE}/admin-login`, { waitUntil: 'networkidle2' })
 await wait(800)
 await shot('eval-00a-admin-login-page')
-await typeInto('input[placeholder="hero123"]', 'admin')
+await typeInto('#portal-email', process.env.ADMIN_EMAIL ?? 'admin@mindspark.local')
 await typeInto('input[type="password"]', 'Admin@12345')
 await clickText('Sign In')
 // Nov 2026: admins land on the Admin Dashboard, Teacher Management is one click away
@@ -197,7 +197,7 @@ ok('item 1 — admin UI lists teacher accounts')
 
 // Teacher UI: nav order + Enrollment page
 await page.goto(`${BASE}/teacher-login`, { waitUntil: 'networkidle2' })
-await typeInto('input[placeholder="hero123"]', workTeacher)
+await typeInto('#portal-email', `${workTeacher}@mindspark.test`)
 await typeInto('input[type="password"]', TEACHER_PASS)
 await clickText('Sign In')
 await waitForUrl('/teacher/dashboard')

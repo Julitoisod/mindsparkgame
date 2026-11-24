@@ -11,6 +11,9 @@
  *   - UTF-8 (with or without BOM), UTF-16 ("Unicode Text") and ANSI files
  * An .xlsx/.xls file gets a clear "save it as CSV" message instead.
  *
+ * Also home to the Last / First / Middle helpers the account forms share
+ * (namePartsOf, readNameParts).
+ *
  * Pure and import-free so `node scripts/check-runs.mts` can test it.
  */
 
@@ -22,6 +25,8 @@ type Column = 'last' | 'first' | 'middle' | 'full'
 const HEADER_SCAN_ROWS = 15
 // Surname particles that belong to the last name: "Juan Dela Cruz"
 const PARTICLES = new Set(['de', 'del', 'dela', 'delos', 'los', 'la', 'las', 'san', 'santa', 'sta', 'sta.', 'van', 'von', 'di', 'da', 'du'])
+// A middle initial: "D." or "D"
+const INITIAL = /^[A-Za-z]\.?$/
 
 export const CLASS_LIST_TEMPLATE = 'Last Name,First Name,Middle Name\nSantos,John Mark,Cruz\nDela Cruz,Ana,Reyes\n'
 
@@ -88,7 +93,7 @@ export function splitFullName(raw: string): ClassListStudent {
     if (rest.length >= 2) return { lastName: last, firstName: rest[0], middleName: rest.slice(1).join(' ').trim() }
     const given = (rest[0] ?? '').split(' ').filter(Boolean)
     // a trailing initial is the middle name: "Santos, Maria Clara D."
-    if (given.length > 1 && /^[A-Za-z]\.?$/.test(given[given.length - 1])) {
+    if (given.length > 1 && INITIAL.test(given[given.length - 1])) {
       return { lastName: last, firstName: given.slice(0, -1).join(' '), middleName: given[given.length - 1] }
     }
     return { lastName: last, firstName: given.join(' '), middleName: '' }
@@ -97,7 +102,44 @@ export function splitFullName(raw: string): ClassListStudent {
   if (parts.length <= 1) return { lastName: '', firstName: parts[0] ?? '', middleName: '' }
   let cut = parts.length - 1
   while (cut > 1 && PARTICLES.has(parts[cut - 1].toLowerCase())) cut--
-  return { lastName: parts.slice(cut).join(' '), firstName: parts.slice(0, cut).join(' '), middleName: '' }
+  const lastName = parts.slice(cut).join(' ')
+  // an initial just before the surname is the middle name: "Shea L. Manzano"
+  if (cut >= 2 && INITIAL.test(parts[cut - 1])) {
+    return { lastName, firstName: parts.slice(0, cut - 1).join(' '), middleName: parts[cut - 1] }
+  }
+  return { lastName, firstName: parts.slice(0, cut).join(' '), middleName: '' }
+}
+
+export type NameParts = ClassListStudent
+
+/**
+ * An account's Last / First / Middle for the edit forms (panel pahabol, Nov 24:
+ * "LAST NAME, FIRST NAME, MIDDLE NAME, not directly FULL NAME"). Accounts made
+ * before the parts were stored only have `full_name`, so they get a best guess
+ * from it, which the form lets the admin or teacher correct.
+ */
+export function namePartsOf(row: { lastName: string | null; firstName: string | null; middleName: string | null; fullName: string | null }): NameParts {
+  if (row.lastName || row.firstName) {
+    return { lastName: row.lastName ?? '', firstName: row.firstName ?? '', middleName: row.middleName ?? '' }
+  }
+  return splitFullName(row.fullName ?? '')
+}
+
+// users.last_name / first_name / middle_name are VARCHAR(60)
+const NAME_PART_MAX = 60
+
+/**
+ * Last / First / Middle from a request body, trimmed, inner blanks collapsed.
+ * null when the body sends none of them; with `required`, Last and First must
+ * be filled in (Middle never is: not everyone has one).
+ */
+export function readNameParts(body: Record<string, unknown>, { required = false } = {}): { parts: NameParts } | { error: string } | null {
+  if (!['lastName', 'firstName', 'middleName'].some(key => typeof body[key] === 'string')) return null
+  const clean = (value: unknown) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '')
+  const parts = { lastName: clean(body.lastName), firstName: clean(body.firstName), middleName: clean(body.middleName) }
+  if (Object.values(parts).some(part => part.length > NAME_PART_MAX)) return { error: `Each name part must be ${NAME_PART_MAX} characters or fewer.` }
+  if (required && (!parts.lastName || !parts.firstName)) return { error: 'Last name and first name are required.' }
+  return { parts }
 }
 
 export function parseClassList(text: string): ClassListResult {

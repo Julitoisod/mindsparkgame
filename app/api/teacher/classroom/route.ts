@@ -2,7 +2,8 @@
  * The teacher's Classroom information (panel revision, Nov 2026b).
  *
  * GET   /api/teacher/classroom  → { classroom, teacherName }
- * PATCH /api/teacher/classroom  { name, gradeLevel, schoolYear, isActive }
+ * PATCH /api/teacher/classroom  { gradeLevel, schoolYear, isActive } — the title
+ *                                follows the grade level (pahabol, Nov 24)
  *
  * Sections stay on /api/teacher/classrooms — this is the classroom they sit in.
  */

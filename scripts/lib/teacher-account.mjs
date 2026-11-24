@@ -3,7 +3,8 @@
  * administrator creates their accounts. Harness scripts therefore create their
  * throwaway teacher through the admin API.
  *
- * ADMIN_USER / ADMIN_PASS override the local default admin account.
+ * ADMIN_USER / ADMIN_PASS override the local default admin account (API sign-in;
+ * the web sign-in pages take ADMIN_EMAIL since the Nov 24 pahabol).
  */
 export async function createTeacher(base, { username, email, password }) {
   const admin = {
@@ -21,7 +22,7 @@ export async function createTeacher(base, { username, email, password }) {
   const res = await fetch(`${base}/api/admin/teachers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', cookie },
-    body: JSON.stringify({ username, email, password, fullName: username }),
+    body: JSON.stringify({ username, email, password, lastName: 'Teacher', firstName: username }),
   })
   const json = await res.json().catch(() => ({}))
   if (res.status !== 201) throw new Error(`could not create teacher ${username}: ${json.message ?? res.status}`)

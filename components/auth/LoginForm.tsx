@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, LogIn, Eye, EyeOff, Mail } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { isStudentApp } from '@/lib/appTarget'
 import type { LoginPortal } from '@/types/user'
@@ -34,13 +34,16 @@ export default function LoginForm({ theme = 'default', portal }: { theme?: 'defa
     e.preventDefault()
     const errs: Record<string, string> = {}
 
-    if (!identifier) errs.identifier = 'Username is required'
+    // Admin and teachers sign in with their email (pahabol, Nov 24); students
+    // keep their username
+    if (!identifier.trim()) errs.identifier = student ? 'Username is required' : 'Email is required'
+    else if (!student && !EMAIL_PATTERN.test(identifier.trim())) errs.identifier = 'Enter a valid email address'
     if (!password) errs.password = 'Password is required'
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
     setLoading(true)
     setErrors({})
-    const user = await login({ identifier, password, portal })
+    const user = await login({ identifier: identifier.trim(), password, portal })
 
     // The student app is student-only — block teacher sign-ins here (req #1)
     if (studentApp && (user?.role === 'teacher' || user?.role === 'admin')) {
@@ -98,12 +101,14 @@ export default function LoginForm({ theme = 'default', portal }: { theme?: 'defa
         </div>
       ) : (
         // Portal (admin / teacher) fields follow the panel's sign-in mockups
-        // (Nov 2026b): a round icon badge, the label above, a white pill input
-        <PortalField label="Username" icon={User} error={errors.identifier} htmlFor="portal-username">
+        // (Nov 2026b): a round icon badge, the label above, a white pill input.
+        // Email, not username (pahabol, Nov 24)
+        <PortalField label="Email" icon={Mail} error={errors.identifier} htmlFor="portal-email">
           <input
-            id="portal-username"
-            type="text"
-            placeholder="hero123"
+            id="portal-email"
+            type="email"
+            inputMode="email"
+            placeholder="name@school.edu.ph"
             autoComplete="username"
             value={identifier}
             onChange={e => setIdentifier(e.target.value)}
@@ -185,6 +190,8 @@ export default function LoginForm({ theme = 'default', portal }: { theme?: 'defa
     </motion.form>
   )
 }
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const portalInput =
   'w-full rounded-full border border-[#d9d0f5] bg-white px-4 py-2.5 text-sm text-[#22326f] placeholder-[#22326f]/40 shadow-inner transition-all focus:border-[#6255E8] focus:outline-none focus:ring-2 focus:ring-[#9B83F5]/40'

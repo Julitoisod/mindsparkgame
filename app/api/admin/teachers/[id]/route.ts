@@ -1,7 +1,7 @@
 /**
  * Admin — edit or deactivate one teacher (2026-10b revision, item 1).
  *
- * PATCH /api/admin/teachers/:id   { fullName?, email?, username?, password?, isActive? }
+ * PATCH /api/admin/teachers/:id   { lastName?, firstName?, middleName?, email?, username?, password?, isActive? }
  *
  * Deactivating is deliberately a flag, not a delete: a teacher's sections,
  * students and questions all reference this row.
@@ -10,6 +10,8 @@ import { NextResponse } from 'next/server'
 import { describeDbError, execute, hasColumn, query } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { requireAdmin } from '@/lib/adminAuth'
+import { composeFullName } from '@/lib/enrollment'
+import { readNameParts } from '@/lib/classList'
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin()
@@ -31,7 +33,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   const body = await request.json().catch(() => ({}))
   const updates: string[] = []
-  const params: (string | number)[] = []
+  const params: (string | number | null)[] = []
 
   if (typeof body.username === 'string' && body.username.trim()) {
     const username = body.username.trim()
@@ -40,8 +42,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (clash.length) return NextResponse.json({ success: false, message: 'Username already in use' }, { status: 409 })
     updates.push('username = ?'); params.push(username)
   }
-  if (typeof body.fullName === 'string') {
-    updates.push('full_name = ?'); params.push(body.fullName.trim())
+  // Last / First / Middle (pahabol, Nov 24); full_name is composed from them
+  const names = readNameParts(body, { required: true })
+  if (names && 'error' in names) return NextResponse.json({ success: false, message: names.error }, { status: 400 })
+  if (names) {
+    const { lastName, firstName, middleName } = names.parts
+    updates.push('last_name = ?', 'first_name = ?', 'middle_name = ?', 'full_name = ?')
+    params.push(lastName, firstName, middleName || null, composeFullName(firstName, middleName, lastName))
   }
   if (typeof body.email === 'string' && body.email.trim()) {
     const email = body.email.trim()

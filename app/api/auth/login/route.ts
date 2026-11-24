@@ -39,7 +39,11 @@ export async function POST(request: Request) {
   const password = data.password
 
   try {
+    // Admin and teachers sign in with their email (pahabol, Nov 24); students
+    // with their username. One message for "no such account" and "wrong
+    // password", so the reply never tells which accounts exist.
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
+    const badCredentials = isEmail ? 'Invalid email or password' : 'Invalid username or password'
     // is_active arrives with 2026-10b; fall back so a deploy that lands before
     // its migration still logs people in.
     const activeColumn = (await hasColumn('users', 'is_active')) ? 'is_active' : '1 AS is_active'
@@ -57,13 +61,13 @@ export async function POST(request: Request) {
     // Constant-time response for non-existent users (prevent user enumeration)
     if (!rows.length || !rows[0].password_hash) {
       await verifyPassword(password, '$2a$12$invalidsaltplaceholderinvalid00')
-      return NextResponse.json({ success: false, message: 'Invalid username or password' }, { status: 401 })
+      return NextResponse.json({ success: false, message: badCredentials }, { status: 401 })
     }
 
     const user = rows[0]
     const valid2 = await verifyPassword(password, user.password_hash!)
     if (!valid2) {
-      return NextResponse.json({ success: false, message: 'Invalid email or password' }, { status: 401 })
+      return NextResponse.json({ success: false, message: badCredentials }, { status: 401 })
     }
 
     // A teacher the admin deactivated keeps their data but cannot sign in (item 1)

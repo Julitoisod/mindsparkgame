@@ -11,11 +11,16 @@ import { NextResponse } from 'next/server'
 import { describeDbError, execute, hasColumn, query } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { requireAdmin } from '@/lib/adminAuth'
+import { composeFullName } from '@/lib/enrollment'
+import { namePartsOf, readNameParts } from '@/lib/classList'
 
 interface TeacherRow {
   id: number
   username: string
   fullName: string | null
+  lastName: string | null
+  firstName: string | null
+  middleName: string | null
   email: string
   isActive: number
   createdAt: string
@@ -34,6 +39,7 @@ export async function GET() {
          u.id,
          u.username,
          u.full_name AS fullName,
+         u.last_name AS lastName, u.first_name AS firstName, u.middle_name AS middleName,
          u.email,
          ${activeColumn} AS isActive,
          u.created_at AS createdAt,
@@ -45,7 +51,7 @@ export async function GET() {
     )
     return NextResponse.json({
       success: true,
-      data: rows.map(r => ({ ...r, isActive: Boolean(r.isActive) })),
+      data: rows.map(r => ({ ...r, ...namePartsOf(r), isActive: Boolean(r.isActive) })),
     })
   } catch (error) {
     console.error('[admin/teachers] GET', error)
@@ -62,9 +68,15 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}))
   const username = String(body.username ?? '').trim()
-  const fullName = String(body.fullName ?? '').trim()
   const email = String(body.email ?? '').trim()
   const password = String(body.password ?? '')
+  // Last / First / Middle, not one "Full name" box (pahabol, Nov 24)
+  const names = readNameParts(body, { required: true }) ?? { error: 'Last name and first name are required.' }
+  if ('error' in names) {
+    return NextResponse.json({ success: false, message: names.error, errors: { name: names.error } }, { status: 400 })
+  }
+  const { lastName, firstName, middleName } = names.parts
+  const fullName = composeFullName(firstName, middleName, lastName)
 
   const errors: Record<string, string> = {}
   if (username.length < 3) errors.username = 'Username must be at least 3 characters.'
@@ -86,15 +98,15 @@ export async function POST(request: Request) {
 
   try {
     const result = await execute(
-      `INSERT INTO users (username, full_name, email, password_hash, role, enrollment_status)
-       VALUES (?, ?, ?, ?, 'teacher', 'enrolled')`,
-      [username, fullName || null, email, await hashPassword(password)],
+      `INSERT INTO users (username, full_name, last_name, first_name, middle_name, email, password_hash, role, enrollment_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'teacher', 'enrolled')`,
+      [username, fullName, lastName, firstName, middleName || null, email, await hashPassword(password)],
     )
     return NextResponse.json({
       success: true,
       message: 'Teacher account created',
       data: {
-        id: result.insertId, username, fullName: fullName || null, email,
+        id: result.insertId, username, fullName, lastName, firstName, middleName, email,
         isActive: true, sectionCount: 0, studentCount: 0, createdAt: new Date().toISOString(),
       },
     }, { status: 201 })
