@@ -5,7 +5,7 @@
  *   node scripts/icon/build-icons.mjs
  *
  * Source art (Nov 2026): the panel's MindSpark Math knight logo,
- * scripts/icon/mindspark-logo.webp. Android rounds the corners itself — the
+ * scripts/icon/mindspark-logo.webp. Corners: baked in (slightly rounded) on the legacy icons; on Android 8+ the
  * launcher masks every adaptive icon to its own shape (squircle or circle).
  * Uses the Playwright Chromium already on this machine — no image library.
  */
@@ -31,23 +31,28 @@ const LOGO = `data:image/webp;base64,${fs.readFileSync(path.join(HERE, 'mindspar
 // The logo's own edge blue — also ic_launcher_background, so the scaled-down
 // adaptive foreground melts into the launcher tile with no visible seam.
 const EDGE_BLUE = '#0140AE'
-// Legacy square icon: the logo, full bleed
-const square = `<img src="${LOGO}" style="width:100%;height:100%;display:block">`
-// Adaptive foreground (108dp canvas): the logo shrunk so its art sits inside the
-// launcher's safe zone, its edges feathered into the background colour
+// Legacy icon (Android 7 and older): the whole logo with slightly rounded
+// corners baked in (panel, Nov 24: "round lang gamay ang each corner")
+const CORNER = '18%'
+const square = `<img src="${LOGO}" style="width:100%;height:100%;display:block;border-radius:${CORNER}">`
+// Adaptive foreground (108dp canvas): the launcher only shows the inner 72dp
+// (2/3), so the WHOLE logo is sized to that window — no fade, no crop. 67.5%
+// overscans by <1% so no seam shows at the mask edge. The launcher's own mask
+// rounds the corners. ponytail: the mask shape (rounded square vs circle) is the
+// phone's choice; Android has no way for an app to force it.
 const foreground = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${EDGE_BLUE}">
-  <img src="${LOGO}" style="width:80%;height:80%;display:block;-webkit-mask-image:radial-gradient(circle,#000 58%,transparent 71%);mask-image:radial-gradient(circle,#000 58%,transparent 71%)">
+  <img src="${LOGO}" style="width:67.5%;height:67.5%;display:block">
 </div>`
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new' })
 const page = await browser.newPage()
 
-/** Rasterise an SVG at an exact pixel size, optionally clipped to a circle. */
-async function render(svg, size, outFile, { round = false } = {}) {
+/** Rasterise markup at an exact pixel size, transparent where it draws nothing. */
+async function render(svg, size, outFile) {
   const html = `<!doctype html><meta charset="utf-8">
     <style>
       html,body{margin:0;padding:0;background:transparent}
-      #w{width:${size}px;height:${size}px;overflow:hidden;${round ? 'border-radius:50%;' : ''}}
+      #w{width:${size}px;height:${size}px;overflow:hidden}
       #w > *{width:${size}px;height:${size}px;display:block}
     </style>
     <div id="w">${svg}</div>`
@@ -61,7 +66,8 @@ for (const [density, size] of DENSITIES) {
   const dir = path.join(RES, `mipmap-${density}`)
   fs.mkdirSync(dir, { recursive: true })
   await render(square, size, path.join(dir, 'ic_launcher.png'))
-  await render(square, size, path.join(dir, 'ic_launcher_round.png'), { round: true })
+  // round icon = same rounded tile, so no launcher shows a circle crop of it
+  await render(square, size, path.join(dir, 'ic_launcher_round.png'))
   console.log(`  mipmap-${density}: ic_launcher + round @ ${size}px`)
 }
 
